@@ -7,11 +7,19 @@ export const dynamic = "force-dynamic";
 
 export default async function PayoutsPage() {
   const s = await getSettings();
-  const supabase = createServerSupabase();
-  const [{ data: deposits }, { data: withdrawals }] = await Promise.all([
-    supabase.from("user_deposits").select("amount,tx,created_at").order("created_at", { ascending: false }).limit(20),
-    supabase.from("user_withdrawal").select("amount,tx,created_at,status").order("created_at", { ascending: false }).limit(20),
-  ]);
+  let deposits: Array<{ amount: number; tx: string | null; created_at: string }> = [];
+  let withdrawals: Array<{ amount: number; tx: string | null; created_at: string; status: string }> = [];
+  try {
+    const supabase = createServerSupabase();
+    const [d, w] = await Promise.all([
+      supabase.from("user_deposits").select("amount,tx,created_at").order("created_at", { ascending: false }).limit(20),
+      supabase.from("user_withdrawal").select("amount,tx,created_at,status").order("created_at", { ascending: false }).limit(20),
+    ]);
+    deposits = ((d as { data: unknown }).data ?? []) as typeof deposits;
+    withdrawals = ((w as { data: unknown }).data ?? []) as typeof withdrawals;
+  } catch {
+    // DB unreachable — render empty lists.
+  }
   return (
     <div className="space-y-6 py-6">
       <h1 className="text-3xl font-bold">Live payouts</h1>

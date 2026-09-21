@@ -9,9 +9,17 @@ export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
   const settings = await getSettings();
-  const supabase = createServerSupabase();
-  const { data: plans } = await supabase.from("plans").select("*").order("price", { ascending: true });
-  const { count: totalUsers } = await supabase.from("profiles").select("id", { count: "exact", head: true });
+  let plans: Array<{ id: number; plan_name: string; version: string | null; price: number; point_per_day: number | null; duration: number; profit: string | null; speed: string }> = [];
+  let totalUsers = 0;
+  try {
+    const supabase = createServerSupabase();
+    const { data: p } = await supabase.from("plans").select("*").order("price", { ascending: true });
+    const { count } = await supabase.from("profiles").select("id", { count: "exact", head: true });
+    plans = (p ?? []) as typeof plans;
+    totalUsers = count ?? 0;
+  } catch {
+    // DB unreachable (e.g. env not configured) — render with empty catalog.
+  }
 
   return (
     <div className="space-y-8 py-6">

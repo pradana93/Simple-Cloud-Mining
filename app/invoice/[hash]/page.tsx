@@ -4,8 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 export const dynamic = "force-dynamic";
 
 export default async function InvoicePage({ params }: { params: { hash: string } }) {
-  const supabase = createServerSupabase();
-  const { data: inv } = await supabase.from("transactions_history").select("*").eq("hash", params.hash).maybeSingle();
+  let inv: { amount: number; status: string; params: { address?: string; amount?: string; timeout?: number } | null; date: string } | null = null;
+  try {
+    const supabase = createServerSupabase();
+    const { data } = await supabase.from("transactions_history").select("*").eq("hash", params.hash).maybeSingle();
+    inv = data as typeof inv;
+  } catch {
+    inv = null;
+  }
   if (!inv) return <p className="py-10">Invoice not found.</p>;
   const tx = inv as { amount: number; status: string; params: { address?: string; amount?: string; timeout?: number } | null; date: string };
   const p = (tx.params ?? {}) as { address?: string; amount?: string; timeout?: number };

@@ -8,8 +8,14 @@ export const dynamic = "force-dynamic";
 
 export default async function PurchasePage({ params }: { params: { planId: string } }) {
   const s = await getSettings();
-  const supabase = createServerSupabase();
-  const { data: plan } = await supabase.from("plans").select("*").eq("id", Number(params.planId)).maybeSingle();
+  let plan: { id: number; plan_name: string; price: number; version: string | null } | null = null;
+  try {
+    const supabase = createServerSupabase();
+    const { data } = await supabase.from("plans").select("*").eq("id", Number(params.planId)).maybeSingle();
+    plan = data as typeof plan;
+  } catch {
+    plan = null;
+  }
   if (!plan) return <p className="py-10">Plan not found.</p>;
   return (
     <div className="mx-auto max-w-lg py-10">

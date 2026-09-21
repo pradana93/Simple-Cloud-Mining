@@ -11,8 +11,14 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const supabase = createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  let userId: string | null = null;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    userId = user?.id ?? null;
+  } catch {
+    userId = null;
+  }
+  if (!userId) {
     return (
       <div className="py-10 text-center">
         <p className="mb-4">Please login to view your dashboard.</p>
@@ -21,11 +27,11 @@ export default async function DashboardPage() {
     );
   }
   // Lazy accrual: Hobby cron runs daily only, so credit on view.
-  await accrueOwnPlans(supabase, user.id);
+  await accrueOwnPlans(supabase, userId);
   const s = await getSettings();
   const [{ data: profile }, { data: activePlans }, { data: paidPlans }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-    supabase.from("user_plan_history").select("*, plan:plans(*)").eq("user_id", user.id).eq("status", "active"),
+    supabase.from("profiles").select("*").eq("id", userId).maybeSingle(),
+    supabase.from("user_plan_history").select("*, plan:plans(*)").eq("user_id", userId).eq("status", "active"),
     supabase.from("plans").select("*").order("price"),
   ]);
   const rate = totalMiningRate((activePlans ?? []).map((r: { plan: { earning_rate: number | null } }) => ({ earning_rate: r.plan?.earning_rate ?? null })));

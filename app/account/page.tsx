@@ -8,18 +8,24 @@ export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
   const supabase = createServerSupabase();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
+  let userId: string | null = null;
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    userId = user?.id ?? null;
+  } catch {
+    userId = null;
+  }
+  if (!userId) {
     return <div className="py-10 text-center"><Link href="/login"><Button>Login</Button></Link></div>;
   }
   // Lazy accrual: Hobby cron runs daily only, so credit on view.
-  await accrueOwnPlans(supabase, user.id);
+  await accrueOwnPlans(supabase, userId);
   const [referrals, aff, deposits, withdrawals, pending] = await Promise.all([
-    supabase.from("profiles").select("username,created_at").eq("reference_user_id", user.id).order("created_at", { ascending: false }),
-    supabase.from("affiliate_history").select("*").eq("user_id", user.id).order("date", { ascending: false }),
-    supabase.from("user_deposits").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-    supabase.from("user_withdrawal").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-    supabase.from("transactions_history").select("*").eq("user_id", user.id).neq("status", "paid").order("date", { ascending: false }),
+    supabase.from("profiles").select("username,created_at").eq("reference_user_id", userId).order("created_at", { ascending: false }),
+    supabase.from("affiliate_history").select("*").eq("user_id", userId).order("date", { ascending: false }),
+    supabase.from("user_deposits").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+    supabase.from("user_withdrawal").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+    supabase.from("transactions_history").select("*").eq("user_id", userId).neq("status", "paid").order("date", { ascending: false }),
   ]);
   return (
     <div className="space-y-6 py-6">
