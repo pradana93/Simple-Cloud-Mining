@@ -3,7 +3,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { accrueForPlan } from "@/lib/mining";
 
 /**
- * GET /api/cron/accrue — Vercel Cron every 5 min.
+ * GET /api/cron/accrue — Vercel Cron daily (00:00 UTC, Hobby free-tier limit).
  * Port of Users_model::updateUserBalance() applied to ALL active plans.
  * Protect with CRON_SECRET header/query in production.
  */

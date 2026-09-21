@@ -2,6 +2,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { accrueOwnPlans } from "@/lib/accrue-user";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,8 @@ export default async function AccountPage() {
   if (!user) {
     return <div className="py-10 text-center"><Link href="/login"><Button>Login</Button></Link></div>;
   }
+  // Lazy accrual: Hobby cron runs daily only, so credit on view.
+  await accrueOwnPlans(supabase, user.id);
   const [referrals, aff, deposits, withdrawals, pending] = await Promise.all([
     supabase.from("profiles").select("username,created_at").eq("reference_user_id", user.id).order("created_at", { ascending: false }),
     supabase.from("affiliate_history").select("*").eq("user_id", user.id).order("date", { ascending: false }),

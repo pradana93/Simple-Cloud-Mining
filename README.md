@@ -30,7 +30,7 @@ Migrated from [`pradana93/Simple-Cloud-Mining`](https://github.com/pradana93/Sim
    - `COINPAYMENTS_MERCHANT_ID`, `COINPAYMENTS_IPN_SECRET`, (+ API keys if `coin_mode=api`)
    - `NEXT_PUBLIC_SITE_URL`, `CRON_SECRET`
 3. **Run** — `npm install`, `npm run dev`. Verify with `npm run build`.
-4. **Deploy (Vercel)** — import repo, add the same env vars, deploy. Cron (`vercel.json`) hits `/api/cron/accrue` every 5 min; set `CRON_SECRET`. CoinPayments IPN URL: `https://YOUR-DOMAIN/api/ipn/coinpayments`.
+4. **Deploy (Vercel)** — import repo, add the same env vars, deploy. Cron (`vercel.json`) hits `/api/cron/accrue` daily at 00:00 UTC (Vercel Hobby free-tier limit is one cron run per day); per-request accrual in `lib/accrue-user.ts` keeps balances fresh between runs. Set `CRON_SECRET`. CoinPayments IPN URL: `https://YOUR-DOMAIN/api/ipn/coinpayments`.
 
 ## Security notes
 

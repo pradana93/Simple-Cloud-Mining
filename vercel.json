@@ -3,7 +3,7 @@
   "crons": [
     {
       "path": "/api/cron/accrue",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }

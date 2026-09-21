@@ -5,6 +5,7 @@ import { totalMiningRate } from "@/lib/mining";
 import { formatCrypto } from "@/lib/utils";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { accrueOwnPlans } from "@/lib/accrue-user";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ export default async function DashboardPage() {
       </div>
     );
   }
+  // Lazy accrual: Hobby cron runs daily only, so credit on view.
+  await accrueOwnPlans(supabase, user.id);
   const s = await getSettings();
   const [{ data: profile }, { data: activePlans }, { data: paidPlans }] = await Promise.all([
     supabase.from("profiles").select("*").eq("id", user.id).maybeSingle(),
