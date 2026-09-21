@@ -1,0 +1,32 @@
+{
+  "description": "SCM - Simple Cloud Mining Script",
+  "type": "project",
+  "homepage": "https://smartyscripts.com",
+  "version": "3.15.0",
+  "require": {
+	"php": ">=7.1",
+	"ext-json": "*",
+	"coinpaymentsnet/coinpayments-php": "^1.3",
+    "seunmatt/codeigniter-log-viewer": "^1.1",
+	"block_io-php/block_io-php": "2.0.2",
+	"bitwasp/bitcoin": "dev-minimal",
+	"ext-curl": "*"
+  },
+  "suggest": {
+	"paragonie/random_compat": "Provides better randomness in PHP 5.x"
+  },
+  "require-dev": {
+	"roave/security-advisories": "dev-master",
+	"mikey179/vfsstream": "1.6.*",
+	"phpunit/phpunit": "4.* || 5.* || 9.*"
+  },
+  "repositories": [
+	{
+	  "type": "git",
+	  "url": "https://github.com/doersf/bitcoin-php.git"
+	}
+  ],
+  "autoload": {
+	"classmap": ["vendor/coinpaymentsnet/coinpayments-php/src"]
+  }
+}
