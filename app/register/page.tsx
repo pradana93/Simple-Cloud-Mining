@@ -8,47 +8,38 @@ import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-function getRefCookie(): string | null {
-  const m = document.cookie.match(/(?:^|; )ref=([^;]+)/);
-  return m ? decodeURIComponent(m[1]) : null;
-}
-
 export default function RegisterPage() {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
+  const [msg, setMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   async function submit(fd: FormData) {
     setErr(null);
+    setMsg(null);
     setLoading(true);
     try {
       const supabase = createClient();
       const username = String(fd.get("username"));
       const email = String(fd.get("email"));
       const password = String(fd.get("password"));
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error || !data.user) {
-        setErr(error?.message ?? "Signup failed");
-        return;
-      }
-      const ref = getRefCookie();
-      let reference_user_id: string | null = null;
-      if (ref) {
-        const { data: upline } = await supabase.from("profiles").select("id").eq("unique_id", Number(ref)).maybeSingle();
-        if (upline) reference_user_id = (upline as { id: string }).id;
-      }
-      const { error: pErr } = await supabase.from("profiles").insert({
-        id: data.user.id,
-        username,
+      // Username travels as auth metadata — the DB trigger creates the
+      // profile + free miner server-side (no RLS failure possible).
+      // Referral cookie is consumed on first dashboard visit.
+      const { data, error } = await supabase.auth.signUp({
         email,
-        unique_id: Math.floor(10000 + Math.random() * 89999),
-        reference_user_id,
+        password,
+        options: { data: { username } },
       });
-      if (pErr) {
-        setErr(pErr.message);
+      if (error) {
+        setErr(error.message);
         return;
       }
-      router.push("/dashboard");
-      router.refresh();
+      if (data.session) {
+        router.push("/dashboard");
+        router.refresh();
+      } else {
+        setMsg("Account created — confirm your email, then sign in. Your free miner activates on first login.");
+      }
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Signup failed");
     } finally {
@@ -100,6 +91,7 @@ export default function RegisterPage() {
             </Button>
           </form>
           {err && <p className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{err}</p>}
+          {msg && <p className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{msg}</p>}
           <p className="mt-6 text-center text-sm text-slate-400">
             Have an account?{" "}
             <Link href="/login" className="font-semibold text-gold-300 hover:text-gold-400">

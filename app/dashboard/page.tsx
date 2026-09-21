@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import {
   ArrowUpRight,
   Gauge,
@@ -13,6 +14,7 @@ import { getCachedSettings } from "@/lib/catalog";
 import { totalMiningRate } from "@/lib/mining";
 import { formatCrypto } from "@/lib/utils";
 import { accrueOwnPlans } from "@/lib/accrue-user";
+import { ensureProfile } from "@/lib/ensure-profile";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 
@@ -32,9 +34,13 @@ function planOf(r: ActiveRow) {
 export default async function DashboardPage() {
   const supabase = createServerSupabase();
   let userId: string | null = null;
+  let userEmail: string | null = null;
+  let usernameMeta: string | null = null;
   try {
     const { data: { user } } = await supabase.auth.getUser();
     userId = user?.id ?? null;
+    userEmail = user?.email ?? null;
+    usernameMeta = ((user as { user_metadata?: { username?: string } } | null)?.user_metadata?.username ?? null);
   } catch {
     userId = null;
   }
@@ -57,6 +63,10 @@ export default async function DashboardPage() {
       </div>
     );
   }
+  // Self-heal: profile + referral + free plan (covers any signup edge case),
+  // then lazy accrual for the Hobby-tier daily cron.
+  const refCookie = cookies().get("ref")?.value ?? null;
+  await ensureProfile({ userId, email: userEmail, usernameMeta, refUniqueId: refCookie });
   await accrueOwnPlans(supabase, userId);
   const s = await getCachedSettings();
   type ProfileLite = { balance: number; username: string };
