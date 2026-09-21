@@ -1,7 +1,7 @@
 import { createServerSupabase } from "./supabase/server";
 import type { SiteSettings } from "./types";
 
-const FALLBACK: SiteSettings = {
+export const FALLBACK: SiteSettings = {
   id: 1,
   sitename: "Simple Cloud Mining",
   siteslogan: "Invest like rich",
