@@ -58,7 +58,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => setItems((v) => v.filter((x) => x.id !== t.id))}
               aria-label="Dismiss"
-              className="rounded-md p-0.5 text-slate-400 transition-colors hover:text-white"
+              className="tap -mr-2 grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 transition-colors hover:text-white"
             >
               <X size={14} />
             </button>

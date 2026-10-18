@@ -198,7 +198,7 @@ export function ChatConsole({ initialThreads }: { initialThreads: ChatThread[] }
           )}
         </aside>
 
-        <section className={cn("panel flex h-[32rem] flex-col overflow-hidden rounded-3xl", !active && "hidden lg:flex")}>
+        <section className={cn("panel flex h-[min(70vh,32rem)] flex-col overflow-hidden rounded-3xl", !active && "hidden lg:flex")}>
           {!active ? (
             <div className="grid flex-1 place-items-center px-6 text-center text-sm text-slate-400">
               Pick a conversation to read and reply.
@@ -209,7 +209,7 @@ export function ChatConsole({ initialThreads }: { initialThreads: ChatThread[] }
                 <button
                   onClick={() => setActive(null)}
                   aria-label="Back to conversations"
-                  className="tap grid h-9 w-9 place-items-center rounded-lg text-slate-300 hover:bg-white/5 lg:hidden"
+                  className="tap grid h-11 w-11 place-items-center rounded-lg text-slate-300 hover:bg-white/5 lg:hidden"
                 >
                   <ArrowLeft size={17} />
                 </button>

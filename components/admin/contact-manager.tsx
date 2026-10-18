@@ -86,7 +86,7 @@ export function ContactManager({ rows }: { rows: AdminMessage[] }) {
                           onClick={() => setStatus(m, s)}
                           disabled={busy || m.status === s}
                           className={cn(
-                            "tap rounded-md px-2.5 py-1.5 text-[11px] font-semibold capitalize transition-colors disabled:opacity-100",
+                            "tap min-h-[44px] rounded-md px-2.5 py-1.5 text-[11px] font-semibold capitalize transition-colors disabled:opacity-100",
                             m.status === s ? "bg-gold-500 text-ink-950" : "text-slate-300 hover:text-white"
                           )}
                         >

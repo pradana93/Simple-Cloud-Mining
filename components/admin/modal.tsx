@@ -53,7 +53,7 @@ export function Modal({
           <button
             onClick={onClose}
             aria-label="Close dialog"
-            className="tap grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white"
+            className="tap grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white"
           >
             <X size={18} />
           </button>

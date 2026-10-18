@@ -238,7 +238,7 @@ export function UsersManager({
                 aria-checked={mode === v}
                 onClick={() => setMode(v)}
                 className={cn(
-                  "tap rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+                  "tap min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
                   mode === v ? "bg-gold-500 text-ink-950" : "text-slate-300 hover:text-white"
                 )}
               >

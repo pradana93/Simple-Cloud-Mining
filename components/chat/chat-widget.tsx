@@ -153,7 +153,7 @@ export default function ChatWidget() {
             <button
               onClick={() => setOpen(false)}
               aria-label="Close chat"
-              className="tap grid h-9 w-9 place-items-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white"
+              className="tap grid h-11 w-11 place-items-center rounded-lg text-slate-400 hover:bg-white/5 hover:text-white"
             >
               <X size={17} />
             </button>

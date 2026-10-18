@@ -20,7 +20,7 @@ export default async function PurchasePage({ params }: { params: { planId: strin
   }
   if (!plan) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
+      <div className="mx-auto max-w-lg py-12 text-center sm:py-16">
         <h1 className="font-display text-2xl font-bold text-white">Plan not found</h1>
         <Link href="/#plans" className="mt-4 inline-block text-sm font-semibold text-gold-300">← Back to plans</Link>
       </div>
@@ -34,7 +34,7 @@ export default async function PurchasePage({ params }: { params: { planId: strin
       <div className="panel rounded-3xl p-7 sm:p-9">
         <h1 className="font-display text-3xl font-bold text-white">{plan.plan_name}</h1>
         <p className="mt-1 text-sm text-slate-400">{plan.version ?? ""} · {plan.duration}-day contract</p>
-        <div className="mt-6 grid grid-cols-3 gap-3 text-center">
+        <div className="mt-6 grid gap-3 text-center sm:grid-cols-3">
           {[
             ["Price", `${formatCrypto(Number(plan.price), s.currency_decimals)} ${s.currency_code}`],
             ["Daily yield", `+${formatCrypto(Number(plan.point_per_day ?? 0), s.currency_decimals)}`],
@@ -42,7 +42,7 @@ export default async function PurchasePage({ params }: { params: { planId: strin
           ].map(([k, v]) => (
             <div key={k} className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/10">
               <p className="text-[11px] font-medium text-slate-400">{k}</p>
-              <p className="font-display mt-1 text-sm font-bold text-white sm:text-base">{v}</p>
+              <p className="font-display mt-1 break-words text-sm font-bold text-white sm:text-base">{v}</p>
             </div>
           ))}
         </div>

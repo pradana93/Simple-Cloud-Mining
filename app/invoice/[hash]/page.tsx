@@ -25,7 +25,7 @@ export default async function InvoicePage({ params }: { params: { hash: string }
   }
   if (!inv) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
+      <div className="mx-auto max-w-lg py-12 text-center sm:py-16">
         <h1 className="font-display text-2xl font-bold text-white">Invoice not found</h1>
         <Link href="/dashboard" className="mt-4 inline-block text-sm font-semibold text-gold-300">Back to console</Link>
       </div>
@@ -49,7 +49,7 @@ export default async function InvoicePage({ params }: { params: { hash: string }
           )}
         </div>
         <h1 className="font-display mt-4 text-2xl font-bold text-white sm:text-3xl">Complete your payment</h1>
-        <p className="mt-1 font-mono text-xs text-slate-400">Invoice {params.hash}</p>
+        <p className="mt-1 break-all font-mono text-xs text-slate-400">Invoice {params.hash}</p>
 
         {p.address ? (
           <div className="mt-6 space-y-4">

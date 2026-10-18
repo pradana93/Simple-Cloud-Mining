@@ -230,7 +230,7 @@ export function WithdrawConsole({
               <p className="mt-1 text-sm text-slate-400">No active rigs are adding to this balance.</p>
             )}
           </div>
-          <div className="grid grid-cols-3 gap-3 text-center">
+          <div className="grid gap-3 text-center sm:grid-cols-3">
             <div className="rounded-2xl bg-white/5 px-4 py-3">
               <p className="text-[11px] text-slate-400">Minimum</p>
               <p className="font-mono text-sm tabular-nums text-slate-100">{money(min)}</p>
@@ -401,7 +401,7 @@ export function WithdrawConsole({
                 aria-selected={filter === f}
                 onClick={() => setFilter(f)}
                 className={cn(
-                  "tap rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
+                  "tap min-h-[44px] rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
                   filter === f ? "bg-gold-500 text-ink-950" : "text-slate-300 hover:text-white"
                 )}
               >
@@ -455,7 +455,7 @@ export function WithdrawConsole({
                       {w.tx && (
                         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3 text-xs">
                           <span className="text-slate-400">Transaction</span>
-                          <span className="font-mono text-slate-200">{w.tx}</span>
+                          <span className="min-w-0 break-all font-mono text-slate-200">{w.tx}</span>
                         </div>
                       )}
                     </div>

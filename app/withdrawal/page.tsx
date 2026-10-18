@@ -26,7 +26,7 @@ export default async function WithdrawalPage() {
 
   if (!userId) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
+      <div className="mx-auto max-w-lg py-12 text-center sm:py-16">
         <span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-gold-500/15 text-gold-300">
           <Wallet size={28} />
         </span>

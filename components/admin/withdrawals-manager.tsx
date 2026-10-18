@@ -95,7 +95,7 @@ export function WithdrawalsManager({
               aria-selected={filter === f}
               onClick={() => setFilter(f)}
               className={cn(
-                "tap rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
+                "tap min-h-[44px] rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors",
                 filter === f ? "bg-gold-500 text-ink-950" : "text-slate-300 hover:text-white"
               )}
             >

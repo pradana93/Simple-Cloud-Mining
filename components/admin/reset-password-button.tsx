@@ -57,7 +57,7 @@ export function ResetPasswordButton({ userId, username }: { userId: string; user
       {pw && (
         <div className="animate-scale-in flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1.5">
           <code className="font-mono text-xs text-emerald-200">{pw}</code>
-          <button onClick={copy} aria-label="Copy new password" className="text-emerald-300 transition-colors hover:text-white">
+          <button onClick={copy} aria-label="Copy new password" className="tap grid h-11 w-11 shrink-0 place-items-center rounded-lg text-emerald-300 transition-colors hover:text-white">
             {copied ? <Check size={13} /> : <Copy size={13} />}
           </button>
         </div>

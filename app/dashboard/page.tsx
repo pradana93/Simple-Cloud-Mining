@@ -50,9 +50,9 @@ function txVariant(status: string): "green" | "gold" | "red" | "slate" {
 
 function Readout({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
   return (
-    <div className="border-t-2 border-gold-500/60 pt-3">
+    <div className="min-w-0 border-t-2 border-gold-500/60 pt-3">
       <p className="text-[11px] font-medium text-slate-400">{label}</p>
-      <p className="font-mono mt-1.5 text-2xl font-medium tabular-nums text-white">{children}</p>
+      <p className="font-mono mt-1.5 break-words text-xl font-medium tabular-nums text-white sm:text-2xl">{children}</p>
       {hint && <p className="mt-0.5 text-[11px] text-slate-400">{hint}</p>}
     </div>
   );
@@ -73,7 +73,7 @@ export default async function DashboardPage() {
   }
   if (!userId) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
+      <div className="mx-auto max-w-lg py-12 text-center sm:py-16">
         <h1 className="font-display mt-6 text-3xl font-bold text-white">Your console awaits</h1>
         <p className="mt-3 text-slate-400">Sign in to monitor rigs, earnings and payouts.</p>
         <div className="mt-7 flex justify-center gap-3">
@@ -256,7 +256,7 @@ export default async function DashboardPage() {
               )}
               <p className="mt-3 text-xs text-slate-400">{nextPayout}</p>
             </div>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-6">
               <Readout label="Live hashrate" hint={`${s.currency_code} per minute`}>
                 <CountUp value={rate} decimals={8} />
               </Readout>

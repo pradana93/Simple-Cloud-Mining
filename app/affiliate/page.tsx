@@ -8,7 +8,7 @@ export default async function AffiliatePage() {
   const [s, c] = await Promise.all([getCachedSettings(), getCachedContents()]);
   return (
     <div className="space-y-10 py-8 sm:py-12">
-      <div className="panel rounded-3xl border-gold-500/20 px-6 py-12 sm:px-12">
+      <div className="panel rounded-3xl border-gold-500/20 px-6 py-10 sm:px-12 sm:py-14">
         <h1 className="font-display max-w-xl text-4xl font-bold leading-tight text-white sm:text-5xl">
           Earn <span className="gold-text">{s.aff_comission}%</span> for life on every referral
           upgrade.

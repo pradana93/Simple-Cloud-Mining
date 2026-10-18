@@ -150,8 +150,8 @@ export function SiteHeaderClient({ sitename }: { sitename: string }) {
 
       <div
         className={cn(
-          "overflow-hidden border-white/5 transition-[max-height,opacity] duration-300 md:hidden",
-          open ? "max-h-[70vh] border-t opacity-100" : "max-h-0 opacity-0"
+          "border-white/5 transition-[max-height,opacity] duration-300 md:hidden",
+          open ? "max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t opacity-100" : "max-h-0 overflow-hidden opacity-0"
         )}
       >
         <div className="panel m-3 rounded-2xl p-3">

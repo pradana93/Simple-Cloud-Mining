@@ -68,7 +68,7 @@ export function PlanExplorer({
               aria-selected={sort === m}
               onClick={() => setSort(m)}
               className={cn(
-                "rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                "min-h-[44px] rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
                 sort === m ? "bg-gold-500 text-ink-950" : "text-slate-300 hover:text-white"
               )}
             >

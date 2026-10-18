@@ -81,7 +81,7 @@ function SettingsControl({
             aria-checked={value === o.value}
             onClick={() => onChange(o.value)}
             className={cn(
-              "tap rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
+              "tap min-h-[44px] rounded-lg px-4 py-2 text-sm font-semibold transition-colors",
               value === o.value ? "bg-gold-500 text-ink-950" : "text-slate-300 hover:text-white"
             )}
           >
@@ -151,7 +151,7 @@ function SettingsControl({
           type="button"
           onClick={() => setReveal((v) => !v)}
           aria-label={reveal ? "Hide value" : "Show value"}
-          className="absolute right-1.5 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-slate-400 hover:text-white"
+          className="absolute right-1.5 top-1/2 grid h-11 w-11 -translate-y-1/2 place-items-center rounded-lg text-slate-400 hover:text-white"
         >
           {reveal ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
@@ -308,7 +308,7 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
 
   return (
     <div className="space-y-6">
-      <div className="panel sticky top-16 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4 backdrop-blur">
+      <div className="panel sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4 backdrop-blur">
         <div className="min-w-0">
           <h1 className="font-display text-xl font-bold text-white">Site settings</h1>
           <p className="truncate text-xs text-slate-400">

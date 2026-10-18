@@ -36,7 +36,7 @@ export default async function AccountPage() {
   }
   if (!userId) {
     return (
-      <div className="mx-auto max-w-lg py-16 text-center">
+      <div className="mx-auto max-w-lg py-12 text-center sm:py-16">
         <h1 className="font-display text-3xl font-bold text-white">Sign in required</h1>
         <Link href="/login" className="mt-6 inline-flex h-11 items-center rounded-xl bg-gold-500 px-6 font-display text-sm font-bold text-ink-950 transition-colors hover:bg-gold-400">
           Sign in

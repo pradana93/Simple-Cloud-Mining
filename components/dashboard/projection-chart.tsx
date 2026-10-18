@@ -61,7 +61,7 @@ export function ProjectionChart({
               aria-selected={days === h}
               onClick={() => setDays(h)}
               className={cn(
-                "tap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+                "tap min-h-[44px] rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
                 days === h ? "bg-gold-500 text-ink-950" : "text-slate-300 hover:text-white"
               )}
             >

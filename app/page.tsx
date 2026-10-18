@@ -11,8 +11,8 @@ export const revalidate = 60;
 
 function Metric({ children, label }: { children: React.ReactNode; label: string }) {
   return (
-    <div className="border-t-2 border-gold-500/70 pt-3">
-      <div className="font-mono text-2xl font-medium tabular-nums text-white">{children}</div>
+    <div className="min-w-0 border-t-2 border-gold-500/70 pt-3">
+      <div className="font-mono break-words text-xl font-medium tabular-nums text-white sm:text-2xl">{children}</div>
       <div className="mt-1 text-xs text-slate-400">{label}</div>
     </div>
   );
@@ -123,7 +123,7 @@ export default async function HomePage() {
 
       <Reveal>
         <section className="grid gap-6 md:grid-cols-[1.4fr_1fr]">
-          <Card className="p-8">
+          <Card className="p-6 sm:p-8">
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gold-500/15 text-gold-300">
               <Activity size={22} />
             </span>
@@ -153,7 +153,7 @@ export default async function HomePage() {
       </Reveal>
 
       <Reveal>
-        <section className="rounded-3xl border border-white/10 px-6 py-12 sm:px-12">
+        <section className="rounded-3xl border border-white/10 px-6 py-10 sm:px-12 sm:py-14">
           <h2 className="font-display max-w-lg text-3xl font-bold text-white sm:text-4xl">
             Create an account and the free miner starts immediately.
           </h2>

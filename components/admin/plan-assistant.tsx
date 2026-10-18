@@ -89,7 +89,7 @@ export function PlanAssistant({
             key={ex}
             type="button"
             onClick={() => setGoal(ex)}
-            className="tap rounded-full border border-slate-700 px-3 py-1 text-[11px] text-slate-300 hover:border-gold-500/50 hover:text-white"
+            className="tap inline-flex min-h-[44px] items-center rounded-full border border-slate-700 px-3 py-1 text-[11px] text-slate-300 hover:border-gold-500/50 hover:text-white"
           >
             {ex}
           </button>

@@ -71,7 +71,7 @@ export function ActivityFeed({
             aria-selected={filter === f.label}
             onClick={() => setFilter(f.label)}
             className={cn(
-              "tap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
+              "tap min-h-[44px] rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors",
               filter === f.label ? "bg-gold-500 text-ink-950" : "text-slate-300 hover:bg-white/5 hover:text-white"
             )}
           >

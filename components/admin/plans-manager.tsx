@@ -331,7 +331,7 @@ export function PlansManager({
               <Input id="p-name" value={draft.plan_name} onChange={(e) => set("plan_name", e.target.value)} className={invalid("plan_name")} placeholder="Plan V1.3" />
               {errors.plan_name && <p className="mt-1.5 text-xs text-red-300">{errors.plan_name}</p>}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="p-version">Version label</Label>
                 <Input id="p-version" value={draft.version} onChange={(e) => set("version", e.target.value)} placeholder="V1.3" />
@@ -341,7 +341,7 @@ export function PlansManager({
                 <Input id="p-speed" value={draft.speed} onChange={(e) => set("speed", e.target.value)} placeholder="50 KH/s" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="p-price">Price ({code})</Label>
                 <Input id="p-price" type="number" min={0} step="any" value={draft.price} onChange={(e) => set("price", e.target.value)} className={invalid("price")} />
@@ -353,7 +353,7 @@ export function PlansManager({
                 {errors.point_per_day && <p className="mt-1.5 text-xs text-red-300">{errors.point_per_day}</p>}
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <Label htmlFor="p-duration">Duration (days)</Label>
                 <Input id="p-duration" type="number" min={1} step={1} value={draft.duration} onChange={(e) => set("duration", e.target.value)} className={invalid("duration")} />

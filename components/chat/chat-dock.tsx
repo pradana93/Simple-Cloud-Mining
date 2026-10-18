@@ -16,5 +16,11 @@ export function ChatDock() {
   }, []);
 
   if (!signedIn || pathname.startsWith("/admin")) return null;
-  return <ChatWidget />;
+  // Reserve room so the fixed support button never sits over the last of the footer.
+  return (
+    <>
+      <div className="h-20" aria-hidden />
+      <ChatWidget />
+    </>
+  );
 }
