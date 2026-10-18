@@ -21,7 +21,7 @@ export const getCachedSettings = unstable_cache(
     }
   },
   ["site-settings"],
-  { revalidate: 300 }
+  { revalidate: 300, tags: ["site-settings"] }
 );
 
 export const getCachedPlans = unstable_cache(
@@ -37,7 +37,7 @@ export const getCachedPlans = unstable_cache(
     }
   },
   ["plans"],
-  { revalidate: 60 }
+  { revalidate: 60, tags: ["plans"] }
 );
 
 export const getCachedFaqs = unstable_cache(
@@ -50,7 +50,7 @@ export const getCachedFaqs = unstable_cache(
     }
   },
   ["faqs"],
-  { revalidate: 300 }
+  { revalidate: 300, tags: ["faqs"] }
 );
 
 export const getCachedContents = unstable_cache(
@@ -69,7 +69,7 @@ export const getCachedContents = unstable_cache(
     }
   },
   ["contents"],
-  { revalidate: 300 }
+  { revalidate: 300, tags: ["contents"] }
 );
 
 export type PayoutEntry = {
@@ -96,7 +96,7 @@ export const getCachedPayouts = unstable_cache(
     }
   },
   ["payouts"],
-  { revalidate: 30 }
+  { revalidate: 30, tags: ["payouts"] }
 );
 
 export const getCachedStats = unstable_cache(
@@ -120,5 +120,5 @@ export const getCachedStats = unstable_cache(
     }
   },
   ["site-stats"],
-  { revalidate: 60 }
+  { revalidate: 60, tags: ["site-stats"] }
 );
