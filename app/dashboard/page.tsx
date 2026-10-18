@@ -9,6 +9,8 @@ import { accrueOwnPlans } from "@/lib/accrue-user";
 import { ensureProfile } from "@/lib/ensure-profile";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Reveal } from "@/components/motion/reveal";
+import { CountUp } from "@/components/motion/count-up";
 
 export const dynamic = "force-dynamic";
 
@@ -45,10 +47,10 @@ export default async function DashboardPage() {
         <h1 className="font-display mt-6 text-3xl font-bold text-white">Your console awaits</h1>
         <p className="mt-3 text-slate-400">Sign in to monitor rigs, earnings and payouts.</p>
         <div className="mt-7 flex justify-center gap-3">
-          <Link href="/login" className="inline-flex h-11 items-center rounded-xl bg-gold-500 px-6 font-display text-sm font-bold text-ink-950 transition-colors hover:bg-gold-400">
+          <Link href="/login" className="tap inline-flex h-11 items-center rounded-xl bg-gold-500 px-6 font-display text-sm font-bold text-ink-950 hover:bg-gold-400">
             Sign in
           </Link>
-          <Link href="/register" className="panel inline-flex h-11 items-center rounded-xl px-6 font-display text-sm font-semibold text-white">
+          <Link href="/register" className="tap panel inline-flex h-11 items-center rounded-xl px-6 font-display text-sm font-semibold text-white hover:border-gold-500/40">
             Create account
           </Link>
         </div>
@@ -87,102 +89,112 @@ export default async function DashboardPage() {
           {profile?.username ? `Hey, ${profile.username}` : "Dashboard"}
         </h1>
         <div className="flex gap-2">
-          <Link href="/account" className="panel inline-flex h-11 items-center gap-1.5 rounded-xl px-4 text-sm font-semibold text-slate-200 hover:border-gold-500/40">
+          <Link href="/account" className="tap panel inline-flex h-11 items-center gap-1.5 rounded-xl px-4 text-sm font-semibold text-slate-200 hover:border-gold-500/40">
             <History size={15} /> History
           </Link>
-          <Link href="/withdrawal" className="inline-flex h-11 items-center gap-1.5 rounded-xl bg-gold-500 px-4 font-display text-sm font-bold text-ink-950 transition-colors hover:bg-gold-400">
+          <Link href="/withdrawal" className="tap inline-flex h-11 items-center gap-1.5 rounded-xl bg-gold-500 px-4 font-display text-sm font-bold text-ink-950 hover:bg-gold-400">
             <WalletMinimal size={15} /> Withdraw
           </Link>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <div className="panel rounded-3xl border-t-2 border-t-gold-500/70 p-6">
-          <p className="text-xs font-medium text-slate-400">Balance</p>
-          <p className="font-mono mt-2 text-3xl font-medium tabular-nums text-white">
-            {formatCrypto(balance, s.currency_decimals)}
-          </p>
-          <p className="mt-1 text-sm text-slate-400">{s.currency_code}, withdrawable</p>
-        </div>
-        <div className="panel rounded-3xl p-6">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
-            <Gauge size={13} className="text-gold-400" /> Live hashrate
-          </p>
-          <p className="font-mono mt-2 text-3xl font-medium tabular-nums text-white">{formatCrypto(rate, 8)}</p>
-          <p className="mt-1 text-sm text-slate-400">per minute across {activePlans.length} rig{activePlans.length === 1 ? "" : "s"}</p>
-        </div>
-        <div className="panel rounded-3xl p-6">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
-            <Pickaxe size={13} className="text-emerald-400" /> Active rigs
-          </p>
-          <p className="font-mono mt-2 text-3xl font-medium tabular-nums text-white">{activePlans.length}</p>
-          <p className="mt-1 text-sm text-slate-400">contracts hashing now</p>
-        </div>
-      </div>
-
-      <section>
-        <h2 className="font-display mb-4 text-xl font-bold text-white">Active rigs</h2>
-        {activePlans.length === 0 ? (
-          <Card className="p-8 text-center">
-            <p className="text-slate-300">No rigs hashing yet.</p>
-            <p className="mt-1 text-sm text-slate-400">Claim the free plan or deploy a paid miner below.</p>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {activePlans.map((r) => {
-              const p = planOf(r);
-              return (
-                <div key={r.id} className="panel card-hover rounded-2xl p-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <span className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300">
-                        <Pickaxe size={20} />
-                      </span>
-                      <div>
-                        <p className="font-display font-bold text-white">{p?.plan_name ?? "Miner"} {p?.version ?? ""}</p>
-                        <p className="text-xs text-slate-400">Expires {r.expire_date ? new Date(r.expire_date).toLocaleDateString() : "never"}</p>
-                      </div>
-                    </div>
-                    <Badge variant="green">Hashing</Badge>
-                  </div>
-                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
-                    <div className="h-full w-full rounded-full bg-gradient-to-r from-emerald-400 to-gold-400" />
-                  </div>
-                  <p className="mt-2 text-xs text-slate-400">
-                    {formatCrypto(Number(p?.earning_rate ?? 0), 8)} per minute to your balance
-                  </p>
-                </div>
-              );
-            })}
+      <Reveal>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="panel rounded-3xl border-t-2 border-t-gold-500/70 p-6">
+            <p className="text-xs font-medium text-slate-400">Balance</p>
+            <p className="font-mono mt-2 text-3xl font-medium tabular-nums text-white">
+              <CountUp value={balance} decimals={s.currency_decimals} />
+            </p>
+            <p className="mt-1 text-sm text-slate-400">{s.currency_code}, withdrawable</p>
           </div>
-        )}
-      </section>
+          <div className="panel rounded-3xl p-6">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
+              <Gauge size={13} className="text-gold-400" /> Live hashrate
+            </p>
+            <p className="font-mono mt-2 text-3xl font-medium tabular-nums text-white">
+              <CountUp value={rate} decimals={8} />
+            </p>
+            <p className="mt-1 text-sm text-slate-400">per minute across {activePlans.length} rig{activePlans.length === 1 ? "" : "s"}</p>
+          </div>
+          <div className="panel rounded-3xl p-6">
+            <p className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
+              <Pickaxe size={13} className="text-emerald-400" /> Active rigs
+            </p>
+            <p className="font-mono mt-2 text-3xl font-medium tabular-nums text-white">
+              <CountUp value={activePlans.length} />
+            </p>
+            <p className="mt-1 text-sm text-slate-400">contracts hashing now</p>
+          </div>
+        </div>
+      </Reveal>
 
-      <section>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-display text-xl font-bold text-white">Deploy more power</h2>
-          <Link href="/#plans" className="text-sm font-semibold text-gold-300 hover:text-gold-400">
-            Compare all plans
-          </Link>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {paidPlans.map((p) => (
-            <div key={p.id} className="panel card-hover flex flex-col rounded-2xl p-5">
-              <p className="font-display font-bold text-white">{p.plan_name}</p>
-              <p className="font-mono mt-1 text-2xl font-medium tabular-nums text-gold-300">
-                {formatCrypto(Number(p.price), s.currency_decimals)} <span className="text-xs text-slate-400">{s.currency_code}</span>
-              </p>
-              <p className="mt-1 text-xs text-slate-400">+{formatCrypto(Number(p.point_per_day ?? 0), s.currency_decimals)}/day · {p.duration}d</p>
-              <Link
-                href={`/purchase/${p.id}`}
-                className="mt-4 inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-slate-700 font-display text-sm font-bold text-white transition-colors hover:border-gold-500/60"
-              >
-                <Plus size={15} /> Deploy
-              </Link>
+      <Reveal>
+        <section>
+          <h2 className="font-display mb-4 text-xl font-bold text-white">Active rigs</h2>
+          {activePlans.length === 0 ? (
+            <Card className="p-8 text-center">
+              <p className="text-slate-300">No rigs hashing yet.</p>
+              <p className="mt-1 text-sm text-slate-400">Claim the free plan or deploy a paid miner below.</p>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {activePlans.map((r) => {
+                const p = planOf(r);
+                return (
+                  <div key={r.id} className="panel card-hover rounded-2xl p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-3">
+                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300">
+                          <Pickaxe size={20} />
+                        </span>
+                        <div>
+                          <p className="font-display font-bold text-white">{p?.plan_name ?? "Miner"} {p?.version ?? ""}</p>
+                          <p className="text-xs text-slate-400">Expires {r.expire_date ? new Date(r.expire_date).toLocaleDateString() : "never"}</p>
+                        </div>
+                      </div>
+                      <Badge variant="green">Hashing</Badge>
+                    </div>
+                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
+                      <div className="h-full w-full rounded-full bg-gradient-to-r from-emerald-400 to-gold-400" />
+                    </div>
+                    <p className="mt-2 text-xs text-slate-400">
+                      {formatCrypto(Number(p?.earning_rate ?? 0), 8)} per minute to your balance
+                    </p>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-      </section>
+          )}
+        </section>
+      </Reveal>
+
+      <Reveal>
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-xl font-bold text-white">Deploy more power</h2>
+            <Link href="/#plans" className="text-sm font-semibold text-gold-300 hover:text-gold-400">
+              Compare all plans
+            </Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {paidPlans.map((p) => (
+              <div key={p.id} className="panel card-hover flex flex-col rounded-2xl p-5">
+                <p className="font-display font-bold text-white">{p.plan_name}</p>
+                <p className="font-mono mt-1 text-2xl font-medium tabular-nums text-gold-300">
+                  {formatCrypto(Number(p.price), s.currency_decimals)} <span className="text-xs text-slate-400">{s.currency_code}</span>
+                </p>
+                <p className="mt-1 text-xs text-slate-400">+{formatCrypto(Number(p.point_per_day ?? 0), s.currency_decimals)}/day · {p.duration}d</p>
+                <Link
+                  href={`/purchase/${p.id}`}
+                  className="tap mt-4 inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-slate-700 font-display text-sm font-bold text-white transition-colors hover:border-gold-500/60"
+                >
+                  <Plus size={15} /> Deploy
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+      </Reveal>
     </div>
   );
 }

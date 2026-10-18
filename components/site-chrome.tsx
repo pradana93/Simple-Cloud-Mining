@@ -2,49 +2,12 @@ import Link from "next/link";
 import { Wallet } from "lucide-react";
 import { getCachedSettings } from "@/lib/catalog";
 import { NAV_LINKS } from "./nav-links";
-import { MobileNav } from "./mobile-nav";
+import { SiteHeaderClient } from "./site-header";
 import { Logo } from "./logo";
 
 export async function SiteHeader() {
   const s = await getCachedSettings();
-  return (
-    <header className="glass-nav sticky top-0 z-40 border-b border-white/10">
-      <div className="relative mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5">
-          <Logo className="h-9 w-9" />
-          <span className="font-display text-base font-bold tracking-tight text-white sm:text-lg">
-            {s.sitename}
-          </span>
-        </Link>
-        <nav className="hidden items-center gap-1 md:flex">
-          {NAV_LINKS.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className="rounded-lg px-3.5 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="hidden items-center gap-2 md:flex">
-          <Link
-            href="/login"
-            className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-white/5 hover:text-white"
-          >
-            Sign in
-          </Link>
-          <Link
-            href="/dashboard"
-            className="rounded-xl bg-gold-500 px-4 py-2 font-display text-sm font-bold text-ink-950 transition-colors hover:bg-gold-400"
-          >
-            Open console
-          </Link>
-        </div>
-        <MobileNav />
-      </div>
-    </header>
-  );
+  return <SiteHeaderClient sitename={s.sitename} />;
 }
 
 export async function SiteFooter() {

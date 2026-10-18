@@ -108,3 +108,25 @@ body {
 ::selection {
   background: rgba(245, 179, 1, 0.35);
 }
+
+/* Motion is purposeful and short; the whole system stands down for reduced-motion. */
+.tap {
+  transition: transform 0.12s ease, background-color 0.18s ease, border-color 0.18s ease,
+    color 0.18s ease;
+}
+.tap:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

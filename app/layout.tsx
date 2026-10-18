@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Chakra_Petch, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader, SiteFooter } from "@/components/site-chrome";
+import { ToastProvider } from "@/components/ui/toast";
 
 const body = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -38,9 +39,11 @@ export default function RootLayout({
       <body
         className={`${body.variable} ${display.variable} ${mono.variable} min-h-screen bg-ink-950 font-body text-slate-200 antialiased`}
       >
-        <SiteHeader />
-        <main className="mx-auto w-full max-w-6xl px-4 sm:px-6">{children}</main>
-        <SiteFooter />
+        <ToastProvider>
+          <SiteHeader />
+          <main className="mx-auto w-full max-w-6xl px-4 sm:px-6">{children}</main>
+          <SiteFooter />
+        </ToastProvider>
       </body>
     </html>
   );

@@ -1,12 +1,14 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck, WalletMinimal } from "lucide-react";
+import { ArrowLeft, Loader2, ShieldCheck, WalletMinimal } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/components/ui/toast";
 
 export default function WithdrawalPage() {
+  const { push } = useToast();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
   async function submit(fd: FormData) {
@@ -19,9 +21,17 @@ export default function WithdrawalPage() {
         body: JSON.stringify({ amount: Number(fd.get("amount")) }),
       });
       const j = await res.json();
-      setMsg(j.ok ? { ok: true, text: "Withdrawal requested. Track it in Account history." } : { ok: false, text: `Error: ${j.error}` });
+      if (j.ok) {
+        setMsg({ ok: true, text: "Withdrawal requested. Track it in Account history." });
+        push("Withdrawal requested", "success");
+      } else {
+        setMsg({ ok: false, text: `Error: ${j.error}` });
+        push(j.error ?? "Withdrawal failed", "error");
+      }
     } catch (e) {
-      setMsg({ ok: false, text: e instanceof Error ? e.message : "Request failed" });
+      const text = e instanceof Error ? e.message : "Request failed";
+      setMsg({ ok: false, text });
+      push(text, "error");
     } finally {
       setLoading(false);
     }
@@ -46,7 +56,13 @@ export default function WithdrawalPage() {
               <Input id="amount" name="amount" type="number" step="0.00000001" min="0" placeholder="0.00000000" required />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Broadcasting…" : "Confirm withdrawal"}
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Broadcasting
+                </>
+              ) : (
+                "Confirm withdrawal"
+              )}
             </Button>
           </form>
           {msg && (

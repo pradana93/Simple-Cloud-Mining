@@ -17,17 +17,34 @@ export function FaqList({ faqs }: { faqs: Array<{ id: number; question: string; 
       {faqs.map((f, i) => {
         const isOpen = open === i;
         return (
-          <div key={f.id} className={cn("panel overflow-hidden rounded-2xl transition-colors", isOpen && "border-gold-500/40")}>
+          <div
+            key={f.id}
+            className={cn("panel overflow-hidden rounded-2xl transition-colors", isOpen && "border-gold-500/40")}
+          >
             <button
               onClick={() => setOpen(isOpen ? null : i)}
-              className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"
+              aria-expanded={isOpen}
+              className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
             >
               <span className="font-display text-[15px] font-bold text-white">{f.question}</span>
-              <ChevronDown size={18} className={cn("shrink-0 text-gold-300 transition-transform", isOpen && "rotate-180")} />
+              <ChevronDown
+                size={18}
+                className={cn("shrink-0 text-gold-300 transition-transform duration-300", isOpen && "rotate-180")}
+              />
             </button>
-            {isOpen && (
-              <div className="prose-dark border-t border-white/10 px-6 py-5 text-sm" dangerouslySetInnerHTML={{ __html: f.answer }} />
-            )}
+            <div
+              className={cn(
+                "grid transition-[grid-template-rows,opacity] duration-300 ease-out",
+                isOpen ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0"
+              )}
+            >
+              <div className="overflow-hidden">
+                <div
+                  className="prose-dark border-t border-white/10 px-6 py-5 text-sm"
+                  dangerouslySetInnerHTML={{ __html: f.answer }}
+                />
+              </div>
+            </div>
           </div>
         );
       })}
