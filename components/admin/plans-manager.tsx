@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/admin/modal";
+import { PlanAssistant } from "@/components/admin/plan-assistant";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 import { cn, formatCrypto } from "@/lib/utils";
 import { earningRateFromDaily, planEconomics } from "@/lib/plan-math";
+import type { PlanProposal } from "@/lib/plan-goal";
 
 export type AdminPlan = {
   id: number;
@@ -179,6 +181,21 @@ export function PlansManager({
   const invalid = (k: string) => (errors[k] ? "border-red-500/60 focus:border-red-500/70 focus:ring-red-500/25" : "");
   const set = (k: keyof Draft, v: string | boolean) => setDraft((d) => ({ ...d, [k]: v }));
 
+  function applyProposal(p: PlanProposal) {
+    setErrors({});
+    setDraft((d) => ({
+      ...d,
+      plan_name: p.plan_name || d.plan_name,
+      version: p.version || d.version,
+      price: String(p.price),
+      point_per_day: String(p.point_per_day),
+      duration: String(p.duration),
+      speed: p.speed || d.speed,
+      profit: p.profit || d.profit,
+      is_default: p.is_default,
+    }));
+  }
+
   return (
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
@@ -295,6 +312,20 @@ export function PlansManager({
       >
         <div className="grid gap-5 lg:grid-cols-2">
           <div className="space-y-4">
+            <PlanAssistant
+              key={editing ? `edit-${editing.id}` : "new"}
+              context={{
+                price: Number(draft.price || 0),
+                durationDays: Number(draft.duration || 0),
+                pointPerDay: Number(draft.point_per_day || 0),
+                currencyCode: code,
+                isEdit: Boolean(editing),
+              }}
+              code={code}
+              symbol={symbol}
+              decimals={decimals}
+              onApply={applyProposal}
+            />
             <div>
               <Label htmlFor="p-name">Plan name</Label>
               <Input id="p-name" value={draft.plan_name} onChange={(e) => set("plan_name", e.target.value)} className={invalid("plan_name")} placeholder="Plan V1.3" />
