@@ -6,9 +6,24 @@ export async function middleware(request: NextRequest) {
   // the whole site down; pass through and let pages render with fallbacks.
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const isAdmin = request.nextUrl.pathname.startsWith("/admin");
   if (!url || !anon) {
     return NextResponse.next({ request });
   }
+
+  // Fast path: no Supabase cookie means nobody is signed in, so skip the auth
+  // round-trip entirely. Anonymous navigation stays instant.
+  const hasAuthCookie = request.cookies.getAll().some((c) => c.name.startsWith("sb-"));
+  if (!hasAuthCookie) {
+    if (isAdmin) {
+      const login = request.nextUrl.clone();
+      login.pathname = "/login";
+      login.search = "";
+      return NextResponse.redirect(login);
+    }
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
   const supabase = createServerClient(url, anon, {
       cookies: {
@@ -25,16 +40,17 @@ export async function middleware(request: NextRequest) {
       },
     }
   );
-  let user = null;
+  // getSession() reads the cookie and only hits the network when the access token
+  // actually needs refreshing, unlike getUser() which validates on every request.
+  // The real admin check still runs server-side in app/admin/layout.tsx.
+  let signedIn = false;
   try {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
+    const { data } = await supabase.auth.getSession();
+    signedIn = Boolean(data.session);
   } catch {
     // Treat as logged out; pages handle a null user.
   }
-  // Edge gate for the control tower: anonymous visitors never reach /admin.
-  // The is_admin check runs server-side in app/admin/layout.tsx.
-  if (!user && request.nextUrl.pathname.startsWith("/admin")) {
+  if (!signedIn && isAdmin) {
     const login = request.nextUrl.clone();
     login.pathname = "/login";
     login.search = "";

@@ -3,7 +3,7 @@ import { ArrowLeft, Receipt } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getCachedSettings } from "@/lib/catalog";
 import { formatCrypto } from "@/lib/utils";
-import { accrueOwnPlans } from "@/lib/accrue-user";
+import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
@@ -44,7 +44,6 @@ export default async function AccountPage() {
       </div>
     );
   }
-  await accrueOwnPlans(supabase, userId);
   const s = await getCachedSettings();
   const empty = { data: [] as Array<Record<string, number | string | null>> };
   let referrals = empty;
@@ -52,22 +51,26 @@ export default async function AccountPage() {
   let deposits = empty;
   let withdrawals = empty;
   let pending = empty;
+  let accrualRows: AccrualRow[] = [];
   try {
-    const [r1, r2, r3, r4, r5] = await Promise.all([
+    const [r1, r2, r3, r4, r5, ar] = await Promise.all([
       supabase.from("profiles").select("username,created_at").eq("reference_user_id", userId).order("created_at", { ascending: false }),
       supabase.from("affiliate_history").select("*").eq("user_id", userId).order("date", { ascending: false }),
       supabase.from("user_deposits").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
       supabase.from("user_withdrawal").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
       supabase.from("transactions_history").select("*").eq("user_id", userId).neq("status", "paid").order("date", { ascending: false }),
+      supabase.from("user_plan_history").select("id,expire_date,last_sum,created_at,plan:plans(earning_rate)").eq("user_id", userId).eq("status", "active"),
     ]);
     referrals = (r1 as typeof empty);
     aff = (r2 as typeof empty);
     deposits = (r3 as typeof empty);
     withdrawals = (r4 as typeof empty);
     pending = (r5 as typeof empty);
+    accrualRows = (((ar as { data: unknown }).data ?? []) as AccrualRow[]);
   } catch {
     // render empty sections
   }
+  await accrueOwnPlans(supabase, userId, { rows: accrualRows });
 
   const sections: Array<{ title: string; rows: Array<Record<string, number | string | null>>; render: (r: Record<string, number | string | null>, i: number) => React.ReactNode; emptyText: string }> = [
     {

@@ -5,7 +5,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getCachedSettings } from "@/lib/catalog";
 import { totalMiningRate } from "@/lib/mining";
 import { formatCrypto } from "@/lib/utils";
-import { accrueOwnPlans } from "@/lib/accrue-user";
+import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { ensureProfile } from "@/lib/ensure-profile";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -17,6 +17,7 @@ export const dynamic = "force-dynamic";
 type ActiveRow = {
   id: number;
   expire_date: string | null;
+  last_sum: string | null;
   created_at: string;
   plan: { plan_name: string; version: string | null; earning_rate: number | null } | Array<{ plan_name: string; version: string | null; earning_rate: number | null }>;
 };
@@ -57,30 +58,47 @@ export default async function DashboardPage() {
       </div>
     );
   }
-  // Self-heal profile + referral + free plan, then run lazy accrual because the
-  // Hobby-tier cron only fires once a day.
+  // Bootstrap the profile + free rig only when the signup trigger hasn't already
+  // (a trigger creates both on signup), then run lazy accrual because the Hobby
+  // cron only fires once a day. Everything shares one parallel batch up front.
   const refCookie = cookies().get("ref")?.value ?? null;
-  await ensureProfile({ userId, email: userEmail, usernameMeta, refUniqueId: refCookie });
-  await accrueOwnPlans(supabase, userId);
   const s = await getCachedSettings();
-  type ProfileLite = { balance: number; username: string };
+  type ProfileLite = { balance: number; username: string; reference_user_id: string | null };
+  type PaidPlan = { id: number; plan_name: string; price: number; version: string | null; point_per_day: number | null; duration: number };
+  const activeSelect = "id,expire_date,last_sum,created_at,plan:plans(plan_name,version,earning_rate)";
   let profile: ProfileLite | null = null;
   let activePlans: ActiveRow[] = [];
-  let paidPlans: Array<{ id: number; plan_name: string; price: number; version: string | null; point_per_day: number | null; duration: number }> = [];
+  let paidPlans: PaidPlan[] = [];
   try {
     const [p, a, pp] = await Promise.all([
-      supabase.from("profiles").select("balance,username").eq("id", userId).maybeSingle(),
-      supabase.from("user_plan_history").select("id,expire_date,created_at,plan:plans(plan_name,version,earning_rate)").eq("user_id", userId).eq("status", "active"),
+      supabase.from("profiles").select("balance,username,reference_user_id").eq("id", userId).maybeSingle(),
+      supabase.from("user_plan_history").select(activeSelect).eq("user_id", userId).eq("status", "active"),
       supabase.from("plans").select("id,plan_name,price,version,point_per_day,duration").order("price"),
     ]);
     profile = ((p as { data: ProfileLite | null }).data ?? null);
     activePlans = (((a as { data: unknown }).data ?? []) as ActiveRow[]);
-    paidPlans = ((((pp as { data: unknown }).data ?? []) as typeof paidPlans)).filter((x) => Number(x.price) > 0);
+    paidPlans = ((((pp as { data: unknown }).data ?? []) as PaidPlan[])).filter((x) => Number(x.price) > 0);
+
+    // Run the bootstrap only when there's real work to do: a missing profile, no
+    // active rig, or an unclaimed referral (`ref` cookie) on a profile with no upline.
+    if (!profile || activePlans.length === 0 || (!profile.reference_user_id && refCookie)) {
+      await ensureProfile({ userId, email: userEmail, usernameMeta, refUniqueId: refCookie });
+      const [p2, a2] = await Promise.all([
+        supabase.from("profiles").select("balance,username,reference_user_id").eq("id", userId).maybeSingle(),
+        supabase.from("user_plan_history").select(activeSelect).eq("user_id", userId).eq("status", "active"),
+      ]);
+      profile = ((p2 as { data: ProfileLite | null }).data ?? profile);
+      activePlans = (((a2 as { data: unknown }).data ?? activePlans) as ActiveRow[]);
+    }
   } catch {
     // render empty state
   }
+  const { earnings } = await accrueOwnPlans(supabase, userId, {
+    rows: activePlans as AccrualRow[],
+    balance: Number(profile?.balance ?? 0),
+  });
   const rate = totalMiningRate(activePlans.map((r) => ({ earning_rate: planOf(r)?.earning_rate ?? null })));
-  const balance = Number(profile?.balance ?? 0);
+  const balance = Number(profile?.balance ?? 0) + earnings;
 
   return (
     <div className="space-y-8 py-8">
