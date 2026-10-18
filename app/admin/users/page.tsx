@@ -1,6 +1,7 @@
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { ResetPasswordButton } from "@/components/admin/reset-password-button";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +44,7 @@ export default async function AdminUsers() {
                   <th className="py-2 pr-4 font-medium">Balance</th>
                   <th className="py-2 pr-4 font-medium">Role</th>
                   <th className="py-2 pr-4 font-medium">Joined</th>
+                  <th className="py-2 pr-4 font-medium">Credentials</th>
                 </tr>
               </thead>
               <tbody>
@@ -55,6 +57,9 @@ export default async function AdminUsers() {
                       {r.is_admin ? <Badge variant="gold">admin</Badge> : <span className="text-slate-400">member</span>}
                     </td>
                     <td className="py-2 pr-4 text-slate-300">{r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}</td>
+                    <td className="py-2 pr-4">
+                      <ResetPasswordButton userId={r.id} username={r.username ?? "member"} />
+                    </td>
                   </tr>
                 ))}
               </tbody>

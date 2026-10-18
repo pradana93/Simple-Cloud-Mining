@@ -1,37 +1,41 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { Loader2 } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
   async function submit(fd: FormData) {
     setErr(null);
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email: String(fd.get("email")),
-        password: String(fd.get("password")),
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: String(fd.get("username")),
+          password: String(fd.get("password")),
+        }),
       });
-      if (error) setErr(error.message);
-      else {
-        router.push("/dashboard");
-        router.refresh();
+      const j = await res.json();
+      if (!j.ok) {
+        setErr(j.error ?? "Login failed");
+        return;
       }
+      window.location.href = j.isAdmin ? "/admin" : "/dashboard";
     } catch (e) {
       setErr(e instanceof Error ? e.message : "Login failed");
     } finally {
       setLoading(false);
     }
   }
+
   return (
     <div className="mx-auto grid max-w-4xl gap-6 py-10 sm:py-14 lg:grid-cols-2">
       <div className="panel relative hidden rounded-3xl p-10 lg:block">
@@ -57,12 +61,24 @@ export default function LoginPage() {
             <span className="font-display text-lg font-bold text-white">Sign in</span>
           </div>
           <h1 className="font-display hidden text-2xl font-bold text-white lg:block">Sign in</h1>
-          <p className="mt-1 text-sm text-slate-400">Access your mining console.</p>
+          <p className="mt-1 text-sm text-slate-400">Username and password. No email needed.</p>
           <form action={submit} className="mt-6 space-y-4">
-            <div><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" placeholder="you@wallet.com" required /></div>
-            <div><Label htmlFor="password">Password</Label><Input id="password" name="password" type="password" placeholder="••••••••" required /></div>
+            <div>
+              <Label htmlFor="username">Username</Label>
+              <Input id="username" name="username" autoComplete="username" placeholder="satoshi_01" required />
+            </div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <Input id="password" name="password" type="password" autoComplete="current-password" placeholder="••••••••" required />
+            </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Unlocking rigs…" : "Enter console"}
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Unlocking rigs
+                </>
+              ) : (
+                "Enter console"
+              )}
             </Button>
           </form>
           {err && <p className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{err}</p>}

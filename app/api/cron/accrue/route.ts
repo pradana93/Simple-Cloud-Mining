@@ -9,7 +9,11 @@ import { accrueForPlan } from "@/lib/mining";
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const secret = req.headers.get("x-cron-secret") ?? url.searchParams.get("secret");
+  const auth = req.headers.get("authorization");
+  const secret =
+    req.headers.get("x-cron-secret") ??
+    url.searchParams.get("secret") ??
+    (auth?.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : null);
   if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }

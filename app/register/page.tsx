@@ -56,7 +56,7 @@ export default function RegisterPage() {
         </p>
         <ol className="mt-8 space-y-4 text-sm">
           {[
-            ["01", "Create account", "Email and password. No wallet needed yet."],
+            ["01", "Create account", "Username and password. Sign in with your username."],
             ["02", "Free miner activates", "It starts earning on the spot."],
             ["03", "Upgrade anytime", "Deploy paid rigs via CoinPayments."],
           ].map(([n, t, d]) => (

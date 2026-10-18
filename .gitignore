@@ -39,3 +39,7 @@ next-env.d.ts
 
 # Supabase CLI local state
 supabase/.temp/
+
+# local credential-reset output (never commit)
+*.local.json
+RESET-CREDENTIALS.local.txt
