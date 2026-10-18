@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { History, Plus, WalletMinimal } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getCachedSettings } from "@/lib/catalog";
@@ -7,6 +7,7 @@ import { totalMiningRate } from "@/lib/mining";
 import { formatCrypto, formatDuration } from "@/lib/utils";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { ensureProfile } from "@/lib/ensure-profile";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
 import { CountUp } from "@/components/motion/count-up";
@@ -37,6 +38,14 @@ type PaidPlan = { id: number; plan_name: string; price: number; point_per_day: n
 
 function planOf(row: { plan: PlanMeta | PlanMeta[] | null }): PlanMeta | null {
   return Array.isArray(row.plan) ? row.plan[0] : row.plan;
+}
+
+function txVariant(status: string): "green" | "gold" | "red" | "slate" {
+  const v = status.toLowerCase();
+  if (v === "paid") return "green";
+  if (v === "pending" || v === "waiting") return "gold";
+  if (v === "canceled") return "red";
+  return "slate";
 }
 
 function Readout({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
@@ -205,7 +214,13 @@ export default async function DashboardPage() {
         ? `About ${formatDuration((minWithdraw - balance) / rate)} until you reach the minimum.`
         : "Deploy hashrate to reach the withdrawal minimum.";
 
-  const referralLink = `${process.env.NEXT_PUBLIC_SITE_URL || "https://scmining.vercel.app"}/referral/${profile?.unique_id ?? ""}`;
+  const referralLink = (() => {
+    const h = headers();
+    const host = h.get("host");
+    const proto = h.get("x-forwarded-proto") ?? (host && host.includes("localhost") ? "http" : "https");
+    const base = host ? `${proto}://${host}` : process.env.NEXT_PUBLIC_SITE_URL || "";
+    return `${base}/referral/${profile?.unique_id ?? ""}`;
+  })();
 
   return (
     <div className="space-y-6 py-8">
@@ -251,8 +266,8 @@ export default async function DashboardPage() {
               <Readout label="Gross earned" hint="since each rig started">
                 <CountUp value={lifetimeEarned} decimals={s.currency_decimals} />
               </Readout>
-              <Readout label="Referrals" hint="accounts you invited">
-                {referrals.length}
+              <Readout label="Per day" hint={`${s.currency_code} at current rate`}>
+                {formatCrypto(perDay, s.currency_decimals)}
               </Readout>
             </div>
           </div>
@@ -260,7 +275,7 @@ export default async function DashboardPage() {
       </Reveal>
 
       <Reveal>
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
           <section className="panel rounded-3xl p-6 lg:col-span-2">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -273,28 +288,13 @@ export default async function DashboardPage() {
                 projection
               </span>
             </div>
-            <div className="mt-4">
+            <div className="mt-5">
               <ProjectionChart
                 start={balance}
                 perDay={perDay}
-                days={30}
                 decimals={s.currency_decimals}
                 target={minWithdraw > balance ? minWithdraw : null}
               />
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-3 text-center">
-              <div className="rounded-2xl bg-white/5 px-3 py-3">
-                <p className="text-[11px] text-slate-400">Per day</p>
-                <p className="font-mono mt-1 text-sm font-medium tabular-nums text-white">{formatCrypto(perDay, s.currency_decimals)}</p>
-              </div>
-              <div className="rounded-2xl bg-white/5 px-3 py-3">
-                <p className="text-[11px] text-slate-400">In 7 days</p>
-                <p className="font-mono mt-1 text-sm font-medium tabular-nums text-white">{formatCrypto(balance + perDay * 7, s.currency_decimals)}</p>
-              </div>
-              <div className="rounded-2xl bg-white/5 px-3 py-3">
-                <p className="text-[11px] text-slate-400">In 30 days</p>
-                <p className="font-mono mt-1 text-sm font-medium tabular-nums text-white">{formatCrypto(balance + perDay * 30, s.currency_decimals)}</p>
-              </div>
             </div>
           </section>
 
@@ -306,6 +306,7 @@ export default async function DashboardPage() {
             decimals={s.currency_decimals}
             code={s.currency_code}
             referralLink={referralLink}
+            invites={referrals}
           />
         </div>
       </Reveal>
@@ -334,7 +335,7 @@ export default async function DashboardPage() {
       </Reveal>
 
       <Reveal>
-        <div className="grid gap-6 lg:grid-cols-3">
+        <div className="grid gap-6 lg:grid-cols-3 lg:items-start">
           <section className="panel rounded-3xl p-6 lg:col-span-2">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-lg font-bold text-white">Recent activity</h2>
@@ -348,8 +349,8 @@ export default async function DashboardPage() {
           </section>
 
           <section className="panel rounded-3xl p-6">
-            <h2 className="font-display text-lg font-bold text-white">Overdue invoices</h2>
-            <p className="mt-1 text-xs text-slate-400">Unpaid top-ups waiting to clear.</p>
+            <h2 className="font-display text-lg font-bold text-white">Open invoices</h2>
+            <p className="mt-1 text-xs text-slate-400">Top-ups waiting to clear.</p>
             {openInvoices.length === 0 ? (
               <p className="py-4 text-sm text-slate-400">No open invoices.</p>
             ) : (
@@ -359,9 +360,12 @@ export default async function DashboardPage() {
                     <Link href={`/invoice/${t.hash}`} className="font-mono text-gold-300 hover:text-gold-400">
                       {t.hash ? `${t.hash.slice(0, 12)}…` : "invoice"}
                     </Link>
-                    <span className="font-mono tabular-nums text-slate-200">
-                      {formatCrypto(Number(t.amount), s.currency_decimals)}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono tabular-nums text-slate-200">
+                        {formatCrypto(Number(t.amount), s.currency_decimals)}
+                      </span>
+                      <Badge variant={txVariant(t.status)}>{t.status}</Badge>
+                    </div>
                   </li>
                 ))}
               </ul>
