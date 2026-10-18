@@ -1,30 +1,52 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
-import { Gauge, History, Pickaxe, Plus, Wallet, WalletMinimal } from "lucide-react";
+import { History, Plus, WalletMinimal } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getCachedSettings } from "@/lib/catalog";
 import { totalMiningRate } from "@/lib/mining";
-import { formatCrypto } from "@/lib/utils";
+import { formatCrypto, formatDuration } from "@/lib/utils";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { ensureProfile } from "@/lib/ensure-profile";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
 import { CountUp } from "@/components/motion/count-up";
 import { LiveBalance } from "@/components/motion/live-balance";
+import { ProjectionChart } from "@/components/dashboard/projection-chart";
+import { RigReadout, type RigView } from "@/components/dashboard/rig-readout";
+import { ActivityFeed, type ActivityItem } from "@/components/dashboard/activity-feed";
+import { AffiliatePanel } from "@/components/dashboard/affiliate-panel";
 
 export const dynamic = "force-dynamic";
 
-type ActiveRow = {
+type PlanMeta = {
+  plan_name: string;
+  version: string | null;
+  earning_rate: number | null;
+  price: number;
+  duration: number;
+};
+type HistoryRow = {
   id: number;
+  status: string;
+  created_at: string;
   expire_date: string | null;
   last_sum: string | null;
-  created_at: string;
-  plan: { plan_name: string; version: string | null; earning_rate: number | null } | Array<{ plan_name: string; version: string | null; earning_rate: number | null }>;
+  plan: PlanMeta | PlanMeta[] | null;
 };
+type PaidPlan = { id: number; plan_name: string; price: number; point_per_day: number | null; duration: number };
 
-function planOf(r: ActiveRow) {
-  return Array.isArray(r.plan) ? r.plan[0] : r.plan;
+function planOf(row: { plan: PlanMeta | PlanMeta[] | null }): PlanMeta | null {
+  return Array.isArray(row.plan) ? row.plan[0] : row.plan;
+}
+
+function Readout({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
+  return (
+    <div className="border-t-2 border-gold-500/60 pt-3">
+      <p className="text-[11px] font-medium text-slate-400">{label}</p>
+      <p className="font-mono mt-1.5 text-2xl font-medium tabular-nums text-white">{children}</p>
+      {hint && <p className="mt-0.5 text-[11px] text-slate-400">{hint}</p>}
+    </div>
+  );
 }
 
 export default async function DashboardPage() {
@@ -43,9 +65,6 @@ export default async function DashboardPage() {
   if (!userId) {
     return (
       <div className="mx-auto max-w-lg py-16 text-center">
-        <span className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-gold-500/15 text-gold-300">
-          <Wallet size={28} />
-        </span>
         <h1 className="font-display mt-6 text-3xl font-bold text-white">Your console awaits</h1>
         <p className="mt-3 text-slate-400">Sign in to monitor rigs, earnings and payouts.</p>
         <div className="mt-7 flex justify-center gap-3">
@@ -59,51 +78,137 @@ export default async function DashboardPage() {
       </div>
     );
   }
-  // Bootstrap the profile + free rig only when the signup trigger hasn't already
-  // (a trigger creates both on signup), then run lazy accrual because the Hobby
-  // cron only fires once a day. Everything shares one parallel batch up front.
+
   const refCookie = cookies().get("ref")?.value ?? null;
   const s = await getCachedSettings();
-  type ProfileLite = { balance: number; username: string; reference_user_id: string | null };
-  type PaidPlan = { id: number; plan_name: string; price: number; version: string | null; point_per_day: number | null; duration: number };
-  const activeSelect = "id,expire_date,last_sum,created_at,plan:plans(plan_name,version,earning_rate)";
+  const now = Date.now();
+  const historySelect = "id,status,created_at,expire_date,last_sum,plan:plans(plan_name,version,earning_rate,price,duration)";
+
+  type ProfileLite = { balance: number; username: string; reference_user_id: string | null; unique_id: number; affiliate_earns: number; affiliate_paid: number };
   let profile: ProfileLite | null = null;
-  let activePlans: ActiveRow[] = [];
+  let rows: HistoryRow[] = [];
+  let referrals: Array<{ username: string | null; created_at: string }> = [];
+  let deposits: Array<{ amount: number; status: string; created_at: string }> = [];
+  let withdrawals: Array<{ amount: number; status: string; created_at: string }> = [];
+  let affiliates: Array<{ amount: number; status: string; date: string }> = [];
+  let txns: Array<{ hash: string | null; amount: number; paid_amount: number | null; status: string; date: string; plan_id: number }> = [];
   let paidPlans: PaidPlan[] = [];
+  let planNames = new Map<number, string>();
+
   try {
-    const [p, a, pp] = await Promise.all([
-      supabase.from("profiles").select("balance,username,reference_user_id").eq("id", userId).maybeSingle(),
-      supabase.from("user_plan_history").select(activeSelect).eq("user_id", userId).eq("status", "active"),
-      supabase.from("plans").select("id,plan_name,price,version,point_per_day,duration").order("price"),
+    const [p, ph, r, dep, wd, aff, tx, pp] = await Promise.all([
+      supabase.from("profiles").select("balance,username,reference_user_id,unique_id,affiliate_earns,affiliate_paid").eq("id", userId).maybeSingle(),
+      supabase.from("user_plan_history").select(historySelect).eq("user_id", userId),
+      supabase.from("profiles").select("username,created_at").eq("reference_user_id", userId).order("created_at", { ascending: false }),
+      supabase.from("user_deposits").select("amount,status,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(12),
+      supabase.from("user_withdrawal").select("amount,status,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(12),
+      supabase.from("affiliate_history").select("amount,status,date").eq("user_id", userId).order("date", { ascending: false }).limit(12),
+      supabase.from("transactions_history").select("hash,amount,paid_amount,status,date,plan_id").eq("user_id", userId).order("date", { ascending: false }).limit(20),
+      supabase.from("plans").select("id,plan_name,price,point_per_day,duration").order("price"),
     ]);
     profile = ((p as { data: ProfileLite | null }).data ?? null);
-    activePlans = (((a as { data: unknown }).data ?? []) as ActiveRow[]);
+    rows = (((ph as { data: unknown }).data ?? []) as HistoryRow[]);
+    referrals = (((r as { data: unknown }).data ?? []) as Array<{ username: string | null; created_at: string }>);
+    deposits = (((dep as { data: unknown }).data ?? []) as typeof deposits);
+    withdrawals = (((wd as { data: unknown }).data ?? []) as typeof withdrawals);
+    affiliates = (((aff as { data: unknown }).data ?? []) as typeof affiliates);
+    txns = (((tx as { data: unknown }).data ?? []) as typeof txns);
     paidPlans = ((((pp as { data: unknown }).data ?? []) as PaidPlan[])).filter((x) => Number(x.price) > 0);
+    planNames = new Map(
+      (((pp as { data: unknown }).data ?? []) as Array<{ id: number; plan_name: string }>).map(
+        (x) => [x.id, x.plan_name] as [number, string]
+      )
+    );
 
-    // Run the bootstrap only when there's real work to do: a missing profile, no
-    // active rig, or an unclaimed referral (`ref` cookie) on a profile with no upline.
-    if (!profile || activePlans.length === 0 || (!profile.reference_user_id && refCookie)) {
+    // Bootstrap the profile + free rig only when there is real work to do.
+    if (!profile || rows.filter((x) => x.status === "active").length === 0 || (!profile.reference_user_id && refCookie)) {
       await ensureProfile({ userId, email: userEmail, usernameMeta, refUniqueId: refCookie });
-      const [p2, a2] = await Promise.all([
-        supabase.from("profiles").select("balance,username,reference_user_id").eq("id", userId).maybeSingle(),
-        supabase.from("user_plan_history").select(activeSelect).eq("user_id", userId).eq("status", "active"),
+      const [p2, ph2] = await Promise.all([
+        supabase.from("profiles").select("balance,username,reference_user_id,unique_id,affiliate_earns,affiliate_paid").eq("id", userId).maybeSingle(),
+        supabase.from("user_plan_history").select(historySelect).eq("user_id", userId),
       ]);
       profile = ((p2 as { data: ProfileLite | null }).data ?? profile);
-      activePlans = (((a2 as { data: unknown }).data ?? activePlans) as ActiveRow[]);
+      rows = (((ph2 as { data: unknown }).data ?? rows) as HistoryRow[]);
     }
   } catch {
-    // render empty state
+    // render the empty console
   }
+
   const stored = Number(profile?.balance ?? 0);
+  const activeRows = rows.filter(
+    (r) => r.status === "active" && (!r.expire_date || new Date(r.expire_date).getTime() > now)
+  );
   const { pending } = await accrueOwnPlans(supabase, userId, {
-    rows: activePlans as AccrualRow[],
+    rows: activeRows as unknown as AccrualRow[],
     balance: stored,
   });
-  const rate = totalMiningRate(activePlans.map((r) => ({ earning_rate: planOf(r)?.earning_rate ?? null })));
+  const rate = totalMiningRate(activeRows.map((r) => ({ earning_rate: planOf(r)?.earning_rate ?? null })));
   const balance = stored + pending;
+  const perDay = rate * 1440;
+
+  const earnedFor = (r: HistoryRow) => {
+    const ratePerMin = Number(planOf(r)?.earning_rate ?? 0);
+    if (ratePerMin <= 0) return 0;
+    const start = new Date(r.created_at).getTime();
+    const end = r.expire_date ? Math.min(now, new Date(r.expire_date).getTime()) : now;
+    return Math.max(0, (end - start) / 60000) * ratePerMin;
+  };
+  const lifetimeEarned = rows.reduce((sum, r) => sum + earnedFor(r), 0);
+
+  const rigs: RigView[] = activeRows.map((r) => {
+    const meta = planOf(r);
+    const rigRate = Number(meta?.earning_rate ?? 0);
+    const price = Number(meta?.price ?? 0);
+    const earned = earnedFor(r);
+    const created = new Date(r.created_at).getTime();
+    const expires = r.expire_date ? new Date(r.expire_date).getTime() : null;
+    const roiPct = price > 0 ? Math.min(999, (earned / price) * 100) : null;
+    const expiryPct = expires ? Math.max(0, Math.min(100, ((now - created) / (expires - created)) * 100)) : null;
+    const breakEvenMinutes = price > 0 && rigRate > 0 ? Math.max(0, (price - earned) / rigRate) : null;
+    return {
+      id: r.id,
+      name: meta?.plan_name ?? "Miner",
+      version: meta?.version ?? null,
+      rate: rigRate,
+      price,
+      earned,
+      roiPct,
+      expiryPct,
+      daysLeft: expires ? (expires - now) / 86_400_000 : null,
+      breakEvenMinutes,
+      startedAt: r.created_at,
+      decimals: s.currency_decimals,
+      code: s.currency_code,
+    };
+  });
+
+  const activity: ActivityItem[] = [
+    ...deposits.map((d, i) => ({ id: `d${i}`, kind: "deposit" as const, label: "Deposit received", amount: Number(d.amount), at: d.created_at, status: d.status })),
+    ...withdrawals.map((w, i) => ({ id: `w${i}`, kind: "withdrawal" as const, label: "Withdrawal", amount: Number(w.amount), at: w.created_at, status: w.status })),
+    ...affiliates.map((a, i) => ({ id: `a${i}`, kind: "affiliate" as const, label: "Affiliate commission", amount: Number(a.amount), at: a.date, status: a.status })),
+    ...referrals.map((r, i) => ({ id: `r${i}`, kind: "referral" as const, label: `Referral joined${r.username ? `: ${r.username}` : ""}`, amount: null, at: r.created_at, status: null })),
+    ...txns
+      .filter((t) => t.status === "paid")
+      .map((t, i) => ({ id: `t${i}`, kind: "plan" as const, label: `Deployed ${planNames.get(t.plan_id) ?? "a plan"}`, amount: Number(t.paid_amount ?? t.amount), at: t.date, status: null })),
+  ]
+    .filter((it) => it.at)
+    .sort((a, b) => new Date(b.at as string).getTime() - new Date(a.at as string).getTime())
+    .slice(0, 7);
+
+  const openInvoices = txns.filter((t) => t.status !== "paid").slice(0, 5);
+
+  const minWithdraw = Number(s.min_withdraw);
+  const nextPayout =
+    minWithdraw <= 0 || balance >= minWithdraw
+      ? "You can place a withdrawal request now."
+      : rate > 0
+        ? `About ${formatDuration((minWithdraw - balance) / rate)} until you reach the minimum.`
+        : "Deploy hashrate to reach the withdrawal minimum.";
+
+  const referralLink = `${process.env.NEXT_PUBLIC_SITE_URL || "https://scmining.vercel.app"}/referral/${profile?.unique_id ?? ""}`;
 
   return (
-    <div className="space-y-8 py-8">
+    <div className="space-y-6 py-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <h1 className="font-display text-3xl font-bold text-white sm:text-4xl">
           {profile?.username ? `Hey, ${profile.username}` : "Dashboard"}
@@ -119,109 +224,178 @@ export default async function DashboardPage() {
       </div>
 
       <Reveal>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <div className="panel rounded-3xl border-t-2 border-t-gold-500/70 p-6">
-            <p className="text-xs font-medium text-slate-400">Balance</p>
-            <p className="font-mono mt-2 text-3xl font-medium tabular-nums text-white">
-              <LiveBalance value={balance} perMinute={rate} decimals={s.currency_decimals} />
-            </p>
-            {rate > 0 ? (
-              <p className="mt-1 flex items-center gap-1.5 text-sm text-emerald-300">
-                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
-                +{formatCrypto(rate, 8)} {s.currency_code}/min, credited live
+        <div className="panel rounded-3xl border-t-2 border-t-gold-500/70 p-6 sm:p-7">
+          <div className="grid gap-7 lg:grid-cols-[1.25fr_1fr]">
+            <div>
+              <p className="text-xs font-medium text-slate-400">Balance</p>
+              <p className="font-mono mt-2 text-4xl font-medium tabular-nums text-white sm:text-5xl">
+                <LiveBalance value={balance} perMinute={rate} decimals={s.currency_decimals} />
               </p>
-            ) : (
-              <p className="mt-1 text-sm text-slate-400">{s.currency_code}, withdrawable</p>
-            )}
-          </div>
-          <div className="panel rounded-3xl p-6">
-            <p className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
-              <Gauge size={13} className="text-gold-400" /> Live hashrate
-            </p>
-            <p className="font-mono mt-2 text-3xl font-medium tabular-nums text-white">
-              <CountUp value={rate} decimals={8} />
-            </p>
-            <p className="mt-1 text-sm text-slate-400">per minute across {activePlans.length} rig{activePlans.length === 1 ? "" : "s"}</p>
-          </div>
-          <div className="panel rounded-3xl p-6">
-            <p className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
-              <Pickaxe size={13} className="text-emerald-400" /> Active rigs
-            </p>
-            <p className="font-mono mt-2 text-3xl font-medium tabular-nums text-white">
-              <CountUp value={activePlans.length} />
-            </p>
-            <p className="mt-1 text-sm text-slate-400">contracts hashing now</p>
+              {rate > 0 ? (
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-emerald-300">
+                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
+                  +{formatCrypto(rate, 8)} {s.currency_code}/min, credited live
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-slate-400">{s.currency_code}, withdrawable</p>
+              )}
+              <p className="mt-3 text-xs text-slate-400">{nextPayout}</p>
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-5">
+              <Readout label="Live hashrate" hint={`${s.currency_code} per minute`}>
+                <CountUp value={rate} decimals={8} />
+              </Readout>
+              <Readout label="Active rigs" hint="contracts hashing now">
+                {activeRows.length}
+              </Readout>
+              <Readout label="Gross earned" hint="since each rig started">
+                <CountUp value={lifetimeEarned} decimals={s.currency_decimals} />
+              </Readout>
+              <Readout label="Referrals" hint="accounts you invited">
+                {referrals.length}
+              </Readout>
+            </div>
           </div>
         </div>
       </Reveal>
 
       <Reveal>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <section className="panel rounded-3xl p-6 lg:col-span-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="font-display text-lg font-bold text-white">Projected balance</h2>
+                <p className="mt-1 text-xs text-slate-400">
+                  A straight line at your current rate over 30 days. A projection, not a record of past earnings.
+                </p>
+              </div>
+              <span className="rounded-md bg-gold-500/15 px-2 py-0.5 font-display text-xs font-semibold text-gold-300 ring-1 ring-gold-500/40">
+                projection
+              </span>
+            </div>
+            <div className="mt-4">
+              <ProjectionChart
+                start={balance}
+                perDay={perDay}
+                days={30}
+                decimals={s.currency_decimals}
+                target={minWithdraw > balance ? minWithdraw : null}
+              />
+            </div>
+            <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+              <div className="rounded-2xl bg-white/5 px-3 py-3">
+                <p className="text-[11px] text-slate-400">Per day</p>
+                <p className="font-mono mt-1 text-sm font-medium tabular-nums text-white">{formatCrypto(perDay, s.currency_decimals)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 px-3 py-3">
+                <p className="text-[11px] text-slate-400">In 7 days</p>
+                <p className="font-mono mt-1 text-sm font-medium tabular-nums text-white">{formatCrypto(balance + perDay * 7, s.currency_decimals)}</p>
+              </div>
+              <div className="rounded-2xl bg-white/5 px-3 py-3">
+                <p className="text-[11px] text-slate-400">In 30 days</p>
+                <p className="font-mono mt-1 text-sm font-medium tabular-nums text-white">{formatCrypto(balance + perDay * 30, s.currency_decimals)}</p>
+              </div>
+            </div>
+          </section>
+
+          <AffiliatePanel
+            count={referrals.length}
+            earns={Number(profile?.affiliate_earns ?? 0)}
+            paid={Number(profile?.affiliate_paid ?? 0)}
+            commissionPct={Number(s.aff_comission)}
+            decimals={s.currency_decimals}
+            code={s.currency_code}
+            referralLink={referralLink}
+          />
+        </div>
+      </Reveal>
+
+      <Reveal>
         <section>
-          <h2 className="font-display mb-4 text-xl font-bold text-white">Active rigs</h2>
-          {activePlans.length === 0 ? (
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-display text-xl font-bold text-white">Active rigs</h2>
+            <Link href="/#plans" className="text-sm font-semibold text-gold-300 hover:text-gold-400">
+              Compare all plans
+            </Link>
+          </div>
+          {rigs.length === 0 ? (
             <Card className="p-8 text-center">
               <p className="text-slate-300">No rigs hashing yet.</p>
               <p className="mt-1 text-sm text-slate-400">Claim the free plan or deploy a paid miner below.</p>
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
-              {activePlans.map((r) => {
-                const p = planOf(r);
-                return (
-                  <div key={r.id} className="panel card-hover rounded-2xl p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <span className="grid h-11 w-11 place-items-center rounded-2xl bg-emerald-500/15 text-emerald-300">
-                          <Pickaxe size={20} />
-                        </span>
-                        <div>
-                          <p className="font-display font-bold text-white">{p?.plan_name ?? "Miner"} {p?.version ?? ""}</p>
-                          <p className="text-xs text-slate-400">Expires {r.expire_date ? new Date(r.expire_date).toLocaleDateString() : "never"}</p>
-                        </div>
-                      </div>
-                      <Badge variant="green">Hashing</Badge>
-                    </div>
-                    <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/5">
-                      <div className="h-full w-full rounded-full bg-gradient-to-r from-emerald-400 to-gold-400" />
-                    </div>
-                    <p className="mt-2 text-xs text-slate-400">
-                      {formatCrypto(Number(p?.earning_rate ?? 0), 8)} per minute to your balance
-                    </p>
-                  </div>
-                );
-              })}
+              {rigs.map((rig) => (
+                <RigReadout key={rig.id} rig={rig} symbol={s.currency_symbol} />
+              ))}
             </div>
           )}
         </section>
       </Reveal>
 
       <Reveal>
-        <section>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-xl font-bold text-white">Deploy more power</h2>
-            <Link href="/#plans" className="text-sm font-semibold text-gold-300 hover:text-gold-400">
-              Compare all plans
-            </Link>
-          </div>
-          <div className="grid gap-4 md:grid-cols-3">
-            {paidPlans.map((p) => (
-              <div key={p.id} className="panel card-hover flex flex-col rounded-2xl p-5">
-                <p className="font-display font-bold text-white">{p.plan_name}</p>
-                <p className="font-mono mt-1 text-2xl font-medium tabular-nums text-gold-300">
-                  {formatCrypto(Number(p.price), s.currency_decimals)} <span className="text-xs text-slate-400">{s.currency_code}</span>
-                </p>
-                <p className="mt-1 text-xs text-slate-400">+{formatCrypto(Number(p.point_per_day ?? 0), s.currency_decimals)}/day · {p.duration}d</p>
-                <Link
-                  href={`/purchase/${p.id}`}
-                  className="tap mt-4 inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-slate-700 font-display text-sm font-bold text-white transition-colors hover:border-gold-500/60"
-                >
-                  <Plus size={15} /> Deploy
-                </Link>
-              </div>
-            ))}
-          </div>
-        </section>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <section className="panel rounded-3xl p-6 lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <h2 className="font-display text-lg font-bold text-white">Recent activity</h2>
+              <Link href="/account" className="text-xs font-semibold text-gold-300 hover:text-gold-400">
+                Full history
+              </Link>
+            </div>
+            <div className="mt-2">
+              <ActivityFeed items={activity} decimals={s.currency_decimals} code={s.currency_code} />
+            </div>
+          </section>
+
+          <section className="panel rounded-3xl p-6">
+            <h2 className="font-display text-lg font-bold text-white">Overdue invoices</h2>
+            <p className="mt-1 text-xs text-slate-400">Unpaid top-ups waiting to clear.</p>
+            {openInvoices.length === 0 ? (
+              <p className="py-4 text-sm text-slate-400">No open invoices.</p>
+            ) : (
+              <ul className="mt-3 divide-y divide-white/5">
+                {openInvoices.map((t, i) => (
+                  <li key={t.hash ?? i} className="flex items-center justify-between gap-2 py-2.5 text-sm">
+                    <Link href={`/invoice/${t.hash}`} className="font-mono text-gold-300 hover:text-gold-400">
+                      {t.hash ? `${t.hash.slice(0, 12)}…` : "invoice"}
+                    </Link>
+                    <span className="font-mono tabular-nums text-slate-200">
+                      {formatCrypto(Number(t.amount), s.currency_decimals)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
       </Reveal>
+
+      {paidPlans.length > 0 && (
+        <Reveal>
+          <section>
+            <h2 className="font-display mb-4 text-xl font-bold text-white">Deploy more power</h2>
+            <div className="grid gap-4 md:grid-cols-3">
+              {paidPlans.map((p) => (
+                <div key={p.id} className="panel card-hover flex flex-col rounded-2xl p-5">
+                  <p className="font-display font-bold text-white">{p.plan_name}</p>
+                  <p className="font-mono mt-1 text-2xl font-medium tabular-nums text-gold-300">
+                    {formatCrypto(Number(p.price), s.currency_decimals)} <span className="text-xs text-slate-400">{s.currency_code}</span>
+                  </p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    +{formatCrypto(Number(p.point_per_day ?? 0), s.currency_decimals)}/day · {p.duration}d
+                  </p>
+                  <Link
+                    href={`/purchase/${p.id}`}
+                    className="tap mt-4 inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-slate-700 font-display text-sm font-bold text-white transition-colors hover:border-gold-500/60"
+                  >
+                    <Plus size={15} /> Deploy
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </section>
+        </Reveal>
+      )}
     </div>
   );
 }
