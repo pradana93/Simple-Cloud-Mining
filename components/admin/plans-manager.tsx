@@ -1,0 +1,376 @@
+"use client";
+import { useMemo, useState } from "react";
+import { AlertTriangle, Pencil, Plus, Trash2, TrendingUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input, Label } from "@/components/ui/input";
+import { Modal } from "@/components/admin/modal";
+import { useAdminAction } from "@/components/admin/use-admin-action";
+import { cn, formatCrypto } from "@/lib/utils";
+import { earningRateFromDaily, planEconomics } from "@/lib/plan-math";
+
+export type AdminPlan = {
+  id: number;
+  plan_name: string;
+  version: string | null;
+  image: string;
+  price: number;
+  point_per_day: number | null;
+  duration: number;
+  profit: string | null;
+  speed: string;
+  is_default: boolean;
+};
+
+type Draft = {
+  plan_name: string;
+  version: string;
+  image: string;
+  speed: string;
+  profit: string;
+  price: string;
+  point_per_day: string;
+  duration: string;
+  is_default: boolean;
+};
+
+function toDraft(p?: AdminPlan | null): Draft {
+  return {
+    plan_name: p?.plan_name ?? "",
+    version: p?.version ?? "",
+    image: p?.image ?? "1.png",
+    speed: p?.speed ?? "1",
+    profit: p?.profit ?? "",
+    price: p ? String(p.price ?? 0) : "0",
+    point_per_day: p ? String(p.point_per_day ?? 0) : "0",
+    duration: p ? String(p.duration ?? 30) : "30",
+    is_default: p?.is_default ?? false,
+  };
+}
+
+function Stat({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" | "mute" }) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-ink-950/50 px-3 py-2.5">
+      <p className="text-[11px] font-medium text-slate-400">{label}</p>
+      <p
+        className={cn(
+          "font-mono mt-0.5 text-sm tabular-nums",
+          tone === "good" && "text-emerald-300",
+          tone === "bad" && "text-red-300",
+          tone === "mute" && "text-slate-200",
+          !tone && "text-white"
+        )}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function Calculator({ draft, symbol, code, decimals }: { draft: Draft; symbol: string; code: string; decimals: number }) {
+  const e = useMemo(
+    () =>
+      planEconomics({
+        price: Number(draft.price || 0),
+        point_per_day: Number(draft.point_per_day || 0),
+        duration: Number(draft.duration || 0),
+      }),
+    [draft.price, draft.point_per_day, draft.duration]
+  );
+  const money = (v: number) => `${symbol}${formatCrypto(v, decimals)}`;
+  const negative = e.ownerProfit < 0;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-ink-950/40 p-4">
+      <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-slate-300">
+        <TrendingUp size={14} className="text-gold-400" /> Owner economics
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <Stat label={`Price (${code})`} value={money(e.price)} tone="mute" />
+        <Stat label={`Payout to member (${code})`} value={money(e.payoutToUser)} tone="mute" />
+        <Stat label={`Profit per sale (${code})`} value={money(e.ownerProfit)} tone={negative ? "bad" : "good"} />
+        <Stat label="Owner margin" value={`${e.ownerMarginPct.toFixed(1)}%`} tone={negative ? "bad" : "good"} />
+        <Stat label="Member ROI" value={`${e.userRoiPct >= 0 ? "+" : ""}${e.userRoiPct.toFixed(1)}%`} tone="mute" />
+        <Stat label="Member break-even" value={e.breakEvenDays > 0 ? `${e.breakEvenDays.toFixed(1)} days` : "instant"} tone="mute" />
+      </div>
+      <p className="mt-3 text-[11px] text-slate-400">
+        Credited at <span className="font-mono text-slate-300">{earningRateFromDaily(e.daily)}</span> {code}/min ·{" "}
+        <span className="font-mono text-slate-300">{formatCrypto(e.daily, 8)}</span> {code}/day
+      </p>
+      {negative && (
+        <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-red-300">
+          <AlertTriangle size={12} /> This plan pays out more than it charges. The owner loses money per sale.
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function PlansManager({
+  plans,
+  usage,
+  symbol,
+  code,
+  decimals,
+}: {
+  plans: AdminPlan[];
+  usage: Record<number, number>;
+  symbol: string;
+  code: string;
+  decimals: number;
+}) {
+  const { run, busy } = useAdminAction();
+  const [editing, setEditing] = useState<AdminPlan | null | undefined>(undefined);
+  const [draft, setDraft] = useState<Draft>(toDraft(null));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [confirming, setConfirming] = useState<AdminPlan | null>(null);
+  const open = editing !== undefined;
+
+  const totalOwnerProfit = useMemo(
+    () =>
+      plans.reduce((sum, p) => {
+        const e = planEconomics(p);
+        return sum + (p.is_default ? 0 : e.ownerProfit);
+      }, 0),
+    [plans]
+  );
+
+  function startCreate() {
+    setDraft(toDraft(null));
+    setErrors({});
+    setEditing(null);
+  }
+  function startEdit(p: AdminPlan) {
+    setDraft(toDraft(p));
+    setErrors({});
+    setEditing(p);
+  }
+  function close() {
+    setEditing(undefined);
+    setErrors({});
+  }
+
+  async function save() {
+    const body = {
+      plan_name: draft.plan_name,
+      version: draft.version,
+      image: draft.image,
+      speed: draft.speed,
+      profit: draft.profit,
+      price: draft.price === "" ? 0 : Number(draft.price),
+      point_per_day: draft.point_per_day === "" ? 0 : Number(draft.point_per_day),
+      duration: draft.duration === "" ? 0 : Number(draft.duration),
+      is_default: draft.is_default,
+    };
+    const url = "/api/admin/plans";
+    const res = editing
+      ? await run(url, { id: editing.id, ...body }, { method: "PATCH", success: "Plan updated" })
+      : await run(url, body, { success: "Plan created" });
+    if (res.ok) close();
+    else if (res.errors) setErrors(res.errors as Record<string, string>);
+  }
+
+  async function remove() {
+    if (!confirming) return;
+    const res = await run("/api/admin/plans", { id: confirming.id }, { method: "DELETE", success: "Plan removed" });
+    if (res.ok) setConfirming(null);
+  }
+
+  const invalid = (k: string) => (errors[k] ? "border-red-500/60 focus:border-red-500/70 focus:ring-red-500/25" : "");
+  const set = (k: keyof Draft, v: string | boolean) => setDraft((d) => ({ ...d, [k]: v }));
+
+  return (
+    <div className="space-y-4">
+      <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
+        <div>
+          <h1 className="font-display text-xl font-bold text-white">Plans</h1>
+          <p className="text-xs text-slate-400">
+            {plans.length} plan{plans.length === 1 ? "" : "s"} selling · projected profit{" "}
+            <span className={cn("font-mono", totalOwnerProfit < 0 ? "text-red-300" : "text-emerald-300")}>
+              {symbol}
+              {formatCrypto(totalOwnerProfit, decimals)} {code}
+            </span>{" "}
+            per paid sale
+          </p>
+        </div>
+        <Button onClick={startCreate}>
+          <Plus size={15} /> New plan
+        </Button>
+      </div>
+
+      <div className="panel overflow-hidden rounded-3xl">
+        {plans.length === 0 ? (
+          <p className="px-6 py-10 text-center text-sm text-slate-400">
+            No plans yet. Add one to start selling hashrate.
+          </p>
+        ) : (
+          <div className="overflow-x-auto px-6 py-2 text-sm">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="text-left text-xs text-slate-400">
+                  <th className="py-3 pr-4 font-medium">Plan</th>
+                  <th className="py-3 pr-4 font-medium">Price</th>
+                  <th className="py-3 pr-4 font-medium">Daily</th>
+                  <th className="py-3 pr-4 font-medium">Duration</th>
+                  <th className="py-3 pr-4 font-medium">Owner profit</th>
+                  <th className="py-3 pr-4 font-medium">Margin</th>
+                  <th className="py-3 pr-4 font-medium">Rigs</th>
+                  <th className="py-3 pr-4 font-medium text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {plans.map((p) => {
+                  const e = planEconomics(p);
+                  return (
+                    <tr key={p.id} className="border-t border-white/5">
+                      <td className="py-3 pr-4">
+                        <span className="font-medium text-white">{p.plan_name}</span>
+                        {p.is_default && <Badge variant="gold" className="ml-2">default</Badge>}
+                        <span className="block text-xs text-slate-400">
+                          {p.version ? `${p.version} · ` : ""}
+                          {String(p.speed ?? "")}
+                        </span>
+                      </td>
+                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">
+                        {symbol}
+                        {formatCrypto(p.price, decimals)}
+                      </td>
+                      <td className="font-mono py-3 pr-4 tabular-nums text-emerald-300">
+                        +{formatCrypto(e.daily, decimals)}
+                      </td>
+                      <td className="py-3 pr-4 text-slate-300">{p.duration} days</td>
+                      <td
+                        className={cn(
+                          "font-mono py-3 pr-4 tabular-nums",
+                          p.is_default ? "text-slate-400" : e.ownerProfit < 0 ? "text-red-300" : "text-emerald-300"
+                        )}
+                      >
+                        {p.is_default ? "free" : `${symbol}${formatCrypto(e.ownerProfit, decimals)}`}
+                      </td>
+                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">
+                        {p.is_default ? "—" : `${e.ownerMarginPct.toFixed(1)}%`}
+                      </td>
+                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{usage[p.id] ?? 0}</td>
+                      <td className="py-3 pr-4">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="secondary" size="sm" onClick={() => startEdit(p)} aria-label={`Edit ${p.plan_name}`}>
+                            <Pencil size={14} /> Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setConfirming(p)}
+                            aria-label={`Remove ${p.plan_name}`}
+                            className="text-red-300 hover:bg-red-500/10 hover:text-red-200"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <Modal
+        open={open}
+        onClose={close}
+        wide
+        title={editing ? `Edit ${editing.plan_name}` : "New plan"}
+        description="Price is what the member pays. Daily yield credits to their balance every 24h while the rig runs."
+        footer={
+          <>
+            <Button variant="secondary" onClick={close} disabled={busy}>
+              Cancel
+            </Button>
+            <Button onClick={save} disabled={busy}>
+              {editing ? "Save plan" : "Create plan"}
+            </Button>
+          </>
+        }
+      >
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="p-name">Plan name</Label>
+              <Input id="p-name" value={draft.plan_name} onChange={(e) => set("plan_name", e.target.value)} className={invalid("plan_name")} placeholder="Plan V1.3" />
+              {errors.plan_name && <p className="mt-1.5 text-xs text-red-300">{errors.plan_name}</p>}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="p-version">Version label</Label>
+                <Input id="p-version" value={draft.version} onChange={(e) => set("version", e.target.value)} placeholder="V1.3" />
+              </div>
+              <div>
+                <Label htmlFor="p-speed">Hashrate</Label>
+                <Input id="p-speed" value={draft.speed} onChange={(e) => set("speed", e.target.value)} placeholder="50 KH/s" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="p-price">Price ({code})</Label>
+                <Input id="p-price" type="number" min={0} step="any" value={draft.price} onChange={(e) => set("price", e.target.value)} className={invalid("price")} />
+                {errors.price && <p className="mt-1.5 text-xs text-red-300">{errors.price}</p>}
+              </div>
+              <div>
+                <Label htmlFor="p-daily">Daily yield</Label>
+                <Input id="p-daily" type="number" min={0} step="any" value={draft.point_per_day} onChange={(e) => set("point_per_day", e.target.value)} className={invalid("point_per_day")} />
+                {errors.point_per_day && <p className="mt-1.5 text-xs text-red-300">{errors.point_per_day}</p>}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="p-duration">Duration (days)</Label>
+                <Input id="p-duration" type="number" min={1} step={1} value={draft.duration} onChange={(e) => set("duration", e.target.value)} className={invalid("duration")} />
+                {errors.duration && <p className="mt-1.5 text-xs text-red-300">{errors.duration}</p>}
+              </div>
+              <div>
+                <Label htmlFor="p-image">Card art</Label>
+                <Input id="p-image" value={draft.image} onChange={(e) => set("image", e.target.value)} placeholder="1.png" />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="p-profit">Profit blurb (shown to members)</Label>
+              <Input id="p-profit" value={draft.profit} onChange={(e) => set("profit", e.target.value)} placeholder="Up to 200%" />
+            </div>
+            <label className="flex items-center gap-3 text-sm font-semibold text-slate-200">
+              <input
+                type="checkbox"
+                checked={draft.is_default}
+                onChange={(e) => set("is_default", e.target.checked)}
+                className="h-4 w-4 rounded border-slate-600 bg-ink-900 accent-gold-500"
+              />
+              Default plan (the free starter rig)
+            </label>
+          </div>
+          <Calculator draft={draft} symbol={symbol} code={code} decimals={decimals} />
+        </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(confirming)}
+        onClose={() => setConfirming(null)}
+        title="Remove plan"
+        description={confirming ? `"${confirming.plan_name}" will be deleted.` : undefined}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setConfirming(null)} disabled={busy}>
+              Keep it
+            </Button>
+            <Button variant="destructive" onClick={remove} disabled={busy}>
+              <Trash2 size={15} /> Remove plan
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-slate-300">
+          Plans that members are still running cannot be removed. Stop those rigs first, or this will be refused.
+        </p>
+      </Modal>
+    </div>
+  );
+}

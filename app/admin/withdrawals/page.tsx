@@ -1,49 +1,38 @@
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { getSettings } from "@/lib/settings";
+import { WithdrawalsManager, type AdminWithdrawal } from "@/components/admin/withdrawals-manager";
 
 export const dynamic = "force-dynamic";
 
-type Row = { id: number; user_id: string; amount: number; status: string; created_at: string };
-
-function statusVariant(s: string): "green" | "gold" | "red" | "slate" {
-  const v = s.toLowerCase();
-  if (["paid", "success"].includes(v)) return "green";
-  if (["pending", "waiting", "processing"].includes(v)) return "gold";
-  if (["canceled", "cancelled", "failed"].includes(v)) return "red";
-  return "slate";
-}
-
 export default async function AdminWithdrawals() {
-  let rows: Row[] = [];
+  const settings = await getSettings();
+  let rows: AdminWithdrawal[] = [];
   try {
     const admin = createAdminSupabase();
-    const { data } = await admin.from("user_withdrawal").select("*").order("created_at", { ascending: false }).limit(100);
-    rows = (data ?? []) as Row[];
+    const [wRes, pRes] = await Promise.all([
+      admin
+        .from("user_withdrawal")
+        .select("id,user_id,amount,status,tx,created_at,date_paid")
+        .order("created_at", { ascending: false })
+        .limit(200),
+      admin.from("profiles").select("id,username").limit(1000),
+    ]);
+    const names = new Map<string, string | null>();
+    for (const p of (pRes.data ?? []) as Array<{ id: string; username: string | null }>) names.set(p.id, p.username);
+    rows = ((wRes.data ?? []) as Array<Omit<AdminWithdrawal, "username">>).map((r) => ({
+      ...r,
+      username: names.get(r.user_id) ?? null,
+    }));
   } catch {
     rows = [];
   }
+
   return (
-    <div className="space-y-4">
-      <h1 className="font-display text-2xl font-bold text-white">Withdrawals</h1>
-      <Card>
-        <CardHeader><CardTitle>Requests ({rows.length})</CardTitle></CardHeader>
-        <CardContent className="text-sm">
-          {rows.length === 0 ? (
-            <p className="text-slate-400">No withdrawal requests. New requests need manual review here.</p>
-          ) : (
-            <div className="divide-y divide-white/5">
-              {rows.map((r) => (
-                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                  <span className="font-mono text-xs text-slate-400">#{r.id} {String(r.user_id).slice(0, 8)}</span>
-                  <span className="font-mono tabular-nums text-white">{Number(r.amount)}</span>
-                  <Badge variant={statusVariant(String(r.status ?? ""))}>{r.status}</Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <WithdrawalsManager
+      rows={rows}
+      symbol={settings.currency_symbol}
+      code={settings.currency_code}
+      decimals={settings.currency_decimals}
+    />
   );
 }

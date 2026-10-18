@@ -4,7 +4,9 @@ import {
   Download,
   Gift,
   Hourglass,
+  Percent,
   Pickaxe,
+  Scale,
   TrendingUp,
   UserPlus,
   Users,
@@ -13,6 +15,7 @@ import {
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { Reveal } from "@/components/motion/reveal";
 import { CountUp } from "@/components/motion/count-up";
+import { planEconomics } from "@/lib/plan-math";
 
 export const dynamic = "force-dynamic";
 
@@ -58,21 +61,29 @@ export default async function AdminHome() {
   const admin = createAdminSupabase();
   let profiles: UserRow[] = [];
   let rigs: Array<{ user_id: string; status: string | null; plan_id: number }> = [];
-  let plans: Array<{ id: number; is_default: boolean | null }> = [];
+  let plans: Array<{
+    id: number;
+    plan_name: string;
+    is_default: boolean | null;
+    price: number | null;
+    point_per_day: number | null;
+    duration: number | null;
+  }> = [];
   let withdrawals: Array<{ user_id: string; amount: number; status: string | null }> = [];
   let deposits: Array<{ user_id: string; amount: number }> = [];
   let pendingInvoices = 0;
   let code = "DOGE";
+  let symbol = "Ð";
   let decimals = 8;
   try {
     const [p, r, pl, w, d, t, s] = await Promise.all([
       admin.from("profiles").select("id,username,email,balance,affiliate_earns,is_admin,created_at"),
       admin.from("user_plan_history").select("user_id,status,plan_id"),
-      admin.from("plans").select("id,is_default"),
+      admin.from("plans").select("id,plan_name,is_default,price,point_per_day,duration"),
       admin.from("user_withdrawal").select("user_id,amount,status"),
       admin.from("user_deposits").select("user_id,amount"),
       admin.from("transactions_history").select("id", { count: "exact", head: true }).eq("status", "pending"),
-      admin.from("settings").select("currency_code,currency_decimals").order("id").limit(1).maybeSingle(),
+      admin.from("settings").select("currency_code,currency_symbol,currency_decimals").order("id").limit(1).maybeSingle(),
     ]);
     profiles = (((p as { data: unknown }).data ?? []) as UserRow[]);
     rigs = (((r as { data: unknown }).data ?? []) as typeof rigs);
@@ -80,8 +91,9 @@ export default async function AdminHome() {
     withdrawals = (((w as { data: unknown }).data ?? []) as typeof withdrawals);
     deposits = (((d as { data: unknown }).data ?? []) as typeof deposits);
     pendingInvoices = (t as { count: number | null }).count ?? 0;
-    const st = (s as { data: { currency_code?: string; currency_decimals?: number } | null }).data;
+    const st = (s as { data: { currency_code?: string; currency_symbol?: string; currency_decimals?: number } | null }).data;
     if (st?.currency_code) code = st.currency_code;
+    if (st?.currency_symbol) symbol = st.currency_symbol;
     if (st?.currency_decimals != null) decimals = st.currency_decimals;
   } catch {
     // No service key during build; render zeros.
@@ -97,6 +109,16 @@ export default async function AdminHome() {
   const affiliate = profiles.reduce((s, u) => s + num(u.affiliate_earns), 0);
   const paidOut = withdrawals.filter((w) => (w.status ?? "").toUpperCase() === "SUCCESS").reduce((s, w) => s + num(w.amount), 0);
   const depositsIn = deposits.reduce((s, d) => s + num(d.amount), 0);
+
+  const catalogue = plans
+    .filter((p) => !p.is_default)
+    .map((p) => ({
+      p,
+      e: planEconomics({ price: p.price ?? 0, point_per_day: p.point_per_day ?? 0, duration: p.duration ?? 0 }),
+    }));
+  const avgMargin = catalogue.length ? catalogue.reduce((s, c) => s + c.e.ownerMarginPct, 0) / catalogue.length : 0;
+  const grossMargin = depositsIn - paidOut;
+  const money = (v: number) => `${symbol}${v.toFixed(decimals)}`;
 
   const rigCount = new Map<string, number>();
   for (const r of rigs) if (r.status === "active") rigCount.set(r.user_id, (rigCount.get(r.user_id) ?? 0) + 1);
@@ -162,6 +184,71 @@ export default async function AdminHome() {
             <CountUp value={pendingInvoices} />
           </Tile>
         </div>
+      </Reveal>
+
+      <Reveal>
+        <section className="panel overflow-hidden rounded-3xl">
+          <div className="border-b border-white/10 px-6 py-4">
+            <h2 className="font-display text-lg font-bold text-white">Owner economics</h2>
+            <p className="mt-1 text-xs text-slate-400">
+              Money in versus money out, plus the margin each active plan sells at.
+            </p>
+          </div>
+          <div className="grid gap-4 border-b border-white/10 px-6 py-5 sm:grid-cols-2 xl:grid-cols-4">
+            <Tile icon={<Scale size={15} />} label={`Gross margin (${code})`} accent={grossMargin < 0 ? "text-red-300" : "text-emerald-400"} hint="revenue in − payouts out">
+              <CountUp value={grossMargin} decimals={decimals} />
+            </Tile>
+            <Tile icon={<Wallet size={15} />} label={`Member balances held (${code})`} accent="text-gold-300" hint="outstanding liability">
+              <CountUp value={accrued} decimals={decimals} />
+            </Tile>
+            <Tile icon={<Percent size={15} />} label="Avg plan margin" accent="text-emerald-400" hint="across paid plans">
+              {avgMargin.toFixed(1)}%
+            </Tile>
+            <Tile icon={<Coins size={15} />} label="Plans selling" accent="text-gold-300" hint="paid tiers live">
+              {catalogue.length}
+            </Tile>
+          </div>
+          {catalogue.length > 0 && (
+            <div className="overflow-x-auto px-6 py-2 text-sm">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="text-left text-xs text-slate-400">
+                    <th className="py-3 pr-4 font-medium">Plan</th>
+                    <th className="py-3 pr-4 font-medium">Price</th>
+                    <th className="py-3 pr-4 font-medium">Pays out</th>
+                    <th className="py-3 pr-4 font-medium">Profit/sale</th>
+                    <th className="py-3 pr-4 font-medium">Margin</th>
+                    <th className="py-3 pr-4 font-medium">Member ROI</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {catalogue.map(({ p, e }) => (
+                    <tr key={p.id} className="border-t border-white/5">
+                      <td className="py-3 pr-4 font-medium text-white">{p.plan_name}</td>
+                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">
+                        {money(p.price ?? 0)}
+                      </td>
+                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">{money(e.payoutToUser)}</td>
+                      <td
+                        className={
+                          "font-mono py-3 pr-4 tabular-nums " +
+                          (e.ownerProfit < 0 ? "text-red-300" : "text-emerald-300")
+                        }
+                      >
+                        {money(e.ownerProfit)}
+                      </td>
+                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">{e.ownerMarginPct.toFixed(1)}%</td>
+                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">
+                        {e.userRoiPct >= 0 ? "+" : ""}
+                        {e.userRoiPct.toFixed(1)}%
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
       </Reveal>
 
       <Reveal>
