@@ -18,7 +18,7 @@ export async function GET(
       cookies().set("ref", params.uniqueId, { maxAge: 86400, path: "/" });
     }
   } catch {
-    // DB unreachable — still redirect home.
+    // DB unreachable; still redirect home.
   }
   redirect("/");
 }

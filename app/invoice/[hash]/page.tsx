@@ -27,7 +27,7 @@ export default async function InvoicePage({ params }: { params: { hash: string }
     return (
       <div className="mx-auto max-w-lg py-16 text-center">
         <h1 className="font-display text-2xl font-bold text-white">Invoice not found</h1>
-        <Link href="/dashboard" className="mt-4 inline-block text-sm font-semibold text-gold-300">← Back to console</Link>
+        <Link href="/dashboard" className="mt-4 inline-block text-sm font-semibold text-gold-300">Back to console</Link>
       </div>
     );
   }
@@ -39,7 +39,7 @@ export default async function InvoicePage({ params }: { params: { hash: string }
       <Link href="/account" className="mb-5 inline-flex items-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-gold-300">
         <ArrowLeft size={15} /> Account history
       </Link>
-      <div className="glass rounded-3xl p-7 sm:p-9">
+      <div className="panel rounded-3xl p-7 sm:p-9">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Badge variant={inv.status === "paid" ? "green" : "gold"}>{inv.status}</Badge>
           {deadline && inv.status !== "paid" && (
@@ -49,12 +49,12 @@ export default async function InvoicePage({ params }: { params: { hash: string }
           )}
         </div>
         <h1 className="font-display mt-4 text-2xl font-bold text-white sm:text-3xl">Complete your payment</h1>
-        <p className="mt-1 font-mono text-xs text-slate-500">Invoice {params.hash}</p>
+        <p className="mt-1 font-mono text-xs text-slate-400">Invoice {params.hash}</p>
 
         {p.address ? (
           <div className="mt-6 space-y-4">
             <div className="rounded-2xl bg-white/[0.03] p-5 text-center ring-1 ring-white/10">
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-500">Send exactly</p>
+              <p className="text-xs font-medium text-slate-400">Send exactly</p>
               <p className="font-display mt-1 text-3xl font-bold text-gold-300">{p.amount}</p>
               <p className="mt-4 break-all rounded-xl bg-ink-950 p-4 font-mono text-sm text-slate-200 ring-1 ring-white/10">
                 {p.address}
@@ -64,10 +64,10 @@ export default async function InvoicePage({ params }: { params: { hash: string }
                 {p.amount && <CopyButton text={p.amount} label="Copy amount" />}
               </div>
             </div>
-            <p className="flex items-start gap-2 text-xs leading-relaxed text-slate-500">
+            <p className="flex items-start gap-2 text-xs leading-relaxed text-slate-400">
               <ShieldCheck size={14} className="mt-0.5 shrink-0 text-emerald-400" />
               Your miner activates automatically once CoinPayments confirms the transaction.
-              Send the exact amount — underpayments cannot be matched.
+              Send the exact amount, since underpayments cannot be matched.
             </p>
           </div>
         ) : (

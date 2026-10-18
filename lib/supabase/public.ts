@@ -3,7 +3,7 @@ import type { Database } from "../types";
 
 let memo: ReturnType<typeof createClient<Database>> | null = null;
 
-/** Key-less public client (no cookies) — safe for cached/static rendering. */
+/** Key-less public client (no cookies), safe for cached/static rendering. */
 export function getPublicSupabase() {
   if (!memo) {
     memo = createClient<Database>(

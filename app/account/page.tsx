@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 
 export const dynamic = "force-dynamic";
 
-function statusVariant(s: string): "green" | "gold" | "red" | "slate" | "blue" {
+function statusVariant(s: string): "green" | "gold" | "red" | "slate" {
   const v = s.toLowerCase();
   if (["paid", "success"].includes(v)) return "green";
   if (["pending", "waiting", "processing"].includes(v)) return "gold";
@@ -38,7 +38,7 @@ export default async function AccountPage() {
     return (
       <div className="mx-auto max-w-lg py-16 text-center">
         <h1 className="font-display text-3xl font-bold text-white">Sign in required</h1>
-        <Link href="/login" className="mt-6 inline-flex h-11 items-center rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-6 font-display text-sm font-bold text-ink-950">
+        <Link href="/login" className="mt-6 inline-flex h-11 items-center rounded-xl bg-gold-500 px-6 font-display text-sm font-bold text-ink-950 transition-colors hover:bg-gold-400">
           Sign in
         </Link>
       </div>
@@ -73,7 +73,7 @@ export default async function AccountPage() {
     {
       title: `Referrals (${referrals.data.length})`,
       rows: referrals.data,
-      emptyText: "No referrals yet — share your link from the Affiliate page.",
+      emptyText: "No referrals yet. Share your link from the Affiliate page.",
       render: (r, i) => <Row key={i} k={String(r.username)} v={r.created_at ? new Date(String(r.created_at)).toLocaleDateString() : ""} />,
     },
     {
@@ -106,20 +106,19 @@ export default async function AccountPage() {
     <div className="space-y-8 py-8">
       <div className="flex items-center justify-between">
         <div>
-          <p className="font-display text-xs font-bold uppercase tracking-[0.2em] text-gold-400">Ledger</p>
-          <h1 className="font-display mt-1 text-3xl font-bold text-white">Account history</h1>
+          <h1 className="font-display text-3xl font-bold text-white">Account history</h1>
         </div>
-        <Link href="/dashboard" className="glass inline-flex h-10 items-center gap-1.5 rounded-xl px-4 text-sm font-semibold text-slate-200">
+        <Link href="/dashboard" className="panel inline-flex h-11 items-center gap-1.5 rounded-xl px-4 text-sm font-semibold text-slate-200">
           <ArrowLeft size={15} /> Console
         </Link>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         {sections.map((sec) => (
-          <div key={sec.title} className="glass rounded-2xl p-5">
+          <div key={sec.title} className="panel rounded-2xl p-5">
             <h2 className="font-display mb-2 text-base font-bold text-white">{sec.title}</h2>
             {sec.rows.length === 0 ? (
-              <p className="py-3 text-sm text-slate-500">{sec.emptyText}</p>
+              <p className="py-3 text-sm text-slate-400">{sec.emptyText}</p>
             ) : (
               <div>{sec.rows.map(sec.render)}</div>
             )}
@@ -127,12 +126,12 @@ export default async function AccountPage() {
         ))}
       </div>
 
-      <div className="glass rounded-2xl p-5">
+      <div className="panel rounded-2xl p-5">
         <h2 className="font-display mb-2 flex items-center gap-2 text-base font-bold text-white">
           <Receipt size={16} className="text-gold-300" /> Open invoices
         </h2>
         {pending.data.length === 0 ? (
-          <p className="py-3 text-sm text-slate-500">No open invoices.</p>
+          <p className="py-3 text-sm text-slate-400">No open invoices.</p>
         ) : (
           pending.data.map((t) => (
             <div key={String(t.hash)} className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 py-2.5 text-sm last:border-0">

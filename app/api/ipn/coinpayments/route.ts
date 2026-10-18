@@ -5,7 +5,7 @@ import { verifyIpnHmac } from "@/lib/coinpayments";
 import { affiliateCommission, expirationForPlan } from "@/lib/mining";
 
 /**
- * POST /api/ipn/coinpayments — port of GatewayIpn::coinpayments().
+ * POST /api/ipn/coinpayments: port of GatewayIpn::coinpayments().
  * CoinPayments sends application/x-www-form-urlencoded with HMAC header.
  */
 export async function POST(req: Request) {

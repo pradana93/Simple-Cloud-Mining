@@ -3,11 +3,7 @@ import { getPublicSupabase } from "./supabase/public";
 import { FALLBACK } from "./settings";
 import type { Plan, SiteSettings } from "./types";
 
-/**
- * Cached public catalog — the performance fix.
- * Public pages (home, payouts, faq, affiliate) read through here instead of
- * hitting Supabase on every request. ISR-style revalidation keeps TTFB fast.
- */
+// Cached public catalog so public pages skip a Supabase round-trip per request.
 
 export const getCachedSettings = unstable_cache(
   async (): Promise<SiteSettings> => {

@@ -1,14 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { accrueForPlan } from "./mining";
 
-/**
- * Free-tier friendly lazy accrual: credit the signed-in user's own active
- * plans on page view, so balances stay fresh even though the Vercel Hobby
- * cron only runs once daily (safety net for expiry + inactive users).
- *
- * Runs under the user's own session — RLS policies ("own plans",
- * "own profile") permit these updates. Same math as the cron route.
- */
+// Credit the signed-in user's own active plans on page view; the daily cron is the safety net.
 export async function accrueOwnPlans(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: SupabaseClient<any>,

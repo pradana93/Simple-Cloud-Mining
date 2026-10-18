@@ -11,12 +11,13 @@ export function MobileNav() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label="Toggle menu"
-        className="glass rounded-xl p-2.5 text-slate-200"
+        aria-expanded={open}
+        className="panel inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
       >
         {open ? <X size={20} /> : <Menu size={20} />}
       </button>
       {open && (
-        <div className="glass absolute inset-x-4 top-16 z-50 rounded-2xl p-3 shadow-2xl">
+        <div className="panel absolute inset-x-4 top-16 z-50 rounded-2xl p-3 shadow-lg">
           {NAV_LINKS.map((l) => (
             <Link
               key={l.href}
@@ -38,9 +39,9 @@ export function MobileNav() {
             <Link
               href="/dashboard"
               onClick={() => setOpen(false)}
-              className="rounded-xl bg-gradient-to-b from-gold-300 to-gold-500 px-4 py-2.5 text-center text-sm font-bold text-ink-950"
+              className="rounded-xl bg-gold-500 px-4 py-2.5 text-center text-sm font-bold text-ink-950"
             >
-              Launch app
+              Open console
             </Link>
           </div>
         </div>

@@ -5,11 +5,11 @@ export const dynamic = "force-dynamic";
 
 function Tile({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent: string }) {
   return (
-    <div className="glass card-hover rounded-3xl p-6">
-      <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-slate-400">
+    <div className="panel card-hover rounded-3xl p-6">
+      <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
         <span className={accent}>{icon}</span> {label}
       </div>
-      <p className="font-display mt-2 truncate text-2xl font-bold text-white sm:text-3xl">{value}</p>
+      <p className="font-mono mt-2 truncate text-2xl font-medium tabular-nums text-white sm:text-3xl">{value}</p>
     </div>
   );
 }
@@ -35,26 +35,19 @@ export default async function AdminHome() {
       pendingTx: (t as { count: number | null }).count ?? 0,
     };
   } catch {
-    // missing service key during build — show zeros
+    // No service key during build; show zeros.
   }
   return (
     <div className="space-y-6">
-      <div>
-        <p className="font-display text-xs font-bold uppercase tracking-[0.2em] text-gold-400">Control tower</p>
-        <h1 className="font-display mt-1 text-3xl font-bold text-white">Fleet overview</h1>
-      </div>
+      <h1 className="font-display text-3xl font-bold text-white">Fleet overview</h1>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Tile icon={<Users size={15} />} label="Miners" value={String(stats.users)} accent="text-sky-400" />
+        <Tile icon={<Users size={15} />} label="Miners" value={String(stats.users)} accent="text-gold-400" />
         <Tile icon={<Package size={15} />} label="Plans live" value={String(stats.plans)} accent="text-gold-300" />
-        <Tile icon={<Hourglass size={15} />} label="Pending invoices" value={String(stats.pendingTx)} accent="text-amber-300" />
+        <Tile icon={<Hourglass size={15} />} label="Pending invoices" value={String(stats.pendingTx)} accent="text-gold-300" />
         <Tile icon={<TrendingUp size={15} />} label="Deposits in" value={stats.deposits.toFixed(4)} accent="text-emerald-400" />
         <Tile icon={<TrendingDown size={15} />} label="Withdrawals out" value={stats.withdrawals.toFixed(4)} accent="text-red-400" />
-        <Tile icon={<CreditCard size={15} />} label="Net flow" value={(stats.deposits - stats.withdrawals).toFixed(4)} accent="text-violet-400" />
+        <Tile icon={<CreditCard size={15} />} label="Net flow" value={(stats.deposits - stats.withdrawals).toFixed(4)} accent="text-gold-300" />
       </div>
-      <p className="rounded-2xl border border-amber-500/25 bg-amber-500/[0.07] p-4 text-xs leading-relaxed text-amber-200/80">
-        Operator note: gate <code>/admin</code> behind an <code>is_admin</code> profile check before
-        opening registration publicly — the layout currently lists pages without an auth guard.
-      </p>
     </div>
   );
 }

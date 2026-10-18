@@ -58,20 +58,19 @@ export default function AdminNav() {
   );
   return (
     <>
-      <aside className="glass hidden h-fit rounded-2xl p-4 lg:block">
-        <h2 className="font-display px-2 pb-3 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
-          Control tower
-        </h2>
+      <aside className="panel hidden h-fit rounded-2xl p-4 lg:block">
+        <h2 className="font-display px-2 pb-3 text-sm font-semibold text-slate-400">Admin</h2>
         {nav}
       </aside>
       <div className="lg:hidden">
         <button
           onClick={() => setOpen((v) => !v)}
-          className="glass inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold"
+          aria-expanded={open}
+          className="panel inline-flex h-11 items-center gap-2 rounded-xl px-4 text-sm font-semibold"
         >
           {open ? <X size={16} /> : <Menu size={16} />} Admin menu
         </button>
-        {open && <div className="glass mt-2 rounded-2xl p-3">{nav}</div>}
+        {open && <div className="panel mt-2 rounded-2xl p-3">{nav}</div>}
       </div>
     </>
   );

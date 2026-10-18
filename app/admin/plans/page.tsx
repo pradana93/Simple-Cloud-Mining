@@ -3,29 +3,66 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
-async function table<T>(name: string, order = "id") {
-  try {
-    const admin = createAdminSupabase();
-    const { data } = await admin.from(name).select("*").order(order, { ascending: false }).limit(100);
-    return (data ?? []) as T[];
-  } catch {
-    return [] as T[];
-  }
-}
-
-function Generic({ title, rows }: { title: string; rows: Array<Record<string, unknown>> }) {
-  const cols = rows.length ? Object.keys(rows[0]).slice(0, 8) : [];
-  return (
-    <Card><CardHeader><CardTitle>{title} ({rows.length})</CardTitle></CardHeader><CardContent className="overflow-x-auto text-xs">
-      <table className="w-full border-collapse">
-        <thead><tr>{cols.map((c) => <th key={c} className="border p-1 text-left">{c}</th>)}</tr></thead>
-        <tbody>{rows.map((r, i) => <tr key={i}>{cols.map((c) => <td key={c} className="border p-1">{String(r[c] ?? "")?.slice(0, 60)}</td>)}</tr>)}</tbody>
-      </table>
-    </CardContent></Card>
-  );
-}
+type PlanRow = {
+  id: number;
+  plan_name: string;
+  version: string | null;
+  price: number;
+  point_per_day: number | null;
+  duration: number;
+  speed: string | number | null;
+};
 
 export default async function AdminPlans() {
-  const rows = await table<Record<string, unknown>>("plans");
-  return <div className="space-y-4"><h1 className="text-2xl font-bold">Plans</h1><Generic title="plans" rows={rows} /></div>;
+  let rows: PlanRow[] = [];
+  try {
+    const admin = createAdminSupabase();
+    const { data } = await admin
+      .from("plans")
+      .select("id,plan_name,version,price,point_per_day,duration,speed")
+      .order("price")
+      .limit(100);
+    rows = (data ?? []) as PlanRow[];
+  } catch {
+    rows = [];
+  }
+  return (
+    <div className="space-y-4">
+      <h1 className="font-display text-2xl font-bold text-white">Plans</h1>
+      <Card>
+        <CardHeader><CardTitle>Published plans ({rows.length})</CardTitle></CardHeader>
+        <CardContent className="overflow-x-auto text-sm">
+          {rows.length === 0 ? (
+            <p className="text-slate-400">No plans published. Add rows to the `plans` table in Supabase to sell hashrate.</p>
+          ) : (
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="text-left text-xs text-slate-400">
+                  <th className="py-2 pr-4 font-medium">Plan</th>
+                  <th className="py-2 pr-4 font-medium">Price</th>
+                  <th className="py-2 pr-4 font-medium">Daily yield</th>
+                  <th className="py-2 pr-4 font-medium">Duration</th>
+                  <th className="py-2 pr-4 font-medium">Hashrate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={r.id} className="border-t border-white/5">
+                    <td className="py-2 pr-4">
+                      <span className="font-medium text-white">{r.plan_name}</span>
+                      {r.version ? <span className="ml-2 text-xs text-slate-400">{r.version}</span> : null}
+                    </td>
+                    <td className="py-2 pr-4 font-mono tabular-nums text-slate-200">{Number(r.price)}</td>
+                    <td className="py-2 pr-4 font-mono tabular-nums text-emerald-300">+{Number(r.point_per_day ?? 0)}</td>
+                    <td className="py-2 pr-4 text-slate-300">{r.duration} days</td>
+                    <td className="py-2 pr-4 text-slate-300">{String(r.speed ?? "")}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

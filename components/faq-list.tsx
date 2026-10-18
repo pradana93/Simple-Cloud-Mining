@@ -7,8 +7,8 @@ export function FaqList({ faqs }: { faqs: Array<{ id: number; question: string; 
   const [open, setOpen] = useState<number | null>(0);
   if (faqs.length === 0) {
     return (
-      <div className="glass rounded-2xl p-8 text-center text-sm text-slate-500">
-        Answers are syncing — check back in a minute.
+      <div className="panel rounded-2xl p-8 text-center text-sm text-slate-400">
+        No answers published yet. Check back shortly.
       </div>
     );
   }
@@ -17,7 +17,7 @@ export function FaqList({ faqs }: { faqs: Array<{ id: number; question: string; 
       {faqs.map((f, i) => {
         const isOpen = open === i;
         return (
-          <div key={f.id} className={cn("glass overflow-hidden rounded-2xl transition-colors", isOpen && "border-gold-500/40")}>
+          <div key={f.id} className={cn("panel overflow-hidden rounded-2xl transition-colors", isOpen && "border-gold-500/40")}>
             <button
               onClick={() => setOpen(isOpen ? null : i)}
               className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left"

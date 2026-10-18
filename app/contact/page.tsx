@@ -19,7 +19,7 @@ export default function ContactPage() {
         subject: String(formData.get("subject")),
         message: String(formData.get("message")),
       });
-      setMsg(error ? { ok: false, text: `Error: ${error.message}` } : { ok: true, text: "Message received — we reply within 24h." });
+      setMsg(error ? { ok: false, text: `Error: ${error.message}` } : { ok: true, text: "Message received. We reply within 24 hours." });
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Send failed" });
     } finally {
@@ -35,7 +35,7 @@ export default function ContactPage() {
         <h1 className="font-display mt-4 text-3xl font-bold text-white sm:text-4xl">Talk to a human</h1>
         <p className="mt-2 text-slate-400">Support, sales and partnership inquiries.</p>
       </div>
-      <div className="glass mt-8 rounded-3xl p-7">
+      <div className="panel mt-8 rounded-3xl p-7">
         <form action={submit} className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div><Label htmlFor="name">Name</Label><Input id="name" name="name" placeholder="Satoshi" required /></div>
@@ -46,7 +46,7 @@ export default function ContactPage() {
             <Label htmlFor="message">Message</Label>
             <textarea
               id="message" name="message" minLength={10} required rows={5} placeholder="How can we help?"
-              className="w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25"
+              className="w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 py-2.5 text-sm text-slate-100 placeholder:text-slate-400 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25"
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>

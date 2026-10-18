@@ -19,7 +19,7 @@ export default function WithdrawalPage() {
         body: JSON.stringify({ amount: Number(fd.get("amount")) }),
       });
       const j = await res.json();
-      setMsg(j.ok ? { ok: true, text: "Withdraw requested — track it in Account history." } : { ok: false, text: `Error: ${j.error}` });
+      setMsg(j.ok ? { ok: true, text: "Withdrawal requested. Track it in Account history." } : { ok: false, text: `Error: ${j.error}` });
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Request failed" });
     } finally {
@@ -54,7 +54,7 @@ export default function WithdrawalPage() {
               {msg.text}
             </p>
           )}
-          <p className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-slate-500">
+          <p className="mt-5 flex items-start gap-2 text-xs leading-relaxed text-slate-400">
             <ShieldCheck size={14} className="mt-0.5 shrink-0 text-emerald-400" />
             Withdrawals respect the min/max limits configured by the operator. Make sure your
             payout wallet is set before requesting.

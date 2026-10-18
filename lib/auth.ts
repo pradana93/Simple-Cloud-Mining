@@ -1,12 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
 
-/**
- * Server-side admin gate. Call at the top of any admin server component
- * BEFORE touching the service-role client. Fails closed: an unauthenticated
- * visitor is sent to /login, a signed-in non-admin gets a 404 (no hint that
- * the area exists), and any auth/DB error also 404s rather than leaking.
- */
+// Admin gate: redirect anonymous users to /login, 404 signed-in non-admins, fail closed on error.
 export async function requireAdmin(): Promise<{ id: string; email: string | null }> {
   const supabase = createServerSupabase();
   let user: { id: string; email?: string | null } | null = null;

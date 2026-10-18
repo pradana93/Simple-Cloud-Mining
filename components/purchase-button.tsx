@@ -27,7 +27,7 @@ export function PurchaseButton({ planId }: { planId: number }) {
   return (
     <div>
       <Button onClick={buy} disabled={loading} className="w-full">{loading ? "Creating invoice…" : "Confirm purchase"}</Button>
-      {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
+      {err && <p className="mt-2 text-sm text-red-300">{err}</p>}
     </div>
   );
 }

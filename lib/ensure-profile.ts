@@ -1,12 +1,6 @@
 import { createAdminSupabase } from "./supabase/admin";
 
-/**
- * Self-healing profile bootstrap (service-role).
- * Guarantees every authenticated user has: profile row, referral link,
- * and at least one active (free) plan — even if the signup trigger was
- * bypassed or the client insert failed on RLS. Safe to call on every
- * dashboard visit; all steps are idempotent.
- */
+// Idempotent bootstrap: guarantees a profile, referral link, and a free plan.
 export async function ensureProfile(opts: {
   userId: string;
   email: string | null;
@@ -92,6 +86,6 @@ export async function ensureProfile(opts: {
 
     return { created, username: row?.username ?? null };
   } catch {
-    return null; // e.g. service key missing — pages render anyway
+    return null; // e.g. missing service key; pages still render
   }
 }

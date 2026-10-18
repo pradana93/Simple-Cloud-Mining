@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
   // If Supabase isn't configured (env vars missing on the host), never take
-  // the whole site down — just pass through. Pages render with fallbacks.
+  // the whole site down; pass through and let pages render with fallbacks.
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) {
@@ -30,7 +30,7 @@ export async function middleware(request: NextRequest) {
     const { data } = await supabase.auth.getUser();
     user = data.user;
   } catch {
-    // Treat as logged out — pages handle null user.
+    // Treat as logged out; pages handle a null user.
   }
   // Edge gate for the control tower: anonymous visitors never reach /admin.
   // The is_admin check runs server-side in app/admin/layout.tsx.
