@@ -163,9 +163,8 @@ export default async function DashboardPage() {
   const activeRows = rows.filter(
     (r) => r.status === "active" && (!r.expire_date || new Date(r.expire_date).getTime() > now)
   );
-  const { pending } = await accrueOwnPlans(supabase, userId, {
+  const { pending } = await accrueOwnPlans(userId, {
     rows: activeRows as unknown as AccrualRow[],
-    balance: stored,
   });
   const rate = totalMiningRate(activeRows.map((r) => ({ earning_rate: planOf(r)?.earning_rate ?? null })));
   const balance = stored + pending;

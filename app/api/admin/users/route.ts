@@ -59,10 +59,16 @@ export async function POST(req: Request) {
       if (!userId || !Number.isFinite(amount)) {
         return NextResponse.json({ ok: false, error: "Member and amount are required" }, { status: 400 });
       }
+      if (mode === "add") {
+        const { data: nb, error } = await admin.rpc("credit_balance", { p_user_id: userId, p_amount: amount });
+        if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+        if (nb == null) return NextResponse.json({ ok: false, error: "Member not found" }, { status: 404 });
+        const next = Number(nb);
+        return NextResponse.json({ ok: true, balance: next, message: `Balance set to ${next.toFixed(8)}` });
+      }
       const { data: profile } = await admin.from("profiles").select("balance").eq("id", userId).maybeSingle();
       if (!profile) return NextResponse.json({ ok: false, error: "Member not found" }, { status: 404 });
-      const current = Number((profile as { balance: number }).balance);
-      const next = Math.max(0, mode === "set" ? amount : current + amount);
+      const next = Math.max(0, amount);
       const { error } = await admin.from("profiles").update({ balance: next }).eq("id", userId);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
       return NextResponse.json({ ok: true, balance: next, message: `Balance set to ${next.toFixed(8)}` });

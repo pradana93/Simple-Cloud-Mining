@@ -70,7 +70,7 @@ export default async function WithdrawalPage() {
     // render with an empty balance and no history
   }
 
-  const { pending } = await accrueOwnPlans(supabase, userId, { rows: activePlans, balance: stored });
+  const { pending } = await accrueOwnPlans(userId, { rows: activePlans });
   const rate = totalMiningRate(activePlans.map((r) => ({ earning_rate: planOf(r)?.earning_rate ?? null })));
   const balance = stored + pending;
   const defaultAddress = withdrawals.find((w) => w.address)?.address ?? "";

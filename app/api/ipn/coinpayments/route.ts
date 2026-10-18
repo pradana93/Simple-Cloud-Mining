@@ -68,7 +68,15 @@ export async function POST(req: Request) {
   }
 
   if (status >= 100 || status === 2) {
-    await admin.from("transactions_history").update({ status: "paid", paid_amount: amount1, txid: txnId }).eq("id", t.id);
+    // Claim the invoice exactly once; a racing duplicate IPN gets no row back.
+    const { data: claimed } = await admin
+      .from("transactions_history")
+      .update({ status: "paid", paid_amount: amount1, txid: txnId })
+      .eq("id", t.id)
+      .neq("status", "paid")
+      .select("id")
+      .maybeSingle();
+    if (!claimed) return new Response("IPN OK");
     await admin.from("user_deposits").insert({ user_id: t.user_id, amount: amount1, tx: txnId, status: "SUCCESS", date_paid: new Date().toISOString() });
     const { data: plan } = await admin.from("plans").select("*").eq("id", t.plan_id).maybeSingle();
     if (plan) {

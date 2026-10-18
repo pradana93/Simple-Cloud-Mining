@@ -33,9 +33,14 @@ export async function POST(req: Request) {
   }
 
   const admin = createAdminSupabase();
-  const { data: profile } = await admin.from("profiles").select("balance").eq("id", user.id).maybeSingle();
-  const balance = Number((profile as { balance: number } | null)?.balance ?? 0);
-  if (!profile || balance < amount) {
+
+  // Atomic reserve: one guarded UPDATE so concurrent requests can't overspend.
+  const { data: debited, error: debitError } = await admin.rpc("debit_balance", {
+    p_user_id: user.id,
+    p_amount: amount,
+  });
+  if (debitError) return NextResponse.json({ ok: false, error: debitError.message }, { status: 500 });
+  if (debited == null) {
     return NextResponse.json({ ok: false, error: "Insufficient earnings balance" }, { status: 400 });
   }
 
@@ -44,16 +49,12 @@ export async function POST(req: Request) {
     .insert({ user_id: user.id, amount, address })
     .select("id")
     .maybeSingle();
-  if (insertError) return NextResponse.json({ ok: false, error: insertError.message }, { status: 500 });
-  const id = (created as { id: number } | null)?.id ?? null;
-
-  // Read-modify-write guarded by the balance check above. If the debit fails,
-  // drop the request row so a member never sees a phantom withdrawal.
-  const { error } = await admin.from("profiles").update({ balance: balance - amount }).eq("id", user.id);
-  if (error) {
-    if (id) await admin.from("user_withdrawal").delete().eq("id", id);
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (insertError) {
+    // Refund the reserved amount so a member never loses balance to a failed row.
+    await admin.rpc("credit_balance", { p_user_id: user.id, p_amount: amount });
+    return NextResponse.json({ ok: false, error: insertError.message }, { status: 500 });
   }
+  const id = (created as { id: number } | null)?.id ?? null;
 
   return NextResponse.json({ ok: true, id });
 }

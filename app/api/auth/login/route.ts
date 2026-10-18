@@ -24,6 +24,16 @@ export async function POST(req: Request) {
 
   try {
     const admin = createAdminSupabase();
+    const ip = (req.headers.get("x-forwarded-for")?.split(",")[0] ?? "").trim().slice(0, 45);
+    const since = Date.now() - 10 * 60 * 1000;
+    const { count } = await admin
+      .from("login_attempts")
+      .select("id", { count: "exact", head: true })
+      .eq("login", raw)
+      .gte("time", since);
+    if ((count ?? 0) >= 10) {
+      return NextResponse.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
+    }
     type Lite = { email: string | null; is_admin: boolean };
     let row: Lite | null = null;
 
@@ -46,6 +56,7 @@ export async function POST(req: Request) {
     }
 
     if (!row?.email) {
+      await admin.from("login_attempts").insert({ ip_address: ip, login: raw, time: Date.now() });
       return NextResponse.json({ ok: false, error: "Invalid username or password" }, { status: 401 });
     }
 
@@ -65,8 +76,10 @@ export async function POST(req: Request) {
 
     const { error } = await supabase.auth.signInWithPassword({ email: row.email, password });
     if (error) {
+      await admin.from("login_attempts").insert({ ip_address: ip, login: raw, time: Date.now() });
       return NextResponse.json({ ok: false, error: "Invalid username or password" }, { status: 401 });
     }
+    await admin.from("login_attempts").delete().eq("login", raw);
     return res;
   } catch {
     return NextResponse.json({ ok: false, error: "Sign-in is unavailable right now" }, { status: 500 });

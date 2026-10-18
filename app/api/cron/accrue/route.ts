@@ -8,13 +8,15 @@ export const dynamic = "force-dynamic";
  * Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically.
  */
 export async function GET(req: Request) {
-  const url = new URL(req.url);
+  const expected = process.env.CRON_SECRET;
+  if (!expected) {
+    return NextResponse.json({ ok: false, error: "Cron is not configured" }, { status: 503 });
+  }
   const auth = req.headers.get("authorization");
   const secret =
     req.headers.get("x-cron-secret") ??
-    url.searchParams.get("secret") ??
     (auth?.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : null);
-  if (process.env.CRON_SECRET && secret !== process.env.CRON_SECRET) {
+  if (secret !== expected) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   try {

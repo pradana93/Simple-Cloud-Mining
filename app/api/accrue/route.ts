@@ -18,7 +18,7 @@ export async function POST() {
   }
   if (!userId) return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
 
-  const { pending, credited } = await accrueOwnPlans(supabase, userId, {});
+  const { pending, credited } = await accrueOwnPlans(userId, {});
   const { data } = await supabase.from("profiles").select("balance").eq("id", userId).maybeSingle();
   const stored = Number((data as { balance: number } | null)?.balance ?? 0);
   return NextResponse.json({ ok: true, balance: stored + (pending - credited) });

@@ -16,6 +16,9 @@ export async function POST(req: Request) {
 
   const { data: plan } = await admin.from("plans").select("*").eq("id", planId).maybeSingle();
   if (!plan) return NextResponse.json({ ok: false, error: "Plan not found" }, { status: 404 });
+  if (!(Number((plan as { price: number }).price) > 0)) {
+    return NextResponse.json({ ok: false, error: "This plan cannot be purchased" }, { status: 400 });
+  }
 
   const { count } = await admin
     .from("transactions_history")

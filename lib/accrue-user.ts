@@ -1,4 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminSupabase } from "./supabase/admin";
 import { accrueForPlan } from "./mining";
 
 export type AccrualRow = {
@@ -10,7 +10,8 @@ export type AccrualRow = {
 };
 
 // Credit the signed-in user's own active plans; the daily cron is the safety net.
-// Writes are throttled and batched so a page view normally costs zero writes.
+// Writes run with the service role (clients can no longer write balances/rigs) and
+// the balance bump is a single atomic credit_balance call.
 //
 // Returns two numbers:
 //   pending  - earnings projected since each rig's last_sum, for live display.
@@ -21,16 +22,15 @@ export type AccrualRow = {
 const MIN_INTERVAL_MS = 60_000;
 
 export async function accrueOwnPlans(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: SupabaseClient<any>,
   userId: string,
-  opts: { rows?: AccrualRow[]; balance?: number; minIntervalMs?: number } = {}
+  opts: { rows?: AccrualRow[]; minIntervalMs?: number } = {}
 ): Promise<{ pending: number; credited: number }> {
   try {
+    const admin = createAdminSupabase();
     const now = new Date();
     let rows = opts.rows;
     if (!rows) {
-      const { data } = await supabase
+      const { data } = await admin
         .from("user_plan_history")
         .select("id,expire_date,last_sum,created_at,plan:plans(earning_rate)")
         .eq("user_id", userId)
@@ -71,18 +71,13 @@ export async function accrueOwnPlans(
 
     const writes: Array<PromiseLike<unknown>> = [];
     if (dueIds.length > 0) {
-      writes.push(supabase.from("user_plan_history").update({ last_sum: now.toISOString() }).in("id", dueIds));
+      writes.push(admin.from("user_plan_history").update({ last_sum: now.toISOString() }).in("id", dueIds));
     }
     if (expiredIds.length > 0) {
-      writes.push(supabase.from("user_plan_history").update({ status: "inactive" }).in("id", expiredIds));
+      writes.push(admin.from("user_plan_history").update({ status: "inactive" }).in("id", expiredIds));
     }
     if (credited > 0) {
-      let current = opts.balance;
-      if (current == null) {
-        const { data: profile } = await supabase.from("profiles").select("balance").eq("id", userId).maybeSingle();
-        current = Number((profile as { balance: number } | null)?.balance ?? 0);
-      }
-      writes.push(supabase.from("profiles").update({ balance: current + credited }).eq("id", userId));
+      writes.push(admin.rpc("credit_balance", { p_user_id: userId, p_amount: credited }));
     }
     await Promise.all(writes);
     return { pending, credited };

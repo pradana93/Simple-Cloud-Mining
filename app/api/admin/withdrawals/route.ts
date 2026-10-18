@@ -46,11 +46,7 @@ export async function POST(req: Request) {
         .update({ status: "CANCELED", date_paid: new Date().toISOString() })
         .eq("id", id);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-      const { data: profile } = await admin.from("profiles").select("balance").eq("id", w.user_id).maybeSingle();
-      if (profile) {
-        const next = Number((profile as { balance: number }).balance) + Number(w.amount);
-        await admin.from("profiles").update({ balance: next }).eq("id", w.user_id);
-      }
+      await admin.rpc("credit_balance", { p_user_id: w.user_id, p_amount: Number(w.amount) });
       revalidateTag("payouts");
       return NextResponse.json({ ok: true, message: `Rejected and refunded ${Number(w.amount).toFixed(8)}` });
     }

@@ -70,7 +70,7 @@ export default async function AccountPage() {
   } catch {
     // render empty sections
   }
-  await accrueOwnPlans(supabase, userId, { rows: accrualRows });
+  await accrueOwnPlans(userId, { rows: accrualRows });
 
   const sections: Array<{ title: string; rows: Array<Record<string, number | string | null>>; render: (r: Record<string, number | string | null>, i: number) => React.ReactNode; emptyText: string }> = [
     {

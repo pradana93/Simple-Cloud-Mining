@@ -1,6 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { getPublicSupabase } from "./supabase/public";
-import { FALLBACK } from "./settings";
+import { FALLBACK, PUBLIC_SETTINGS_COLUMNS } from "./settings";
 import type { Plan, SiteSettings } from "./types";
 
 // Cached public catalog so public pages skip a Supabase round-trip per request.
@@ -10,7 +10,7 @@ export const getCachedSettings = unstable_cache(
     try {
       const { data } = await getPublicSupabase()
         .from("settings")
-        .select("*")
+        .select(PUBLIC_SETTINGS_COLUMNS)
         .order("id", { ascending: true })
         .limit(1)
         .maybeSingle();
