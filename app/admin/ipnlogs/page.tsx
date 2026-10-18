@@ -1,5 +1,6 @@
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AdminPageHeader } from "@/components/admin/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,7 @@ export default async function AdminIpnLogs() {
   }
   return (
     <div className="space-y-4">
-      <h1 className="font-display text-2xl font-bold text-white">IPN logs</h1>
+      <AdminPageHeader title="IPN logs" />
       <Card>
         <CardHeader><CardTitle>CoinPayments callback errors ({rows.length})</CardTitle></CardHeader>
         <CardContent className="text-sm">

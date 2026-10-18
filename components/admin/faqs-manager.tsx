@@ -3,6 +3,7 @@ import { useState } from "react";
 import { HelpCircle, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { Modal } from "@/components/admin/modal";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 
@@ -54,10 +55,7 @@ export function FaqsManager({ rows }: { rows: AdminFaq[] }) {
   return (
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
-        <div>
-          <h1 className="font-display text-xl font-bold text-white">FAQs</h1>
-          <p className="text-xs text-slate-400">{rows.length} answers published on the FAQ page</p>
-        </div>
+        <AdminPageHeader title="FAQs" description={<>{rows.length} answers published on the FAQ page</>} />
         <Button onClick={startCreate}>
           <Plus size={15} /> New FAQ
         </Button>

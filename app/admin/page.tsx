@@ -1,4 +1,6 @@
+import Link from "next/link";
 import {
+  AlertTriangle,
   ArrowLeftRight,
   Coins,
   Download,
@@ -7,15 +9,19 @@ import {
   Percent,
   Pickaxe,
   Scale,
+  Share2,
+  TrendingDown,
   TrendingUp,
   UserPlus,
   Users,
   Wallet,
 } from "lucide-react";
 import { createAdminSupabase } from "@/lib/supabase/admin";
-import { Reveal } from "@/components/motion/reveal";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { CountUp } from "@/components/motion/count-up";
+import { Badge } from "@/components/ui/badge";
 import { planEconomics } from "@/lib/plan-math";
+import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -28,34 +34,44 @@ type UserRow = {
   is_admin: boolean | null;
   created_at: string | null;
 };
+type DepositRow = { user_id: string; amount: number; created_at: string | null };
 
-function Tile({
-  icon,
-  label,
-  children,
-  accent,
-  hint,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  children: React.ReactNode;
-  accent: string;
-  hint?: string;
-}) {
+const num = (v: unknown) => Number(v ?? 0);
+const DAY = 86_400_000;
+const WINDOW = 14;
+
+function signed(symbol: string, v: number, decimals: number) {
+  return `${v < 0 ? "-" : ""}${symbol}${Math.abs(v).toFixed(decimals)}`;
+}
+
+// 14-day bars over a bounded scale. The daily numbers are also printed as text,
+// so the shape is a readout, not the only place the figure lives.
+function Bars({ values, accent, label }: { values: number[]; accent: string; label: string }) {
+  const max = Math.max(1, ...values);
   return (
-    <div className="panel card-hover rounded-3xl border-t-2 border-t-white/10 p-6">
-      <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
-        <span className={accent}>{icon}</span> {label}
-      </div>
-      <p className="font-mono mt-2 truncate text-2xl font-medium tabular-nums text-white sm:text-3xl">
-        {children}
-      </p>
-      {hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
+    <div className="flex h-14 items-end gap-1" role="img" aria-label={label}>
+      {values.map((v, i) => (
+        <div
+          key={i}
+          className={cn("flex-1 rounded-sm", v === 0 ? "bg-white/5" : accent)}
+          style={{ height: `${Math.max(8, (v / max) * 100)}%` }}
+        />
+      ))}
     </div>
   );
 }
 
-const num = (v: unknown) => Number(v ?? 0);
+function Readout({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-4 py-3">
+      <span className="flex items-center gap-2 text-sm text-slate-300">
+        <span className="text-gold-400">{icon}</span>
+        {label}
+      </span>
+      <span className="font-mono flex items-center gap-2 text-sm tabular-nums text-white">{value}</span>
+    </div>
+  );
+}
 
 export default async function AdminHome() {
   const admin = createAdminSupabase();
@@ -70,45 +86,78 @@ export default async function AdminHome() {
     duration: number | null;
   }> = [];
   let withdrawals: Array<{ user_id: string; amount: number; status: string | null }> = [];
-  let deposits: Array<{ user_id: string; amount: number }> = [];
+  let deposits: DepositRow[] = [];
   let pendingInvoices = 0;
   let code = "DOGE";
   let symbol = "Ð";
   let decimals = 8;
+  let failed = false;
   try {
     const [p, r, pl, w, d, t, s] = await Promise.all([
       admin.from("profiles").select("id,username,email,balance,affiliate_earns,is_admin,created_at"),
       admin.from("user_plan_history").select("user_id,status,plan_id"),
       admin.from("plans").select("id,plan_name,is_default,price,point_per_day,duration"),
       admin.from("user_withdrawal").select("user_id,amount,status"),
-      admin.from("user_deposits").select("user_id,amount"),
+      admin.from("user_deposits").select("user_id,amount,created_at"),
       admin.from("transactions_history").select("id", { count: "exact", head: true }).eq("status", "pending"),
       admin.from("settings").select("currency_code,currency_symbol,currency_decimals").order("id").limit(1).maybeSingle(),
     ]);
-    profiles = (((p as { data: unknown }).data ?? []) as UserRow[]);
-    rigs = (((r as { data: unknown }).data ?? []) as typeof rigs);
-    plans = (((pl as { data: unknown }).data ?? []) as typeof plans);
-    withdrawals = (((w as { data: unknown }).data ?? []) as typeof withdrawals);
-    deposits = (((d as { data: unknown }).data ?? []) as typeof deposits);
-    pendingInvoices = (t as { count: number | null }).count ?? 0;
-    const st = (s as { data: { currency_code?: string; currency_symbol?: string; currency_decimals?: number } | null }).data;
+    if ([p, r, pl, w, d, t, s].some((x) => (x as { error?: unknown }).error)) failed = true;
+    profiles = ((p.data ?? []) as UserRow[]);
+    rigs = ((r.data ?? []) as typeof rigs);
+    plans = ((pl.data ?? []) as typeof plans);
+    withdrawals = ((w.data ?? []) as typeof withdrawals);
+    deposits = ((d.data ?? []) as DepositRow[]);
+    pendingInvoices = (t.count ?? 0);
+    const st = s.data as { currency_code?: string; currency_symbol?: string; currency_decimals?: number } | null;
     if (st?.currency_code) code = st.currency_code;
     if (st?.currency_symbol) symbol = st.currency_symbol;
     if (st?.currency_decimals != null) decimals = st.currency_decimals;
   } catch {
-    // No service key during build; render zeros.
+    failed = true;
   }
 
-  const weekAgo = Date.now() - 7 * 86400000;
+  const weekAgo = Date.now() - 7 * DAY;
   const freePlanIds = new Set(plans.filter((p) => p.is_default).map((p) => p.id));
   const totalUsers = profiles.length;
-  const newThisWeek = profiles.filter((u) => u.created_at && new Date(u.created_at).getTime() >= weekAgo).length;
+  const within = (iso: string | null, from: number, to = Number.POSITIVE_INFINITY) => {
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    return t >= from && t < to;
+  };
+  const newThisWeek = profiles.filter((u) => within(u.created_at, weekAgo)).length;
+  const newPriorWeek = profiles.filter((u) => within(u.created_at, weekAgo - 7 * DAY, weekAgo)).length;
+  const weekDelta = newThisWeek - newPriorWeek;
   const activeRigs = rigs.filter((r) => r.status === "active").length;
   const freeGranted = rigs.filter((r) => freePlanIds.has(r.plan_id)).length;
   const accrued = profiles.reduce((s, u) => s + num(u.balance), 0);
   const affiliate = profiles.reduce((s, u) => s + num(u.affiliate_earns), 0);
   const paidOut = withdrawals.filter((w) => (w.status ?? "").toUpperCase() === "SUCCESS").reduce((s, w) => s + num(w.amount), 0);
   const depositsIn = deposits.reduce((s, d) => s + num(d.amount), 0);
+  const netFlow = depositsIn - paidOut;
+
+  // Real per-day series, bucketed to local midnight so a day means a calendar day.
+  const midnight = new Date();
+  midnight.setHours(0, 0, 0, 0);
+  const start = midnight.getTime() - (WINDOW - 1) * DAY;
+  const bucket = (iso: string | null) => {
+    if (!iso) return -1;
+    const t = new Date(iso);
+    t.setHours(0, 0, 0, 0);
+    return Math.round((t.getTime() - start) / DAY);
+  };
+  const memberSeries = new Array(WINDOW).fill(0) as number[];
+  for (const u of profiles) {
+    const i = bucket(u.created_at);
+    if (i >= 0 && i < WINDOW) memberSeries[i] += 1;
+  }
+  const depositSeries = new Array(WINDOW).fill(0) as number[];
+  for (const d of deposits) {
+    const i = bucket(d.created_at);
+    if (i >= 0 && i < WINDOW) depositSeries[i] += num(d.amount);
+  }
+  const members14 = memberSeries.reduce((a, b) => a + b, 0);
+  const deposits14 = depositSeries.reduce((a, b) => a + b, 0);
 
   const catalogue = plans
     .filter((p) => !p.is_default)
@@ -117,7 +166,6 @@ export default async function AdminHome() {
       e: planEconomics({ price: p.price ?? 0, point_per_day: p.point_per_day ?? 0, duration: p.duration ?? 0 }),
     }));
   const avgMargin = catalogue.length ? catalogue.reduce((s, c) => s + c.e.ownerMarginPct, 0) / catalogue.length : 0;
-  const grossMargin = depositsIn - paidOut;
   const money = (v: number) => `${symbol}${v.toFixed(decimals)}`;
 
   const rigCount = new Map<string, number>();
@@ -136,167 +184,241 @@ export default async function AdminHome() {
     }))
     .sort((a, b) => num(b.u.balance) - num(a.u.balance));
 
+  const flowTone = netFlow < 0 ? "text-red-300" : netFlow === 0 ? "text-white" : "text-emerald-300";
+  const FlowIcon = netFlow < 0 ? TrendingDown : TrendingUp;
+  const flowWord = netFlow < 0 ? "Deficit" : netFlow === 0 ? "Balanced" : "Surplus";
+
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-display text-3xl font-bold text-white">Members &amp; rewards</h1>
-        <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-          How many miners joined, and what the platform has credited back to them. Accrued is the
-          balance members hold right now; paid out is what has already left the mine.
-        </p>
+    <div className="space-y-6">
+      <AdminPageHeader
+        title={"Members & rewards"}
+        description="Who joined, and what the platform credited back. Net flow is money in minus money out; the readouts carry the running totals."
+      />
+
+      {failed && (
+        <div className="panel flex items-start gap-3 rounded-2xl border-red-500/30 px-5 py-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-red-300" />
+          <div>
+            <p className="text-sm font-medium text-white">Some figures could not be loaded</p>
+            <p className="mt-0.5 text-xs text-slate-300">What did load is shown below. Reload to try again.</p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="panel rounded-2xl p-6 ring-1 ring-gold-500/25 lg:col-span-2">
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-400">
+            <ArrowLeftRight size={14} className="text-gold-400" /> Net flow ({code})
+          </div>
+          <div className="mt-3 flex flex-wrap items-baseline gap-3">
+            <span className={cn("font-mono text-3xl font-bold tabular-nums sm:text-4xl", flowTone)}>
+              {signed(symbol, netFlow, decimals)}
+            </span>
+            <span className={cn("inline-flex items-center gap-1 text-xs font-semibold", flowTone)}>
+              <FlowIcon size={14} /> {flowWord}
+            </span>
+          </div>
+          <p className="mt-2 text-xs text-slate-400">Deposits in minus payouts out, all time.</p>
+          <div className="mt-5 grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-white/5">
+            <div className="bg-[#0d1117] p-4">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Download size={13} className="text-emerald-400" /> Deposits in
+              </div>
+              <p className="font-mono mt-1.5 text-lg font-semibold tabular-nums text-emerald-300">{money(depositsIn)}</p>
+            </div>
+            <div className="bg-[#0d1117] p-4">
+              <div className="flex items-center gap-2 text-xs text-slate-400">
+                <Wallet size={13} className="text-gold-300" /> Paid out
+              </div>
+              <p className="font-mono mt-1.5 text-lg font-semibold tabular-nums text-white">{money(paidOut)}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel rounded-2xl p-6">
+          <h2 className="font-display text-sm font-semibold text-white">Last {WINDOW} days</h2>
+          <div className="mt-4 space-y-5">
+            <div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">New members</span>
+                <span className="font-mono tabular-nums text-slate-200">{members14}</span>
+              </div>
+              <div className="mt-2">
+                <Bars values={memberSeries} accent="bg-gold-500" label={`New members per day, last ${WINDOW} days`} />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Deposits</span>
+                <span className="font-mono tabular-nums text-slate-200">{money(deposits14)}</span>
+              </div>
+              <div className="mt-2">
+                <Bars values={depositSeries} accent="bg-emerald-500" label={`Deposits per day, last ${WINDOW} days`} />
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <Reveal>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          <Tile icon={<Users size={15} />} label="Total members" accent="text-gold-400" hint={`${newThisWeek} joined in the last 7 days`}>
-            <CountUp value={totalUsers} />
-          </Tile>
-          <Tile icon={<Pickaxe size={15} />} label="Active rigs" accent="text-emerald-400" hint="hashing right now">
-            <CountUp value={activeRigs} />
-          </Tile>
-          <Tile icon={<Gift size={15} />} label="Free miners granted" accent="text-gold-300" hint="starter contracts issued">
-            <CountUp value={freeGranted} />
-          </Tile>
-          <Tile icon={<TrendingUp size={15} />} label={`Accrued to members (${code})`} accent="text-emerald-400">
-            <CountUp value={accrued} decimals={decimals} />
-          </Tile>
-          <Tile icon={<Wallet size={15} />} label={`Paid out (${code})`} accent="text-gold-300" hint="settled withdrawals">
-            <CountUp value={paidOut} decimals={decimals} />
-          </Tile>
-          <Tile icon={<Coins size={15} />} label={`Affiliate earnings (${code})`} accent="text-gold-300" hint="commission credited to referrers">
-            <CountUp value={affiliate} decimals={decimals} />
-          </Tile>
+      <section className="panel rounded-2xl px-5 py-2">
+        <div className="divide-y divide-white/5">
+          <Readout icon={<Users size={15} />} label="Total members" value={<CountUp value={totalUsers} />} />
+          <Readout
+            icon={<UserPlus size={15} />}
+            label="New this week"
+            value={
+              <>
+                <CountUp value={newThisWeek} />
+                {weekDelta !== 0 && (
+                  <span className={cn("text-xs font-normal", weekDelta > 0 ? "text-emerald-300" : "text-red-300")}>
+                    {weekDelta > 0 ? "+" : ""}
+                    {weekDelta} vs last week
+                  </span>
+                )}
+              </>
+            }
+          />
+          <Readout icon={<Pickaxe size={15} />} label="Active rigs" value={<CountUp value={activeRigs} />} />
+          <Readout icon={<Gift size={15} />} label="Free miners granted" value={<CountUp value={freeGranted} />} />
+          <Readout icon={<Coins size={15} />} label={`Accrued to members (${code})`} value={money(accrued)} />
+          <Readout icon={<Share2 size={15} />} label={`Affiliate earnings (${code})`} value={money(affiliate)} />
+          <Readout icon={<Hourglass size={15} />} label="Pending invoices" value={<CountUp value={pendingInvoices} />} />
         </div>
-      </Reveal>
+      </section>
 
-      <Reveal>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Tile icon={<UserPlus size={15} />} label="New this week" accent="text-gold-300">
-            <CountUp value={newThisWeek} />
-          </Tile>
-          <Tile icon={<Download size={15} />} label={`Deposits in (${code})`} accent="text-emerald-400">
-            <CountUp value={depositsIn} decimals={decimals} />
-          </Tile>
-          <Tile icon={<ArrowLeftRight size={15} />} label={`Net flow (${code})`} accent="text-gold-300">
-            <CountUp value={depositsIn - paidOut} decimals={decimals} />
-          </Tile>
-          <Tile icon={<Hourglass size={15} />} label="Pending invoices" accent="text-gold-300">
-            <CountUp value={pendingInvoices} />
-          </Tile>
+      <section className="panel overflow-hidden rounded-2xl">
+        <div className="border-b border-white/10 px-6 py-4">
+          <h2 className="font-display text-lg font-bold text-white">Owner economics</h2>
+          <p className="mt-1 text-xs text-slate-400">Money in versus money out, plus the margin each active plan sells at.</p>
         </div>
-      </Reveal>
-
-      <Reveal>
-        <section className="panel overflow-hidden rounded-3xl">
-          <div className="border-b border-white/10 px-6 py-4">
-            <h2 className="font-display text-lg font-bold text-white">Owner economics</h2>
-            <p className="mt-1 text-xs text-slate-400">
-              Money in versus money out, plus the margin each active plan sells at.
+        <div className="grid grid-cols-2 gap-px bg-white/5 sm:grid-cols-4">
+          <div className="bg-[#0d1117] p-5">
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <Scale size={14} className="text-gold-400" /> Gross margin ({code})
+            </div>
+            <p className={cn("font-mono mt-2 flex items-center gap-1.5 text-xl font-semibold tabular-nums", flowTone)}>
+              <FlowIcon size={14} /> {signed(symbol, netFlow, decimals)}
             </p>
           </div>
-          <div className="grid gap-4 border-b border-white/10 px-6 py-5 sm:grid-cols-2 xl:grid-cols-4">
-            <Tile icon={<Scale size={15} />} label={`Gross margin (${code})`} accent={grossMargin < 0 ? "text-red-300" : "text-emerald-400"} hint="revenue in − payouts out">
-              <CountUp value={grossMargin} decimals={decimals} />
-            </Tile>
-            <Tile icon={<Wallet size={15} />} label={`Member balances held (${code})`} accent="text-gold-300" hint="outstanding liability">
-              <CountUp value={accrued} decimals={decimals} />
-            </Tile>
-            <Tile icon={<Percent size={15} />} label="Avg plan margin" accent="text-emerald-400" hint="across paid plans">
-              {avgMargin.toFixed(1)}%
-            </Tile>
-            <Tile icon={<Coins size={15} />} label="Plans selling" accent="text-gold-300" hint="paid tiers live">
-              {catalogue.length}
-            </Tile>
-          </div>
-          {catalogue.length > 0 && (
-            <div className="overflow-x-auto px-6 py-2 text-sm">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="text-left text-xs text-slate-400">
-                    <th className="py-3 pr-4 font-medium">Plan</th>
-                    <th className="py-3 pr-4 font-medium">Price</th>
-                    <th className="py-3 pr-4 font-medium">Pays out</th>
-                    <th className="py-3 pr-4 font-medium">Profit/sale</th>
-                    <th className="py-3 pr-4 font-medium">Margin</th>
-                    <th className="py-3 pr-4 font-medium">Member ROI</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catalogue.map(({ p, e }) => (
-                    <tr key={p.id} className="border-t border-white/5">
-                      <td className="py-3 pr-4 font-medium text-white">{p.plan_name}</td>
-                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">
-                        {money(p.price ?? 0)}
-                      </td>
-                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">{money(e.payoutToUser)}</td>
-                      <td
-                        className={
-                          "font-mono py-3 pr-4 tabular-nums " +
-                          (e.ownerProfit < 0 ? "text-red-300" : "text-emerald-300")
-                        }
-                      >
-                        {money(e.ownerProfit)}
-                      </td>
-                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">{e.ownerMarginPct.toFixed(1)}%</td>
-                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">
-                        {e.userRoiPct >= 0 ? "+" : ""}
-                        {e.userRoiPct.toFixed(1)}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          <div className="bg-[#0d1117] p-5">
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <Wallet size={14} className="text-gold-400" /> Member balances held ({code})
             </div>
-          )}
-        </section>
-      </Reveal>
+            <p className="font-mono mt-2 text-xl font-semibold tabular-nums text-gold-300">{money(accrued)}</p>
+          </div>
+          <div className="bg-[#0d1117] p-5">
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <Percent size={14} className="text-gold-400" /> Avg plan margin
+            </div>
+            <p className="font-mono mt-2 text-xl font-semibold tabular-nums text-emerald-300">{avgMargin.toFixed(1)}%</p>
+          </div>
+          <div className="bg-[#0d1117] p-5">
+            <div className="flex items-center gap-2 text-xs text-slate-400">
+              <Coins size={14} className="text-gold-400" /> Plans selling
+            </div>
+            <p className="font-mono mt-2 text-xl font-semibold tabular-nums text-white">{catalogue.length}</p>
+          </div>
+        </div>
+        {catalogue.length > 0 && (
+          <div className="overflow-x-auto px-6 py-2 text-sm">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="text-left text-xs text-slate-400">
+                  <th className="py-3 pr-4 font-medium">Plan</th>
+                  <th className="py-3 pr-4 font-medium">Price</th>
+                  <th className="py-3 pr-4 font-medium">Pays out</th>
+                  <th className="py-3 pr-4 font-medium">Profit/sale</th>
+                  <th className="py-3 pr-4 font-medium">Margin</th>
+                  <th className="py-3 pr-4 font-medium">Member ROI</th>
+                </tr>
+              </thead>
+              <tbody>
+                {catalogue.map(({ p, e }) => (
+                  <tr key={p.id} className="border-t border-white/5 transition-colors hover:bg-white/[0.03]">
+                    <td className="py-3 pr-4 font-medium text-white">{p.plan_name}</td>
+                    <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{money(p.price ?? 0)}</td>
+                    <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">{money(e.payoutToUser)}</td>
+                    <td className={cn("font-mono py-3 pr-4 tabular-nums", e.ownerProfit < 0 ? "text-red-300" : "text-emerald-300")}>
+                      <span className="inline-flex items-center gap-1">
+                        {e.ownerProfit < 0 ? <TrendingDown size={13} /> : <TrendingUp size={13} />}
+                        {signed(symbol, e.ownerProfit, decimals)}
+                      </span>
+                    </td>
+                    <td className={cn("font-mono py-3 pr-4 tabular-nums", e.ownerMarginPct < 0 ? "text-red-300" : "text-emerald-300")}>
+                      {e.ownerMarginPct < 0 ? "" : "+"}
+                      {e.ownerMarginPct.toFixed(1)}%
+                    </td>
+                    <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">
+                      {e.userRoiPct >= 0 ? "+" : ""}
+                      {e.userRoiPct.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
 
-      <Reveal>
-        <section className="panel overflow-hidden rounded-3xl">
-          <div className="border-b border-white/10 px-6 py-4">
+      <section className="panel overflow-hidden rounded-2xl">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-white/10 px-6 py-4">
+          <div>
             <h2 className="font-display text-lg font-bold text-white">What each member received</h2>
             <p className="mt-1 text-xs text-slate-400">Sorted by accrued balance, highest first.</p>
           </div>
-          {members.length === 0 ? (
-            <p className="px-6 py-8 text-sm text-slate-400">No members yet. Accounts appear here after signup.</p>
-          ) : (
-            <div className="overflow-x-auto px-6 py-2 text-sm">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="text-left text-xs text-slate-400">
-                    <th className="py-3 pr-4 font-medium">Member</th>
-                    <th className="py-3 pr-4 font-medium">Joined</th>
-                    <th className="py-3 pr-4 font-medium">Rigs</th>
-                    <th className="py-3 pr-4 font-medium">Accrued</th>
-                    <th className="py-3 pr-4 font-medium">Paid out</th>
-                    <th className="py-3 pr-4 font-medium">Affiliate</th>
-                    <th className="py-3 pr-4 font-medium">Deposited</th>
+          <Link href="/admin/users" className="text-xs font-semibold text-gold-300 hover:text-gold-200">
+            All members
+          </Link>
+        </div>
+        {members.length === 0 ? (
+          <div className="px-6 py-12 text-center">
+            <Users size={22} className="mx-auto text-slate-400" />
+            <p className="mt-3 text-sm text-slate-200">No members yet</p>
+            <p className="mt-1 text-xs text-slate-400">
+              Accounts appear here after the first signup, and each one is issued a free rig automatically.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto px-6 py-2 text-sm">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="text-left text-xs text-slate-400">
+                  <th className="py-3 pr-4 font-medium">Member</th>
+                  <th className="py-3 pr-4 font-medium">Joined</th>
+                  <th className="py-3 pr-4 font-medium">Rigs</th>
+                  <th className="py-3 pr-4 font-medium">Accrued</th>
+                  <th className="py-3 pr-4 font-medium">Paid out</th>
+                  <th className="py-3 pr-4 font-medium">Affiliate</th>
+                  <th className="py-3 pr-4 font-medium">Deposited</th>
+                </tr>
+              </thead>
+              <tbody>
+                {members.slice(0, 25).map((m) => (
+                  <tr key={m.u.id} className="border-t border-white/5 transition-colors hover:bg-white/[0.03]">
+                    <td className="py-3 pr-4">
+                      <span className="font-medium text-white">{m.u.username ?? "unknown"}</span>
+                      {m.u.is_admin && (
+                        <Badge variant="gold" className="ml-2">
+                          admin
+                        </Badge>
+                      )}
+                      <span className="block text-xs text-slate-400">{m.u.email ?? ""}</span>
+                    </td>
+                    <td className="py-3 pr-4 text-slate-300">
+                      {m.u.created_at ? new Date(m.u.created_at).toLocaleDateString() : ""}
+                    </td>
+                    <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{m.rigs}</td>
+                    <td className="font-mono py-3 pr-4 tabular-nums text-emerald-300">{num(m.u.balance).toFixed(decimals)}</td>
+                    <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{m.paid.toFixed(decimals)}</td>
+                    <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{num(m.u.affiliate_earns).toFixed(decimals)}</td>
+                    <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{m.deposited.toFixed(decimals)}</td>
                   </tr>
-                </thead>
-                <tbody>
-                  {members.slice(0, 25).map((m) => (
-                    <tr key={m.u.id} className="border-t border-white/5">
-                      <td className="py-3 pr-4">
-                        <span className="font-medium text-white">{m.u.username ?? "unknown"}</span>
-                        {m.u.is_admin && <span className="ml-2 text-xs text-gold-300">admin</span>}
-                        <span className="block text-xs text-slate-400">{m.u.email ?? ""}</span>
-                      </td>
-                      <td className="py-3 pr-4 text-slate-300">
-                        {m.u.created_at ? new Date(m.u.created_at).toLocaleDateString() : ""}
-                      </td>
-                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{m.rigs}</td>
-                      <td className="font-mono py-3 pr-4 tabular-nums text-emerald-300">{num(m.u.balance).toFixed(decimals)}</td>
-                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{m.paid.toFixed(decimals)}</td>
-                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{num(m.u.affiliate_earns).toFixed(decimals)}</td>
-                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{m.deposited.toFixed(decimals)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-      </Reveal>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

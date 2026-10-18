@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Loader2, Send } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import type { ChatMessage, ChatSender, ChatThread } from "@/lib/types";
 
 type Incoming = { id: number; user_id: string; sender: ChatSender; body: string; created_at: string; read_by_admin: boolean };
@@ -145,12 +146,14 @@ export function ChatConsole({ initialThreads }: { initialThreads: ChatThread[] }
   return (
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
-        <div>
-          <h1 className="font-display text-xl font-bold text-white">Live chat</h1>
-          <p className="text-xs text-slate-400">
-            {threads.length} conversation{threads.length === 1 ? "" : "s"} · {totalUnread} unread
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Live chat"
+          description={
+            <>
+              {threads.length} conversation{threads.length === 1 ? "" : "s"} · {totalUnread} unread
+            </>
+          }
+        />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">

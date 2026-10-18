@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Check, EyeOff, RefreshCw, RotateCcw, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 import { cn } from "@/lib/utils";
 import type { RiskBand, RiskRow } from "@/lib/risk";
@@ -42,12 +43,10 @@ export function RiskConsole({ rows }: { rows: RiskRow[] }) {
   return (
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
-        <div>
-          <h1 className="font-display text-xl font-bold text-white">Anti-fraud</h1>
-          <p className="text-xs text-slate-400">
-            {open.length} in queue · {counts.high} high · {counts.medium} medium
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Anti-fraud"
+          description={`${open.length} in queue · ${counts.high} high · ${counts.medium} medium`}
+        />
         <div className="flex flex-wrap items-center gap-3">
           <div role="tablist" aria-label="Filter risk queue" className="flex rounded-xl border border-slate-700 p-1">
             {FILTERS.map((f) => (

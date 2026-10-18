@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input, Label } from "@/components/ui/input";
 import { CopyButton } from "@/components/copy-button";
 import { Modal } from "@/components/admin/modal";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 import { cn, formatCrypto } from "@/lib/utils";
 
@@ -81,12 +82,10 @@ export function WithdrawalsManager({
   return (
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
-        <div>
-          <h1 className="font-display text-xl font-bold text-white">Withdrawals</h1>
-          <p className="text-xs text-slate-400">
-            {rows.filter((r) => matches(r, "Pending")).length} awaiting review · {money(pendingTotal)} {code} held
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Withdrawals"
+          description={`${rows.filter((r) => matches(r, "Pending")).length} awaiting review · ${money(pendingTotal)} ${code} held`}
+        />
         <div role="tablist" aria-label="Filter withdrawals" className="flex rounded-xl border border-slate-700 p-1">
           {FILTERS.map((f) => (
             <button

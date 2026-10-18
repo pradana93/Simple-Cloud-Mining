@@ -6,6 +6,7 @@ import { Input, Label } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { ALL_FIELDS, SETTINGS_SECTIONS, type SettingsField } from "@/lib/settings-fields";
 import type { SiteSettings } from "@/lib/types";
 
@@ -309,20 +310,22 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
   return (
     <div className="space-y-6">
       <div className="panel sticky top-14 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4 backdrop-blur">
-        <div className="min-w-0">
-          <h1 className="font-display text-xl font-bold text-white">Site settings</h1>
-          <p className="truncate text-xs text-slate-400">
-            {dirty
-              ? `${changedKeys.length} unsaved change${changedKeys.length === 1 ? "" : "s"}`
-              : savedAt
-                ? `Saved at ${savedAt}`
-                : "All changes saved"}
-            {" · "}
-            <kbd className="rounded border border-slate-700 px-1 font-sans text-[10px] text-slate-400">Ctrl</kbd>
-            {"+"}
-            <kbd className="rounded border border-slate-700 px-1 font-sans text-[10px] text-slate-400">S</kbd> to save
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Site settings"
+          description={
+            <>
+              {dirty
+                ? `${changedKeys.length} unsaved change${changedKeys.length === 1 ? "" : "s"}`
+                : savedAt
+                  ? `Saved at ${savedAt}`
+                  : "All changes saved"}
+              {" · "}
+              <kbd className="rounded border border-slate-700 px-1 font-sans text-[10px] text-slate-400">Ctrl</kbd>
+              {"+"}
+              <kbd className="rounded border border-slate-700 px-1 font-sans text-[10px] text-slate-400">S</kbd> to save
+            </>
+          }
+        />
         <div className="flex items-center gap-2">
           {dirty && <Badge variant="gold">unsaved</Badge>}
           <Button variant="secondary" onClick={discard} disabled={!dirty || saving}>

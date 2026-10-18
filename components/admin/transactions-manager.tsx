@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Ban } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { Modal } from "@/components/admin/modal";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 import { cn, formatCrypto } from "@/lib/utils";
@@ -63,13 +64,15 @@ export function TransactionsManager({
   return (
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
-        <div>
-          <h1 className="font-display text-xl font-bold text-white">Transactions</h1>
-          <p className="text-xs text-slate-400">
-            {rows.length} invoices · {symbol}
-            {formatCrypto(open, decimals)} {code} open
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Transactions"
+          description={
+            <>
+              {rows.length} invoices · {symbol}
+              {formatCrypto(open, decimals)} {code} open
+            </>
+          }
+        />
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}

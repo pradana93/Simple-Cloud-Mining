@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Link2, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { Modal } from "@/components/admin/modal";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 
@@ -51,10 +52,7 @@ export function UrlchainsManager({ rows }: { rows: AdminChain[] }) {
   return (
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
-        <div>
-          <h1 className="font-display text-xl font-bold text-white">Blockchain explorers</h1>
-          <p className="text-xs text-slate-400">{rows.length} chains · back the transaction links shown to members</p>
-        </div>
+        <AdminPageHeader title="Blockchain explorers" description={<>{rows.length} chains · back the transaction links shown to members</>} />
         <Button onClick={startCreate}>
           <Plus size={15} /> New explorer
         </Button>

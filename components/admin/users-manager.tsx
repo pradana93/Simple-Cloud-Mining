@@ -4,6 +4,7 @@ import { Coins, KeyRound, Pickaxe, Search, ShieldCheck, ShieldMinus } from "luci
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label } from "@/components/ui/input";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { Modal } from "@/components/admin/modal";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 import { ResetPasswordButton } from "@/components/admin/reset-password-button";
@@ -94,10 +95,7 @@ export function UsersManager({
   return (
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
-        <div>
-          <h1 className="font-display text-xl font-bold text-white">Members</h1>
-          <p className="text-xs text-slate-400">{members.length} accounts · grant plans, adjust balances, manage access</p>
-        </div>
+        <AdminPageHeader title="Members" description={<>{members.length} accounts · grant plans, adjust balances, manage access</>} />
         <label className="relative block w-full sm:w-64">
           <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or email" className="pl-9" aria-label="Search members" />

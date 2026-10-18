@@ -4,6 +4,7 @@ import { AlertTriangle, Pencil, Plus, Trash2, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label } from "@/components/ui/input";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { Modal } from "@/components/admin/modal";
 import { PlanAssistant } from "@/components/admin/plan-assistant";
 import { useAdminAction } from "@/components/admin/use-admin-action";
@@ -199,17 +200,19 @@ export function PlansManager({
   return (
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
-        <div>
-          <h1 className="font-display text-xl font-bold text-white">Plans</h1>
-          <p className="text-xs text-slate-400">
-            {plans.length} plan{plans.length === 1 ? "" : "s"} selling · projected profit{" "}
-            <span className={cn("font-mono", totalOwnerProfit < 0 ? "text-red-300" : "text-emerald-300")}>
-              {symbol}
-              {formatCrypto(totalOwnerProfit, decimals)} {code}
-            </span>{" "}
-            per paid sale
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Plans"
+          description={
+            <>
+              {plans.length} plan{plans.length === 1 ? "" : "s"} selling · projected profit{" "}
+              <span className={cn("font-mono", totalOwnerProfit < 0 ? "text-red-300" : "text-emerald-300")}>
+                {symbol}
+                {formatCrypto(totalOwnerProfit, decimals)} {code}
+              </span>{" "}
+              per paid sale
+            </>
+          }
+        />
         <Button onClick={startCreate}>
           <Plus size={15} /> New plan
         </Button>

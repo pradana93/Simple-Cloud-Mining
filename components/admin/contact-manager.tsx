@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Mail, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { AdminPageHeader } from "@/components/admin/page-header";
 import { Modal } from "@/components/admin/modal";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 import { cn } from "@/lib/utils";
@@ -44,12 +45,14 @@ export function ContactManager({ rows }: { rows: AdminMessage[] }) {
   return (
     <div className="space-y-4">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
-        <div>
-          <h1 className="font-display text-xl font-bold text-white">Contact inbox</h1>
-          <p className="text-xs text-slate-400">
-            {rows.length} messages · {unread} unread
-          </p>
-        </div>
+        <AdminPageHeader
+          title="Contact inbox"
+          description={
+            <>
+              {rows.length} messages · {unread} unread
+            </>
+          }
+        />
       </div>
 
       <div className="panel overflow-hidden rounded-3xl">
