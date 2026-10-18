@@ -5,7 +5,8 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getCachedSettings } from "@/lib/catalog";
 import { totalMiningRate } from "@/lib/mining";
-import { formatCrypto, formatDuration } from "@/lib/utils";
+import { planEconomics } from "@/lib/plan-math";
+import { cn, formatCrypto, formatDuration } from "@/lib/utils";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { ensureProfile } from "@/lib/ensure-profile";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +48,13 @@ function txVariant(status: string): "green" | "gold" | "red" | "slate" {
   if (v === "pending" || v === "waiting") return "gold";
   if (v === "canceled") return "red";
   return "slate";
+}
+
+function breakEvenLabel(days: number) {
+  if (days <= 0) return "not applicable";
+  if (days < 1) return "under a day";
+  const d = Math.ceil(days);
+  return `${d} day${d === 1 ? "" : "s"}`;
 }
 
 function Readout({ label, children, hint }: { label: string; children: React.ReactNode; hint?: string }) {
@@ -229,6 +237,20 @@ export default async function DashboardPage() {
         ? `About ${formatDuration((minWithdraw - balance) / rate)} until you reach the minimum.`
         : "Deploy hashrate to reach the withdrawal minimum.";
 
+  const paidEcon = paidPlans.map((p) => ({
+    p,
+    e: planEconomics({ price: p.price, point_per_day: p.point_per_day, duration: p.duration }),
+  }));
+  let bestId: number | null = null;
+  let bestVal = -1;
+  for (const x of paidEcon) {
+    const v = x.e.price > 0 ? x.e.payoutToUser / x.e.price : 0;
+    if (v > bestVal) {
+      bestVal = v;
+      bestId = x.p.id;
+    }
+  }
+
   const referralLink = (() => {
     const h = headers();
     const host = h.get("host");
@@ -389,29 +411,74 @@ export default async function DashboardPage() {
         </div>
       </Reveal>
 
-      {paidPlans.length > 0 && (
+      {paidEcon.length > 0 && (
         <Reveal>
           <section>
-            <h2 className="font-display mb-4 text-xl font-bold text-white">Deploy more power</h2>
-            <div className="grid gap-4 md:grid-cols-3">
-              {paidPlans.map((p) => (
-                <div key={p.id} className="panel card-hover flex flex-col rounded-2xl p-5">
-                  <p className="font-display font-bold text-white">{p.plan_name}</p>
-                  <p className="font-mono mt-1 text-2xl font-medium tabular-nums text-gold-300">
-                    {formatCrypto(Number(p.price), s.currency_decimals)} <span className="text-xs text-slate-400">{s.currency_code}</span>
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400">
-                    +{formatCrypto(Number(p.point_per_day ?? 0), s.currency_decimals)}/day · {p.duration}d
-                  </p>
-                  <Link
-                    href={`/purchase/${p.id}`}
-                    className="tap mt-4 inline-flex h-11 items-center justify-center gap-1.5 rounded-xl border border-slate-700 font-display text-sm font-bold text-white transition-colors hover:border-gold-500/60"
-                  >
-                    <Plus size={15} /> Deploy
-                  </Link>
-                </div>
-              ))}
+            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="font-display text-xl font-bold text-white">Deploy more power</h2>
+                <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
+                  {rate > 0
+                    ? `Your rigs are mining ${formatCrypto(perDay, s.currency_decimals)} ${s.currency_code}/day. A plan below stacks on top and pays a fixed rate for its whole term.`
+                    : "Your rigs are idle. Deploy a plan to start earning a fixed daily rate for its full term."}
+                </p>
+              </div>
+              <Link href="/#plans" className="text-xs font-semibold text-gold-300 hover:text-gold-400">
+                Compare all plans
+              </Link>
             </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              {paidEcon.map(({ p, e }) => {
+                const isBest = paidEcon.length > 1 && p.id === bestId;
+                return (
+                  <div
+                    key={p.id}
+                    className={cn("panel card-hover flex flex-col rounded-2xl p-5", isBest && "ring-1 ring-gold-500/40")}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-display font-bold text-white">{p.plan_name}</p>
+                      {isBest && (
+                        <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 font-display text-[11px] font-semibold text-emerald-300 ring-1 ring-emerald-500/40">
+                          Best payback
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 font-mono text-2xl font-medium tabular-nums text-gold-300">
+                      {formatCrypto(Number(p.price), s.currency_decimals)}{" "}
+                      <span className="text-xs text-slate-400">{s.currency_code}</span>
+                    </p>
+                    <p className="mt-1 text-sm text-white">
+                      <span className="font-mono text-emerald-300">
+                        +{formatCrypto(Number(p.point_per_day ?? 0), s.currency_decimals)} {s.currency_code}
+                      </span>{" "}
+                      per day
+                    </p>
+                    <dl className="mt-4 space-y-2 border-t border-white/10 pt-4 text-xs">
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-slate-400">Pays out over {e.durationDays} days</dt>
+                        <dd className="font-mono tabular-nums text-slate-200">
+                          {formatCrypto(e.payoutToUser, s.currency_decimals)} {s.currency_code}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-slate-400">Break-even</dt>
+                        <dd className="font-mono tabular-nums text-slate-200">{breakEvenLabel(e.breakEvenDays)}</dd>
+                      </div>
+                    </dl>
+                    <Link
+                      href={`/purchase/${p.id}`}
+                      className="tap mt-5 inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-gold-500 font-display text-sm font-bold text-ink-950 transition-colors hover:bg-gold-400"
+                    >
+                      <Plus size={15} /> Deploy
+                    </Link>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-4 text-xs leading-relaxed text-slate-400">
+              Each plan credits a fixed daily rate for its full term, so the total above is set when you deploy.
+              Figures use the plan&apos;s published rate.
+            </p>
           </section>
         </Reveal>
       )}
