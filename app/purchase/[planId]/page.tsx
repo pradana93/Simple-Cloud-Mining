@@ -2,6 +2,8 @@ import Link from "next/link";
 import { ArrowLeft, BadgeCheck, Coins, Timer } from "lucide-react";
 import { getCachedSettings } from "@/lib/catalog";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { getMoneyCfg } from "@/lib/currency";
+import { formatMoney } from "@/lib/money";
 import { formatCrypto } from "@/lib/utils";
 import { PurchaseButton } from "@/components/purchase-button";
 
@@ -9,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 export default async function PurchasePage({ params }: { params: { planId: string } }) {
   const s = await getCachedSettings();
+  const cfg = await getMoneyCfg();
   type PurchasePlan = { id: number; plan_name: string; price: number; version: string | null; point_per_day: number | null; duration: number };
   let plan: PurchasePlan | null = null;
   try {
@@ -50,6 +53,11 @@ export default async function PurchasePage({ params }: { params: { planId: strin
           <p className="flex items-center gap-2 text-slate-300"><Coins size={15} className="text-gold-300" /> Pay {s.coin_cur1}, credited in {s.coin_cur2}</p>
           <p className="flex items-center gap-2 text-slate-300"><BadgeCheck size={15} className="text-emerald-400" /> Miner activates automatically after CoinPayments confirms</p>
           <p className="flex items-center gap-2 text-slate-300"><Timer size={15} className="text-gold-400" /> Mode: {s.coin_mode === "api" ? "instant invoice" : "hosted gateway"}</p>
+          {cfg.mode === "fiat" && (
+            <p className="border-t border-white/10 pt-2.5 text-xs text-slate-400">
+              You pay in {s.currency_code}. At the current rate that is about {formatMoney(Number(plan.price), cfg)}, converted only for display.
+            </p>
+          )}
         </div>
         <div className="mt-6">
           <PurchaseButton planId={Number(params.planId)} />

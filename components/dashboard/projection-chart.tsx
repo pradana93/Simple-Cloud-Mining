@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { cn, formatCrypto } from "@/lib/utils";
+import { formatMoney, type MoneyCfg } from "@/lib/money";
 
 const HORIZONS = [7, 30, 90] as const;
 
@@ -13,13 +14,16 @@ export function ProjectionChart({
   perDay,
   decimals,
   target,
+  cfg,
 }: {
   start: number;
   perDay: number;
   decimals: number;
   target?: number | null;
+  cfg?: MoneyCfg;
 }) {
   const [days, setDays] = useState<number>(30);
+  const fmt = (v: number) => (cfg ? formatMoney(v, cfg, decimals) : formatCrypto(v, decimals));
 
   const W = 680;
   const H = 200;
@@ -51,7 +55,7 @@ export function ProjectionChart({
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-slate-400">
-          At <span className="font-mono tabular-nums text-slate-300">{formatCrypto(perDay, decimals)}</span> per day
+          At <span className="font-mono tabular-nums text-slate-300">{fmt(perDay)}</span> per day
         </p>
         <div role="tablist" aria-label="Projection horizon" className="flex rounded-xl border border-slate-700 p-1">
           {HORIZONS.map((h) => (
@@ -75,7 +79,7 @@ export function ProjectionChart({
         viewBox={`0 0 ${W} ${H}`}
         className="w-full"
         role="img"
-        aria-label={`Projected ${days} day balance from ${formatCrypto(start, decimals)} to ${formatCrypto(end, decimals)}, at ${formatCrypto(perDay, decimals)} per day`}
+        aria-label={`Projected ${days} day balance from ${fmt(start)} to ${fmt(end)}, at ${fmt(perDay)} per day`}
       >
         <defs>
           <linearGradient id="projection-fill" x1="0" y1="0" x2="0" y2="1">
@@ -88,7 +92,7 @@ export function ProjectionChart({
           <g key={i}>
             <line x1={padL} x2={W - padR} y1={y(v)} y2={y(v)} stroke="rgba(148,163,184,0.14)" />
             <text x={padL - 8} y={y(v) + 3} textAnchor="end" fontSize="10" className="fill-slate-500">
-              {formatCrypto(v, decimals)}
+              {fmt(v)}
             </text>
           </g>
         ))}
@@ -127,16 +131,16 @@ export function ProjectionChart({
       <div className="mt-4 grid grid-cols-2 gap-3 text-center sm:grid-cols-3">
         <div className="rounded-2xl bg-white/5 px-3 py-3">
           <p className="text-[11px] text-slate-400">Per day</p>
-          <p className="font-mono mt-1 text-sm font-medium tabular-nums text-white">{formatCrypto(perDay, decimals)}</p>
+          <p className="font-mono mt-1 text-sm font-medium tabular-nums text-white">{fmt(perDay)}</p>
         </div>
         <div className="rounded-2xl bg-white/5 px-3 py-3">
           <p className="text-[11px] text-slate-400">In {days} days</p>
-          <p className="font-mono mt-1 text-sm font-medium tabular-nums text-white">{formatCrypto(end, decimals)}</p>
+          <p className="font-mono mt-1 text-sm font-medium tabular-nums text-white">{fmt(end)}</p>
         </div>
         <div className="rounded-2xl bg-white/5 px-3 py-3">
           <p className="text-[11px] text-slate-400">Growth</p>
           <p className="font-mono mt-1 text-sm font-medium tabular-nums text-emerald-300">
-            +{formatCrypto(perDay * days, decimals)}
+            +{fmt(perDay * days)}
           </p>
         </div>
       </div>

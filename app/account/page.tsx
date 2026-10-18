@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft, Receipt } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
-import { getCachedSettings } from "@/lib/catalog";
-import { formatCrypto } from "@/lib/utils";
+import { getMoneyCfg } from "@/lib/currency";
+import { formatMoney } from "@/lib/money";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { Badge } from "@/components/ui/badge";
 
@@ -44,7 +44,7 @@ export default async function AccountPage() {
       </div>
     );
   }
-  const s = await getCachedSettings();
+  const cfg = await getMoneyCfg();
   const empty = { data: [] as Array<Record<string, number | string | null>> };
   let referrals = empty;
   let aff = empty;
@@ -84,7 +84,7 @@ export default async function AccountPage() {
       rows: aff.data,
       emptyText: "No affiliate earnings yet.",
       render: (r, i) => (
-        <Row key={i} k={`${formatCrypto(Number(r.amount), s.currency_decimals)} ${s.currency_code}`} v={<Badge variant={statusVariant(String(r.status ?? ""))}>{String(r.status)}</Badge>} />
+        <Row key={i} k={formatMoney(Number(r.amount), cfg)} v={<Badge variant={statusVariant(String(r.status ?? ""))}>{String(r.status)}</Badge>} />
       ),
     },
     {
@@ -92,7 +92,7 @@ export default async function AccountPage() {
       rows: deposits.data,
       emptyText: "No deposits yet.",
       render: (r, i) => (
-        <Row key={i} k={`${formatCrypto(Number(r.amount), s.currency_decimals)} ${s.currency_code}`} v={<Badge variant={statusVariant(String(r.status ?? ""))}>{String(r.status)}</Badge>} />
+        <Row key={i} k={formatMoney(Number(r.amount), cfg)} v={<Badge variant={statusVariant(String(r.status ?? ""))}>{String(r.status)}</Badge>} />
       ),
     },
     {
@@ -100,7 +100,7 @@ export default async function AccountPage() {
       rows: withdrawals.data,
       emptyText: "No withdrawals yet.",
       render: (r, i) => (
-        <Row key={i} k={`${formatCrypto(Number(r.amount), s.currency_decimals)} ${s.currency_code}`} v={<Badge variant={statusVariant(String(r.status ?? ""))}>{String(r.status)}</Badge>} />
+        <Row key={i} k={formatMoney(Number(r.amount), cfg)} v={<Badge variant={statusVariant(String(r.status ?? ""))}>{String(r.status)}</Badge>} />
       ),
     },
   ];
@@ -141,7 +141,7 @@ export default async function AccountPage() {
               <Link href={`/invoice/${t.hash}`} className="font-mono text-gold-300 hover:text-gold-400">
                 {String(t.hash).slice(0, 20)}…
               </Link>
-              <span className="text-slate-300">{formatCrypto(Number(t.amount), s.currency_decimals)} {s.currency_code}</span>
+              <span className="text-slate-300">{formatMoney(Number(t.amount), cfg)}</span>
               <Badge variant={statusVariant(String(t.status ?? ""))}>{String(t.status)}</Badge>
             </div>
           ))

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Link2, Users } from "lucide-react";
 import { CopyButton } from "@/components/copy-button";
 import { formatCrypto, timeAgo } from "@/lib/utils";
+import { formatMoney, type MoneyCfg } from "@/lib/money";
 
 function Row({ k, v }: { k: string; v: React.ReactNode }) {
   return (
@@ -21,6 +22,7 @@ export function AffiliatePanel({
   code,
   referralLink,
   invites,
+  cfg,
 }: {
   count: number;
   earns: number;
@@ -30,6 +32,7 @@ export function AffiliatePanel({
   code: string;
   referralLink: string;
   invites: Array<{ username: string | null; created_at: string }>;
+  cfg?: MoneyCfg;
 }) {
   return (
     <div className="panel flex flex-col rounded-3xl p-6">
@@ -47,7 +50,13 @@ export function AffiliatePanel({
           k="Earned"
           v={
             <span className="font-mono tabular-nums text-emerald-300">
-              {formatCrypto(earns, decimals)} <span className="text-[11px] text-slate-400">{code}</span>
+              {cfg ? (
+                formatMoney(earns, cfg)
+              ) : (
+                <>
+                  {formatCrypto(earns, decimals)} <span className="text-[11px] text-slate-400">{code}</span>
+                </>
+              )}
             </span>
           }
         />
@@ -55,7 +64,13 @@ export function AffiliatePanel({
           k="Paid out"
           v={
             <span className="font-mono tabular-nums text-slate-200">
-              {formatCrypto(paid, decimals)} <span className="text-[11px] text-slate-400">{code}</span>
+              {cfg ? (
+                formatMoney(paid, cfg)
+              ) : (
+                <>
+                  {formatCrypto(paid, decimals)} <span className="text-[11px] text-slate-400">{code}</span>
+                </>
+              )}
             </span>
           }
         />

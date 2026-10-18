@@ -7,7 +7,14 @@ import { Logo } from "./logo";
 
 export async function SiteHeader() {
   const s = await getCachedSettings();
-  return <SiteHeaderClient sitename={s.sitename} />;
+  return (
+    <SiteHeaderClient
+      sitename={s.sitename}
+      fiatEnabled={s.fiat_enabled}
+      currencyCode={s.currency_code}
+      fiatCurrency={s.fiat_currency}
+    />
+  );
 }
 
 export async function SiteFooter() {

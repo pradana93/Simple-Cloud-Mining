@@ -4,9 +4,11 @@ import { History, Plus, WalletMinimal } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getCachedSettings } from "@/lib/catalog";
+import { getMoneyCfg } from "@/lib/currency";
+import { formatMoney, moneyUnit } from "@/lib/money";
 import { totalMiningRate } from "@/lib/mining";
 import { planEconomics } from "@/lib/plan-math";
-import { cn, formatCrypto, formatDuration } from "@/lib/utils";
+import { cn, formatDuration } from "@/lib/utils";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { ensureProfile } from "@/lib/ensure-profile";
 import { Badge } from "@/components/ui/badge";
@@ -99,6 +101,7 @@ export default async function DashboardPage() {
 
   const refCookie = cookies().get("ref")?.value ?? null;
   const s = await getCachedSettings();
+  const cfg = await getMoneyCfg();
   const now = Date.now();
   const historySelect = "id,status,created_at,expire_date,last_sum,plan:plans(plan_name,version,earning_rate,price,duration)";
 
@@ -281,30 +284,30 @@ export default async function DashboardPage() {
             <div>
               <p className="text-xs font-medium text-slate-400">Balance</p>
               <p className="font-mono mt-2 text-4xl font-medium tabular-nums text-white sm:text-5xl">
-                <LiveBalance value={balance} perMinute={rate} decimals={s.currency_decimals} />
+                <LiveBalance value={balance} perMinute={rate} decimals={s.currency_decimals} cfg={cfg} />
               </p>
               {rate > 0 ? (
                 <p className="mt-1 flex items-center gap-1.5 text-sm text-emerald-300">
                   <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
-                  +{formatCrypto(rate, 8)} {s.currency_code}/min, credited live
+                  +{formatMoney(rate, cfg, 8)}/min, credited live
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-slate-400">{s.currency_code}, withdrawable</p>
+                <p className="mt-1 text-sm text-slate-400">{moneyUnit(cfg)}, withdrawable</p>
               )}
               <p className="mt-3 text-xs text-slate-400">{nextPayout}</p>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-6">
-              <Readout label="Live hashrate" hint={`${s.currency_code} per minute`}>
-                <CountUp value={rate} decimals={8} />
+              <Readout label="Live hashrate" hint={`${moneyUnit(cfg)} per minute`}>
+                <CountUp value={rate} decimals={8} cfg={cfg} />
               </Readout>
               <Readout label="Active rigs" hint="contracts hashing now">
                 {activeRows.length}
               </Readout>
               <Readout label="Gross earned" hint="since each rig started">
-                <CountUp value={lifetimeEarned} decimals={s.currency_decimals} />
+                <CountUp value={lifetimeEarned} decimals={s.currency_decimals} cfg={cfg} />
               </Readout>
-              <Readout label="Per day" hint={`${s.currency_code} at current rate`}>
-                {formatCrypto(perDay, s.currency_decimals)}
+              <Readout label="Per day" hint={`${moneyUnit(cfg)} at current rate`}>
+                {formatMoney(perDay, cfg)}
               </Readout>
             </div>
           </div>
@@ -331,6 +334,7 @@ export default async function DashboardPage() {
                 perDay={perDay}
                 decimals={s.currency_decimals}
                 target={minWithdraw > balance ? minWithdraw : null}
+                cfg={cfg}
               />
             </div>
           </section>
@@ -344,6 +348,7 @@ export default async function DashboardPage() {
             code={s.currency_code}
             referralLink={referralLink}
             invites={referrals}
+            cfg={cfg}
           />
         </div>
       </Reveal>
@@ -364,7 +369,7 @@ export default async function DashboardPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {rigs.map((rig) => (
-                <RigReadout key={rig.id} rig={rig} symbol={s.currency_symbol} />
+                <RigReadout key={rig.id} rig={rig} symbol={s.currency_symbol} cfg={cfg} />
               ))}
             </div>
           )}
@@ -381,7 +386,7 @@ export default async function DashboardPage() {
               </Link>
             </div>
             <div className="mt-2">
-              <ActivityFeed items={activity} decimals={s.currency_decimals} code={s.currency_code} />
+              <ActivityFeed items={activity} decimals={s.currency_decimals} code={s.currency_code} cfg={cfg} />
             </div>
           </section>
 
@@ -399,7 +404,7 @@ export default async function DashboardPage() {
                     </Link>
                     <div className="flex items-center gap-2">
                       <span className="font-mono tabular-nums text-slate-200">
-                        {formatCrypto(Number(t.amount), s.currency_decimals)}
+                        {formatMoney(Number(t.amount), cfg)}
                       </span>
                       <Badge variant={txVariant(t.status)}>{t.status}</Badge>
                     </div>
@@ -419,7 +424,7 @@ export default async function DashboardPage() {
                 <h2 className="font-display text-xl font-bold text-white">Deploy more power</h2>
                 <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
                   {rate > 0
-                    ? `Your rigs are mining ${formatCrypto(perDay, s.currency_decimals)} ${s.currency_code}/day. A plan below stacks on top and pays a fixed rate for its whole term.`
+                    ? `Your rigs are mining ${formatMoney(perDay, cfg)}/day. A plan below stacks on top and pays a fixed rate for its whole term.`
                     : "Your rigs are idle. Deploy a plan to start earning a fixed daily rate for its full term."}
                 </p>
               </div>
@@ -444,12 +449,11 @@ export default async function DashboardPage() {
                       )}
                     </div>
                     <p className="mt-2 font-mono text-2xl font-medium tabular-nums text-gold-300">
-                      {formatCrypto(Number(p.price), s.currency_decimals)}{" "}
-                      <span className="text-xs text-slate-400">{s.currency_code}</span>
+                      {formatMoney(Number(p.price), cfg)}
                     </p>
                     <p className="mt-1 text-sm text-white">
                       <span className="font-mono text-emerald-300">
-                        +{formatCrypto(Number(p.point_per_day ?? 0), s.currency_decimals)} {s.currency_code}
+                        +{formatMoney(Number(p.point_per_day ?? 0), cfg)}
                       </span>{" "}
                       per day
                     </p>
@@ -457,7 +461,7 @@ export default async function DashboardPage() {
                       <div className="flex items-center justify-between gap-3">
                         <dt className="text-slate-400">Pays out over {e.durationDays} days</dt>
                         <dd className="font-mono tabular-nums text-slate-200">
-                          {formatCrypto(e.payoutToUser, s.currency_decimals)} {s.currency_code}
+                          {formatMoney(e.payoutToUser, cfg)}
                         </dd>
                       </div>
                       <div className="flex items-center justify-between gap-3">

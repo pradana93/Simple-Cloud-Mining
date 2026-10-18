@@ -4,7 +4,8 @@ import { Link2, Percent, Users } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getCachedContents, getCachedSettings } from "@/lib/catalog";
-import { formatCrypto } from "@/lib/utils";
+import { getMoneyCfg } from "@/lib/currency";
+import { formatMoney } from "@/lib/money";
 import { CopyButton } from "@/components/copy-button";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,7 @@ function Readout({ label, value, hint, tone }: { label: string; value: string; h
 
 export default async function AffiliatePage() {
   const [s, c] = await Promise.all([getCachedSettings(), getCachedContents()]);
+  const cfg = await getMoneyCfg();
 
   const supabase = createServerSupabase();
   let userId: string | null = null;
@@ -134,8 +136,8 @@ export default async function AffiliatePage() {
       {userId ? (
         <section aria-label="Your affiliate numbers" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Readout label="Invited" hint="members you referred" value={String(invited)} />
-          <Readout label="Earned" hint={`lifetime, in ${s.currency_code}`} value={formatCrypto(earns, s.currency_decimals)} tone="emerald" />
-          <Readout label="Paid out" hint="already settled to you" value={formatCrypto(paid, s.currency_decimals)} />
+          <Readout label="Earned" hint="lifetime, before fees" value={formatMoney(earns, cfg)} tone="emerald" />
+          <Readout label="Paid out" hint="already settled to you" value={formatMoney(paid, cfg)} />
           <Readout label="Commission" hint="per upgrade, for life" value={`${s.aff_comission}%`} tone="gold" />
         </section>
       ) : (

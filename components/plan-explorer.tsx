@@ -2,6 +2,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { cn, formatCrypto } from "@/lib/utils";
+import { formatMoney, type MoneyCfg } from "@/lib/money";
 
 type PlanItem = {
   id: number;
@@ -26,14 +27,17 @@ export function PlanExplorer({
   plans,
   currencyCode,
   decimals,
+  cfg,
 }: {
   plans: PlanItem[];
   currencyCode: string;
   decimals: number;
+  cfg?: MoneyCfg;
 }) {
   const all = useMemo(() => [...plans].sort((a, b) => Number(a.price) - Number(b.price)), [plans]);
   const [sort, setSort] = useState<"price" | "yield">("price");
   const [selectedId, setSelectedId] = useState<number | null>(all[0]?.id ?? null);
+  const money = (v: number) => (cfg ? formatMoney(v, cfg, decimals) : `${formatCrypto(v, decimals)} ${currencyCode}`);
 
   const sorted = useMemo(() => {
     const copy = [...all];
@@ -104,9 +108,9 @@ export function PlanExplorer({
                   </div>
                   <div className="text-right">
                     <div className="font-mono tabular-nums text-white">
-                      {free ? "Free" : formatCrypto(Number(p.price), decimals)}
+                      {free ? "Free" : cfg ? formatMoney(Number(p.price), cfg, decimals) : formatCrypto(Number(p.price), decimals)}
                     </div>
-                    {!free && <div className="text-[10px] text-slate-400">{currencyCode}</div>}
+                    {!free && !cfg && <div className="text-[10px] text-slate-400">{currencyCode}</div>}
                   </div>
                 </div>
               </button>
@@ -119,15 +123,15 @@ export function PlanExplorer({
         <div className="text-xs text-slate-400">Selected plan</div>
         <h3 className="font-display mt-1 text-2xl font-bold text-white">{sel.plan_name}</h3>
         <dl className="mt-5 space-y-2.5 text-sm">
-          <Row label="Daily yield" value={`+${formatCrypto(Number(sel.point_per_day ?? 0), decimals)} ${currencyCode}`} emerald />
+          <Row label="Daily yield" value={`+${money(Number(sel.point_per_day ?? 0))}`} emerald />
           <Row label="Hashrate" value={String(sel.speed ?? "n/a")} />
           <Row label="Contract" value={`${sel.duration} days`} />
-          <Row label="Price" value={isFree ? "Free" : `${formatCrypto(Number(sel.price), decimals)} ${currencyCode}`} />
+          <Row label="Price" value={isFree ? "Free" : money(Number(sel.price))} />
         </dl>
         <div className="mt-5 rounded-2xl border border-white/10 p-4">
           <div className="text-xs text-slate-400">Projected over {sel.duration} days</div>
           <div className="font-mono mt-1 text-2xl font-medium tabular-nums text-gold-300">
-            +{formatCrypto(projected, decimals)} {currencyCode}
+            +{money(projected)}
           </div>
         </div>
         <Link

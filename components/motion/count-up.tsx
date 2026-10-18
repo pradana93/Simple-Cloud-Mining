@@ -1,19 +1,24 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { fiatDecimals, fiatSymbol, type MoneyCfg } from "@/lib/money";
 
 export function CountUp({
   value,
   decimals = 0,
   duration = 900,
+  cfg,
   className,
 }: {
   value: number;
   decimals?: number;
   duration?: number;
+  cfg?: MoneyCfg;
   className?: string;
 }) {
   const [display, setDisplay] = useState(0);
   const fromRef = useRef(0);
+  const fiat = cfg?.mode === "fiat" && cfg.rate > 0;
+  const shownDecimals = fiat ? fiatDecimals(value * cfg!.rate) : decimals;
 
   useEffect(() => {
     const target = Number.isFinite(value) ? value : 0;
@@ -39,5 +44,10 @@ export function CountUp({
     return () => cancelAnimationFrame(raf);
   }, [value, duration]);
 
-  return <span className={className}>{display.toFixed(decimals)}</span>;
+  return (
+    <span className={className}>
+      {fiat ? `≈${fiatSymbol(cfg!.fiatCurrency)}` : ""}
+      {(fiat ? display * cfg!.rate : display).toFixed(shownDecimals)}
+    </span>
+  );
 }

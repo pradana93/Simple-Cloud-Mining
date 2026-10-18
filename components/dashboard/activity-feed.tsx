@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ArrowDownToLine, Percent, Pickaxe, Users, WalletMinimal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatCrypto, timeAgo } from "@/lib/utils";
+import { formatMoney, type MoneyCfg } from "@/lib/money";
 
 export type ActivityKind = "deposit" | "withdrawal" | "affiliate" | "referral" | "plan";
 
@@ -52,10 +53,12 @@ export function ActivityFeed({
   items,
   decimals,
   code,
+  cfg,
 }: {
   items: ActivityItem[];
   decimals: number;
   code: string;
+  cfg?: MoneyCfg;
 }) {
   const [filter, setFilter] = useState<string>("All");
   const active = FILTERS.find((f) => f.label === filter);
@@ -97,7 +100,13 @@ export function ActivityFeed({
               </div>
               {it.amount != null && (
                 <span className="font-mono shrink-0 text-sm tabular-nums text-white">
-                  {formatCrypto(it.amount, decimals)} <span className="text-[11px] text-slate-400">{code}</span>
+                  {cfg ? (
+                    formatMoney(it.amount, cfg)
+                  ) : (
+                    <>
+                      {formatCrypto(it.amount, decimals)} <span className="text-[11px] text-slate-400">{code}</span>
+                    </>
+                  )}
                 </span>
               )}
               {it.status && (

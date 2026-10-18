@@ -1,4 +1,6 @@
 import { getCachedPayouts, getCachedSettings, getCachedStats } from "@/lib/catalog";
+import { getMoneyCfg } from "@/lib/currency";
+import { moneyUnit } from "@/lib/money";
 import { Reveal } from "@/components/motion/reveal";
 import { CountUp } from "@/components/motion/count-up";
 import { PayoutFeed } from "@/components/payout-feed";
@@ -11,6 +13,7 @@ export default async function PayoutsPage() {
     getCachedPayouts(),
     getCachedStats(),
   ]);
+  const cfg = await getMoneyCfg();
   return (
     <div className="space-y-8 py-8 sm:py-10">
       <Reveal>
@@ -19,7 +22,7 @@ export default async function PayoutsPage() {
           <p className="mt-3 text-slate-400">
             Every deposit and withdrawal, published as it lands.{" "}
             <span className="font-semibold text-gold-300">
-              <CountUp value={stats.totalPaid} decimals={s.currency_decimals} /> {s.currency_code}
+              <CountUp value={stats.totalPaid} decimals={s.currency_decimals} cfg={cfg} /> {moneyUnit(cfg)}
             </span>{" "}
             paid out so far.
           </p>
@@ -31,6 +34,7 @@ export default async function PayoutsPage() {
           withdrawals={withdrawals}
           currencyCode={s.currency_code}
           decimals={s.currency_decimals}
+          cfg={cfg}
         />
       </Reveal>
     </div>

@@ -59,6 +59,8 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { key: "currency_symbol", label: "Symbol", type: "text", maxLength: 10 },
       { key: "currency_code", label: "Code", type: "text", required: true, maxLength: 10 },
       { key: "currency_decimals", label: "Decimals", type: "slider", min: 0, max: 18, step: 1, integer: true },
+      { key: "fiat_enabled", label: "Fiat display", type: "switch", help: "Let members switch balances and prices to fiat, converted at a live rate." },
+      { key: "fiat_currency", label: "Fiat currency", type: "text", maxLength: 3, help: "ISO code, for example USD." },
       { key: "coin_cur1", label: "Coin paid in", type: "text", maxLength: 20 },
       { key: "coin_cur2", label: "Coin paid out", type: "text", maxLength: 20 },
     ],

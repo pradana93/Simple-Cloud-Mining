@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { cn, formatCrypto } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { formatMoney, type MoneyCfg } from "@/lib/money";
 
 type Entry = { amount: number; tx: string | null; status?: string };
 type Row = Entry & { kind: "in" | "out" };
@@ -12,11 +13,13 @@ export function PayoutFeed({
   withdrawals,
   currencyCode,
   decimals,
+  cfg,
 }: {
   deposits: Entry[];
   withdrawals: Entry[];
   currencyCode: string;
   decimals: number;
+  cfg?: MoneyCfg;
 }) {
   const [tab, setTab] = useState<"all" | "in" | "out">("all");
   const [q, setQ] = useState("");
@@ -76,7 +79,13 @@ export function PayoutFeed({
             return (
               <div key={i} className="flex items-center justify-between gap-3 px-6 py-3.5 text-sm">
                 <span className="font-mono tabular-nums text-white">
-                  {formatCrypto(Number(r.amount), decimals)} <span className="text-slate-400">{currencyCode}</span>
+                  {cfg ? (
+                    formatMoney(Number(r.amount), cfg, decimals)
+                  ) : (
+                    <>
+                      {formatCrypto(Number(r.amount), decimals)} <span className="text-slate-400">{currencyCode}</span>
+                    </>
+                  )}
                 </span>
                 <span className="hidden truncate font-mono text-xs text-slate-400 sm:inline">
                   {r.tx ? `${r.tx.slice(0, 18)}…` : "no tx"}

@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+import { fiatDecimals, fiatSymbol, type MoneyCfg } from "@/lib/money";
 
 // A balance readout that keeps climbing while the tab is open. The server hands
 // us a value plus the rig's per-minute rate; this projects the balance forward
@@ -9,16 +10,20 @@ export function LiveBalance({
   value,
   perMinute,
   decimals = 8,
+  cfg,
   className,
 }: {
   value: number;
   perMinute: number;
   decimals?: number;
+  cfg?: MoneyCfg;
   className?: string;
 }) {
   const [display, setDisplay] = useState(value);
   const base = useRef({ balance: value, at: Date.now() });
   const perSecond = perMinute > 0 ? perMinute / 60 : 0;
+  const fiat = cfg?.mode === "fiat" && cfg.rate > 0;
+  const shownDecimals = fiat ? fiatDecimals(value * cfg!.rate) : decimals;
 
   useEffect(() => {
     base.current = { balance: value, at: Date.now() };
@@ -61,5 +66,10 @@ export function LiveBalance({
     };
   }, [perSecond]);
 
-  return <span className={className}>{display.toFixed(decimals)}</span>;
+  return (
+    <span className={className}>
+      {fiat ? `≈${fiatSymbol(cfg!.fiatCurrency)}` : ""}
+      {(fiat ? display * cfg!.rate : display).toFixed(shownDecimals)}
+    </span>
+  );
 }

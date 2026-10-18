@@ -1,6 +1,7 @@
 import { Pickaxe } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { cn, formatCrypto, formatDuration } from "@/lib/utils";
+import { cn, formatDuration } from "@/lib/utils";
+import { cryptoCfg, formatMoney, type MoneyCfg } from "@/lib/money";
 
 export type RigView = {
   id: number;
@@ -32,8 +33,9 @@ function Bar({ pct, tone }: { pct: number; tone: "gold" | "emerald" }) {
   );
 }
 
-export function RigReadout({ rig, symbol }: { rig: RigView; symbol: string }) {
+export function RigReadout({ rig, symbol, cfg }: { rig: RigView; symbol: string; cfg?: MoneyCfg }) {
   const paidBack = rig.roiPct != null && rig.roiPct >= 100;
+  const money = cfg ?? cryptoCfg({ code: rig.code, symbol, decimals: rig.decimals });
   return (
     <div className="panel card-hover rounded-2xl p-5">
       <div className="flex items-start justify-between gap-3">
@@ -55,13 +57,13 @@ export function RigReadout({ rig, symbol }: { rig: RigView; symbol: string }) {
         <div className="border-t-2 border-gold-500/50 pt-2.5">
           <p className="text-[11px] text-slate-400">Rate / min</p>
           <p className="font-mono mt-1 text-base font-medium tabular-nums text-white">
-            {formatCrypto(rig.rate, 8)}
+            {formatMoney(rig.rate, money, 8)}
           </p>
         </div>
         <div className="border-t-2 border-gold-500/50 pt-2.5">
           <p className="text-[11px] text-slate-400">Earned</p>
           <p className="font-mono mt-1 text-base font-medium tabular-nums text-emerald-300">
-            {formatCrypto(rig.earned, rig.decimals)}
+            {formatMoney(rig.earned, money)}
           </p>
         </div>
       </div>
@@ -70,7 +72,7 @@ export function RigReadout({ rig, symbol }: { rig: RigView; symbol: string }) {
         <div>
           <div className="mb-1.5 flex items-center justify-between text-[11px]">
             <span className="text-slate-400">
-              {rig.price > 0 ? <>Return on {symbol}{formatCrypto(rig.price, rig.decimals)}</> : "Free rig"}
+              {rig.price > 0 ? <>Return on {formatMoney(rig.price, money)}</> : "Free rig"}
             </span>
             <span className={cn("font-medium", paidBack ? "text-emerald-300" : "text-slate-300")}>
               {rig.roiPct == null

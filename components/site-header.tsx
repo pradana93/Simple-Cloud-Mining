@@ -6,6 +6,7 @@ import { Menu, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { NAV_LINKS } from "./nav-links";
 import { Logo } from "./logo";
+import { CurrencyToggle } from "./fx/currency-toggle";
 import { cn } from "@/lib/utils";
 
 function isActive(pathname: string, href: string) {
@@ -13,7 +14,17 @@ function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function SiteHeaderClient({ sitename }: { sitename: string }) {
+export function SiteHeaderClient({
+  sitename,
+  fiatEnabled,
+  currencyCode,
+  fiatCurrency,
+}: {
+  sitename: string;
+  fiatEnabled: boolean;
+  currencyCode: string;
+  fiatCurrency: string;
+}) {
   const pathname = usePathname();
   const supabase = useMemo(() => createClient(), []);
   const [scrolled, setScrolled] = useState(false);
@@ -113,6 +124,7 @@ export function SiteHeaderClient({ sitename }: { sitename: string }) {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
+          <CurrencyToggle enabled={fiatEnabled} code={currencyCode} fiatCurrency={fiatCurrency} className="mr-1" />
           {authed === null ? (
             <span className="inline-block h-9 w-24" aria-hidden />
           ) : authed ? (
@@ -165,6 +177,9 @@ export function SiteHeaderClient({ sitename }: { sitename: string }) {
               {l.label}
             </Link>
           ))}
+          <div className="mt-2 border-t border-white/10 pt-3 md:hidden">
+            <CurrencyToggle enabled={fiatEnabled} code={currencyCode} fiatCurrency={fiatCurrency} />
+          </div>
           <div className="mt-2 grid grid-cols-2 gap-2 border-t border-white/10 pt-3">
             {authed === null ? (
               <span className="rounded-xl border border-white/10 px-4 py-2.5" aria-hidden />

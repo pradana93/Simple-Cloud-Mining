@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Activity } from "lucide-react";
 import { getCachedPlans, getCachedPayouts, getCachedSettings, getCachedStats } from "@/lib/catalog";
-import { formatCrypto } from "@/lib/utils";
+import { getMoneyCfg } from "@/lib/currency";
+import { formatMoney, moneyUnit } from "@/lib/money";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
 import { CountUp } from "@/components/motion/count-up";
@@ -25,6 +26,7 @@ export default async function HomePage() {
     getCachedStats(),
     getCachedPayouts(),
   ]);
+  const cfg = await getMoneyCfg();
 
   return (
     <div className="space-y-20 py-10 sm:py-14">
@@ -67,11 +69,11 @@ export default async function HomePage() {
             <Metric label="Hashrate plans">
               <CountUp value={plans.length} />
             </Metric>
-            <Metric label={`${s.currency_code} paid out`}>
-              <CountUp value={stats.totalPaid} decimals={s.currency_decimals} />
+            <Metric label={`${moneyUnit(cfg)} paid out`}>
+              <CountUp value={stats.totalPaid} decimals={s.currency_decimals} cfg={cfg} />
             </Metric>
-            <Metric label={`${s.currency_code} staked`}>
-              <CountUp value={stats.totalDeposits} decimals={s.currency_decimals} />
+            <Metric label={`${moneyUnit(cfg)} staked`}>
+              <CountUp value={stats.totalDeposits} decimals={s.currency_decimals} cfg={cfg} />
             </Metric>
           </div>
         </Reveal>
@@ -90,7 +92,7 @@ export default async function HomePage() {
               {payouts.withdrawals.slice(0, 6).map((w, i) => (
                 <li key={i} className="flex items-center justify-between py-3 text-sm">
                   <span className="font-mono tabular-nums text-white">
-                    {formatCrypto(Number(w.amount), s.currency_decimals)} {s.currency_code}
+                    {formatMoney(Number(w.amount), cfg)}
                   </span>
                   <span className="text-slate-400">{w.status ? w.status.toLowerCase() : "pending"}</span>
                 </li>
@@ -117,7 +119,7 @@ export default async function HomePage() {
               How mining works
             </Link>
           </div>
-          <PlanExplorer plans={plans} currencyCode={s.currency_code} decimals={s.currency_decimals} />
+          <PlanExplorer plans={plans} currencyCode={s.currency_code} decimals={s.currency_decimals} cfg={cfg} />
         </section>
       </Reveal>
 
