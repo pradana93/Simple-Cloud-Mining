@@ -4,6 +4,7 @@ import { Check, RotateCcw, Wallet, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input, Label } from "@/components/ui/input";
+import { CopyButton } from "@/components/copy-button";
 import { Modal } from "@/components/admin/modal";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 import { cn, formatCrypto } from "@/lib/utils";
@@ -15,6 +16,7 @@ export type AdminWithdrawal = {
   amount: number;
   status: string;
   tx: string | null;
+  address: string | null;
   created_at: string | null;
   date_paid: string | null;
 };
@@ -113,6 +115,7 @@ export function WithdrawalsManager({
                 <tr className="text-left text-xs text-slate-400">
                   <th className="py-3 pr-4 font-medium">Member</th>
                   <th className="py-3 pr-4 font-medium">Amount</th>
+                  <th className="py-3 pr-4 font-medium">Payout to</th>
                   <th className="py-3 pr-4 font-medium">Status</th>
                   <th className="py-3 pr-4 font-medium">Requested</th>
                   <th className="py-3 pr-4 font-medium">Paid</th>
@@ -130,13 +133,22 @@ export function WithdrawalsManager({
                       </td>
                       <td className="font-mono py-3 pr-4 tabular-nums text-white">{money(Number(r.amount))}</td>
                       <td className="py-3 pr-4">
+                        {r.address ? (
+                          <span className="font-mono text-xs text-slate-200" title={r.address}>
+                            {r.address.length > 16 ? `${r.address.slice(0, 8)}…${r.address.slice(-6)}` : r.address}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-500">not recorded</span>
+                        )}
+                      </td>
+                      <td className="py-3 pr-4">
                         <Badge variant={variant(r.status)}>{r.status}</Badge>
                       </td>
                       <td className="py-3 pr-4 text-slate-300">
                         {r.created_at ? new Date(r.created_at).toLocaleDateString() : ""}
                       </td>
                       <td className="py-3 pr-4 text-slate-300">
-                        {r.date_paid ? new Date(r.date_paid).toLocaleDateString() : "—"}
+                        {r.date_paid ? new Date(r.date_paid).toLocaleDateString() : "Not yet"}
                       </td>
                       <td className="py-3 pr-4">
                         <div className="flex justify-end gap-2">
@@ -196,6 +208,15 @@ export function WithdrawalsManager({
           </>
         }
       >
+        {approving?.address && (
+          <div className="mb-4 rounded-2xl bg-white/5 p-4">
+            <p className="text-xs text-slate-400">Send to</p>
+            <div className="mt-1.5 flex items-center justify-between gap-3">
+              <span className="break-all font-mono text-sm text-slate-100">{approving.address}</span>
+              <CopyButton text={approving.address} />
+            </div>
+          </div>
+        )}
         <div>
           <Label htmlFor="w-tx">Transaction reference (optional)</Label>
           <Input id="w-tx" value={tx} onChange={(e) => setTx(e.target.value)} placeholder="Blockchain hash or payout id" />

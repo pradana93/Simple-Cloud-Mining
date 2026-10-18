@@ -12,7 +12,7 @@ export default async function AdminWithdrawals() {
     const [wRes, pRes] = await Promise.all([
       admin
         .from("user_withdrawal")
-        .select("id,user_id,amount,status,tx,created_at,date_paid")
+        .select("id,user_id,amount,status,tx,address,created_at,date_paid")
         .order("created_at", { ascending: false })
         .limit(200),
       admin.from("profiles").select("id,username").limit(1000),

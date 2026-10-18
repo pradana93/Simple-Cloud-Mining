@@ -57,6 +57,7 @@ export type WithdrawalRow = {
   amount: number;
   status: "PENDING" | "PROCESSING" | "SUCCESS" | "CANCELED";
   tx: string | null;
+  address: string | null;
   created_at: string;
   date_paid: string | null;
 };
