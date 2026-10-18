@@ -2,6 +2,7 @@ import Link from "next/link";
 import { cookies, headers } from "next/headers";
 import { History, Plus, WalletMinimal } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getCachedSettings } from "@/lib/catalog";
 import { totalMiningRate } from "@/lib/mining";
 import { formatCrypto, formatDuration } from "@/lib/utils";
@@ -128,6 +129,21 @@ export default async function DashboardPage() {
         (x) => [x.id, x.plan_name] as [number, string]
       )
     );
+
+    // The profiles policy hides other members, so the downline is counted with
+    // the service role, scoped to this user's id.
+    try {
+      const admin = createAdminSupabase();
+      const { data: refRows } = await admin
+        .from("profiles")
+        .select("username,created_at")
+        .eq("reference_user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(12);
+      if (refRows) referrals = refRows as typeof referrals;
+    } catch {
+      // Keep whatever the user-scoped query returned.
+    }
 
     // Bootstrap the profile + free rig only when there is real work to do.
     if (!profile || rows.filter((x) => x.status === "active").length === 0 || (!profile.reference_user_id && refCookie)) {

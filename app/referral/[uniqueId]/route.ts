@@ -1,24 +1,27 @@
-import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
-import { createServerSupabase } from "@/lib/supabase/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { createAdminSupabase } from "@/lib/supabase/admin";
 
-/** Legacy: /referral/:unique_id sets a cookie then redirects home. */
-export async function GET(
-  _req: Request,
-  { params }: { params: { uniqueId: string } }
-) {
-  try {
-    const supabase = createServerSupabase();
-    const { data } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("unique_id", Number(params.uniqueId))
-      .maybeSingle();
-    if (data) {
-      cookies().set("ref", params.uniqueId, { maxAge: 86400, path: "/" });
+// /referral/:unique_id records the referrer in a cookie, then sends the visitor
+// to signup where the attribution is applied on the first console load. The
+// lookup runs with the service role because profiles RLS only exposes a
+// caller's own row, so an anonymous read would never find the referrer.
+export async function GET(req: NextRequest, { params }: { params: { uniqueId: string } }) {
+  const id = (params.uniqueId ?? "").trim();
+  const dest = req.nextUrl.clone();
+  dest.pathname = "/register";
+  dest.search = "";
+
+  const res = NextResponse.redirect(dest);
+  if (/^\d+$/.test(id)) {
+    try {
+      const admin = createAdminSupabase();
+      const { data } = await admin.from("profiles").select("id").eq("unique_id", Number(id)).maybeSingle();
+      if (data) {
+        res.cookies.set("ref", id, { maxAge: 60 * 60 * 24 * 30, path: "/", sameSite: "lax" });
+      }
+    } catch {
+      // DB unreachable; send them to signup without attribution.
     }
-  } catch {
-    // DB unreachable; still redirect home.
   }
-  redirect("/");
+  return res;
 }
