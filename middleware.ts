@@ -56,6 +56,14 @@ export async function middleware(request: NextRequest) {
     login.search = "";
     return NextResponse.redirect(login);
   }
+  // A signed-in member has no business on the sign in / sign up screens.
+  const path = request.nextUrl.pathname;
+  if (signedIn && (path === "/login" || path === "/register")) {
+    const dash = request.nextUrl.clone();
+    dash.pathname = "/dashboard";
+    dash.search = "";
+    return NextResponse.redirect(dash);
+  }
   return response;
 }
 
