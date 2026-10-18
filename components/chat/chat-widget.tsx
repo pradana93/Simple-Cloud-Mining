@@ -180,7 +180,7 @@ export default function ChatWidget() {
                     )}
                   >
                     <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                    <p className={cn("mt-1 text-[10px]", m.sender === "user" ? "text-ink-950/60" : "text-slate-500")}>
+                    <p className={cn("mt-1 text-[10px]", m.sender === "user" ? "text-ink-950/70" : "text-slate-400")}>
                       {new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                     </p>
                   </div>
