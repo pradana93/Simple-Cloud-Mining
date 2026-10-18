@@ -1,8 +1,9 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Menu, X } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { NAV_LINKS } from "./nav-links";
 import { Logo } from "./logo";
 import { cn } from "@/lib/utils";
@@ -14,8 +15,40 @@ function isActive(pathname: string, href: string) {
 
 export function SiteHeaderClient({ sitename }: { sitename: string }) {
   const pathname = usePathname();
+  const supabase = useMemo(() => createClient(), []);
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
+  // null until the session is read from the cookie on the client, so a signed-in
+  // member never sees a stale "Sign in" action.
+  const [authed, setAuthed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (alive) setAuthed(Boolean(data.session));
+      })
+      .catch(() => {
+        if (alive) setAuthed(false);
+      });
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthed(Boolean(session));
+    });
+    return () => {
+      alive = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  async function signOut() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Even if the call fails, bounce home so the server re-evaluates.
+    }
+    window.location.href = "/";
+  }
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -80,12 +113,23 @@ export function SiteHeaderClient({ sitename }: { sitename: string }) {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
-          <Link
-            href="/login"
-            className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
-          >
-            Sign in
-          </Link>
+          {authed === null ? (
+            <span className="inline-block h-9 w-24" aria-hidden />
+          ) : authed ? (
+            <button
+              onClick={signOut}
+              className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              Sign out
+            </button>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-xl px-4 py-2 text-sm font-semibold text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
+            >
+              Sign in
+            </Link>
+          )}
           <Link
             href="/dashboard"
             className="tap rounded-xl bg-gold-500 px-4 py-2 font-display text-sm font-bold text-ink-950 hover:bg-gold-400"
@@ -122,13 +166,24 @@ export function SiteHeaderClient({ sitename }: { sitename: string }) {
             </Link>
           ))}
           <div className="mt-2 grid grid-cols-2 gap-2 border-t border-white/10 pt-3">
-            <Link
-              href="/login"
-              onClick={() => setOpen(false)}
-              className="rounded-xl border border-slate-700 px-4 py-2.5 text-center text-sm font-semibold"
-            >
-              Sign in
-            </Link>
+            {authed === null ? (
+              <span className="rounded-xl border border-white/10 px-4 py-2.5" aria-hidden />
+            ) : authed ? (
+              <button
+                onClick={signOut}
+                className="rounded-xl border border-slate-700 px-4 py-2.5 text-center text-sm font-semibold text-slate-200"
+              >
+                Sign out
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="rounded-xl border border-slate-700 px-4 py-2.5 text-center text-sm font-semibold"
+              >
+                Sign in
+              </Link>
+            )}
             <Link
               href="/dashboard"
               onClick={() => setOpen(false)}
