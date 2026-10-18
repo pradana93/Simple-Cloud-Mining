@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createAdminSupabase } from "@/lib/supabase/admin";
+import { recordEvent } from "@/lib/risk-telemetry";
 import type { Database } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -74,12 +75,13 @@ export async function POST(req: Request) {
       },
     });
 
-    const { error } = await supabase.auth.signInWithPassword({ email: row.email, password });
+    const { data: signIn, error } = await supabase.auth.signInWithPassword({ email: row.email, password });
     if (error) {
       await admin.from("login_attempts").insert({ ip_address: ip, login: raw, time: Date.now() });
       return NextResponse.json({ ok: false, error: "Invalid username or password" }, { status: 401 });
     }
     await admin.from("login_attempts").delete().eq("login", raw);
+    if (signIn.user) await recordEvent({ userId: signIn.user.id, kind: "login", req });
     return res;
   } catch {
     return NextResponse.json({ ok: false, error: "Sign-in is unavailable right now" }, { status: 500 });

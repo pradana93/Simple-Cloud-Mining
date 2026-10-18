@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { accrueOwnPlans } from "@/lib/accrue-user";
+import { recordEvent } from "@/lib/risk-telemetry";
 
 export const dynamic = "force-dynamic";
 
 // Called by the live balance readout while a member has the console open, so the
 // stored balance keeps pace with the number on screen. Returns the authoritative
 // balance (post-write stored value plus any not-yet-persisted projection).
-export async function POST() {
+export async function POST(req: Request) {
   const supabase = createServerSupabase();
   let userId: string | null = null;
   try {
@@ -18,6 +19,7 @@ export async function POST() {
   }
   if (!userId) return NextResponse.json({ ok: false, error: "Not signed in" }, { status: 401 });
 
+  await recordEvent({ userId, kind: "accrue", req });
   const { pending, credited } = await accrueOwnPlans(userId, {});
   const { data } = await supabase.from("profiles").select("balance").eq("id", userId).maybeSingle();
   const stored = Number((data as { balance: number } | null)?.balance ?? 0);

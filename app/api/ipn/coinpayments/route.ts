@@ -3,6 +3,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
 import { verifyIpnHmac } from "@/lib/coinpayments";
 import { affiliateCommission, expirationForPlan } from "@/lib/mining";
+import { recordEvent } from "@/lib/risk-telemetry";
 
 /**
  * POST /api/ipn/coinpayments: port of GatewayIpn::coinpayments().
@@ -77,6 +78,7 @@ export async function POST(req: Request) {
       .select("id")
       .maybeSingle();
     if (!claimed) return new Response("IPN OK");
+    await recordEvent({ userId: t.user_id, kind: "deposit", detail: { amount: amount1, txid: txnId, planId: t.plan_id } });
     await admin.from("user_deposits").insert({ user_id: t.user_id, amount: amount1, tx: txnId, status: "SUCCESS", date_paid: new Date().toISOString() });
     const { data: plan } = await admin.from("plans").select("*").eq("id", t.plan_id).maybeSingle();
     if (plan) {

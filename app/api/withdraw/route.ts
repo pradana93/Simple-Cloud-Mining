@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
+import { recordEvent } from "@/lib/risk-telemetry";
 
 const ADDRESS_MIN = 8;
 const ADDRESS_MAX = 200;
@@ -55,6 +56,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: insertError.message }, { status: 500 });
   }
   const id = (created as { id: number } | null)?.id ?? null;
+  await recordEvent({ userId: user.id, kind: "withdraw", req, detail: { amount } });
 
   return NextResponse.json({ ok: true, id });
 }

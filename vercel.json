@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/accrue",
       "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/risk",
+      "schedule": "15 0 * * *"
     }
   ]
 }
