@@ -25,10 +25,20 @@ export async function middleware(request: NextRequest) {
       },
     }
   );
+  let user = null;
   try {
-    await supabase.auth.getUser();
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
   } catch {
     // Treat as logged out — pages handle null user.
+  }
+  // Edge gate for the control tower: anonymous visitors never reach /admin.
+  // The is_admin check runs server-side in app/admin/layout.tsx.
+  if (!user && request.nextUrl.pathname.startsWith("/admin")) {
+    const login = request.nextUrl.clone();
+    login.pathname = "/login";
+    login.search = "";
+    return NextResponse.redirect(login);
   }
   return response;
 }
