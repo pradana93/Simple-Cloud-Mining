@@ -77,6 +77,25 @@ export type DepositRow = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Database = any;
 
+export type ChatSender = "user" | "admin";
+
+export type ChatMessage = {
+  id: number;
+  sender: ChatSender;
+  body: string;
+  created_at: string;
+  read_by_user?: boolean;
+};
+
+export type ChatThread = {
+  userId: string;
+  username: string;
+  lastBody: string;
+  lastSender: ChatSender;
+  lastAt: string;
+  unread: number;
+};
+
 export type SiteSettings = {
   id: number;
   sitename: string;

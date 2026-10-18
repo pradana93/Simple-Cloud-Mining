@@ -9,6 +9,7 @@ import {
   Home,
   Link2,
   Menu,
+  MessagesSquare,
   Package,
   ScrollText,
   Settings,
@@ -17,9 +18,11 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { ChatUnread } from "@/components/admin/chat-unread";
 
 const links = [
   ["Overview", "/admin", Home],
+  ["Live chat", "/admin/chat", MessagesSquare],
   ["Plans", "/admin/plans", Package],
   ["Users", "/admin/users", Users],
   ["Transactions", "/admin/transactions", CreditCard],
@@ -51,6 +54,7 @@ export default function AdminNav() {
             )}
           >
             <Icon size={16} /> {label}
+            {href === "/admin/chat" && <ChatUnread />}
           </Link>
         );
       })}

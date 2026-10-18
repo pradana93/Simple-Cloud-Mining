@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
 import { CountUp } from "@/components/motion/count-up";
+import { LiveBalance } from "@/components/motion/live-balance";
 
 export const dynamic = "force-dynamic";
 
@@ -93,12 +94,13 @@ export default async function DashboardPage() {
   } catch {
     // render empty state
   }
-  const { earnings } = await accrueOwnPlans(supabase, userId, {
+  const stored = Number(profile?.balance ?? 0);
+  const { pending } = await accrueOwnPlans(supabase, userId, {
     rows: activePlans as AccrualRow[],
-    balance: Number(profile?.balance ?? 0),
+    balance: stored,
   });
   const rate = totalMiningRate(activePlans.map((r) => ({ earning_rate: planOf(r)?.earning_rate ?? null })));
-  const balance = Number(profile?.balance ?? 0) + earnings;
+  const balance = stored + pending;
 
   return (
     <div className="space-y-8 py-8">
@@ -121,9 +123,16 @@ export default async function DashboardPage() {
           <div className="panel rounded-3xl border-t-2 border-t-gold-500/70 p-6">
             <p className="text-xs font-medium text-slate-400">Balance</p>
             <p className="font-mono mt-2 text-3xl font-medium tabular-nums text-white">
-              <CountUp value={balance} decimals={s.currency_decimals} />
+              <LiveBalance value={balance} perMinute={rate} decimals={s.currency_decimals} />
             </p>
-            <p className="mt-1 text-sm text-slate-400">{s.currency_code}, withdrawable</p>
+            {rate > 0 ? (
+              <p className="mt-1 flex items-center gap-1.5 text-sm text-emerald-300">
+                <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden />
+                +{formatCrypto(rate, 8)} {s.currency_code}/min, credited live
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-slate-400">{s.currency_code}, withdrawable</p>
+            )}
           </div>
           <div className="panel rounded-3xl p-6">
             <p className="flex items-center gap-1.5 text-xs font-medium text-slate-400">

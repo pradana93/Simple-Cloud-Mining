@@ -3,6 +3,7 @@ import { Chakra_Petch, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader, SiteFooter } from "@/components/site-chrome";
 import { ToastProvider } from "@/components/ui/toast";
+import { ChatDock } from "@/components/chat/chat-dock";
 
 const body = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -43,6 +44,7 @@ export default function RootLayout({
           <SiteHeader />
           <main className="mx-auto w-full max-w-6xl px-4 sm:px-6">{children}</main>
           <SiteFooter />
+          <ChatDock />
         </ToastProvider>
       </body>
     </html>
