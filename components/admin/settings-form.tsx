@@ -16,7 +16,11 @@ function toDraft(s: Partial<Record<string, unknown>>): Draft {
   const d: Draft = {};
   for (const f of ALL_FIELDS) {
     const v = s[f.key as string];
-    d[f.key as string] = v === null || v === undefined ? "" : String(v);
+    if (f.boolean) {
+      d[f.key as string] = v === true || v === "yes" || v === "true" ? "yes" : "no";
+    } else {
+      d[f.key as string] = v === null || v === undefined ? "" : String(v);
+    }
   }
   return d;
 }

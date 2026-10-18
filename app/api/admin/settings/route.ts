@@ -25,8 +25,11 @@ function coerce(field: SettingsField, raw: unknown): { value?: unknown; error?: 
     }
     case "switch": {
       const v = String(raw).toLowerCase();
-      if (v !== "yes" && v !== "no") return { error: `${field.label} must be yes or no` };
-      return { value: v };
+      const on = v === "yes" || v === "true";
+      const off = v === "no" || v === "false";
+      if (!on && !off) return { error: `${field.label} must be yes or no` };
+      // Boolean columns store true/false; text columns keep the yes/no convention.
+      return { value: field.boolean ? on : on ? "yes" : "no" };
     }
     case "select":
     case "segmented": {
