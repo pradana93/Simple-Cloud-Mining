@@ -119,7 +119,7 @@ export default async function HomePage() {
               How mining works
             </Link>
           </div>
-          <PlanExplorer plans={plans} currencyCode={s.currency_code} decimals={s.currency_decimals} cfg={cfg} />
+          <PlanExplorer plans={plans} currencyCode={s.currency_code} decimals={s.currency_decimals} priceCurrency={s.price_currency} cfg={cfg} />
         </section>
       </Reveal>
 

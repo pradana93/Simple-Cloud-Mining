@@ -11,8 +11,7 @@ export async function SiteHeader() {
     <SiteHeaderClient
       sitename={s.sitename}
       fiatEnabled={s.fiat_enabled}
-      currencyCode={s.currency_code}
-      fiatCurrency={s.fiat_currency}
+      cryptoCode={s.currency_code}
     />
   );
 }

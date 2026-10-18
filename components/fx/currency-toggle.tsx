@@ -2,54 +2,78 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { FX_COOKIE, formatFiat, type MoneyMode } from "@/lib/money";
+import { CUR_COOKIE, FX_COOKIE, formatFiat, type MoneyMode } from "@/lib/money";
 
 type Props = {
   enabled: boolean;
-  code: string;
-  fiatCurrency: string;
+  cryptoCode: string;
   className?: string;
 };
 
-export function CurrencyToggle({ enabled, code, fiatCurrency, className }: Props) {
+type RatePayload = {
+  display?: string;
+  currencies?: string[];
+  rate?: number | null;
+};
+
+export function CurrencyToggle({ enabled, cryptoCode, className }: Props) {
   const router = useRouter();
   const [mode, setMode] = useState<MoneyMode>("crypto");
+  const [cur, setCur] = useState("USD");
+  const [currencies, setCurrencies] = useState<string[]>(["USD"]);
   const [rate, setRate] = useState<number | null>(null);
+  const [ready, setReady] = useState(false);
   const [pending, start] = useTransition();
 
   useEffect(() => {
-    setMode(document.cookie.split("; ").some((c) => c === `${FX_COOKIE}=fiat`) ? "fiat" : "crypto");
-  }, []);
-
-  useEffect(() => {
-    if (!enabled || mode !== "fiat") return;
+    if (!enabled) return;
+    const readCookie = (name: string) =>
+      document.cookie.split("; ").find((c) => c.startsWith(`${name}=`))?.split("=")[1] ?? null;
+    setMode(readCookie(FX_COOKIE) === "crypto" ? "crypto" : "fiat");
+    const picked = readCookie(CUR_COOKIE);
+    if (picked) setCur(picked.toUpperCase());
     let alive = true;
     fetch("/api/rate")
       .then((r) => r.json())
-      .then((d: { rate?: number | null }) => {
-        if (alive) setRate(typeof d.rate === "number" ? d.rate : null);
+      .then((d: RatePayload) => {
+        if (!alive) return;
+        if (Array.isArray(d.currencies) && d.currencies.length) setCurrencies(d.currencies);
+        if (!picked && d.display) setCur(d.display);
+        if (typeof d.rate === "number") setRate(d.rate);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setReady(true);
+      });
     return () => {
       alive = false;
     };
-  }, [enabled, mode]);
+  }, [enabled]);
 
   if (!enabled) return null;
 
   function pick(next: MoneyMode) {
-    if (next === mode) return;
     document.cookie = `${FX_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
     setMode(next);
+    start(() => router.refresh());
+  }
+
+  function changeCurrency(next: string) {
+    document.cookie = `${CUR_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;
+    setCur(next);
     start(() => router.refresh());
   }
 
   const hint =
     mode === "fiat"
       ? rate
-        ? `1 ${code} is about ${formatFiat(rate, fiatCurrency)} right now. Fiat values are indicative.`
+        ? `1 ${cryptoCode} is about ${formatFiat(rate, cur)} right now. Fiat values are indicative.`
         : "Fetching the live rate. Showing crypto until it loads."
-      : `Show values in ${fiatCurrency}`;
+      : `Show values in your local currency`;
+
+  if (!ready) {
+    return <span className={cn("inline-block h-8 w-24 rounded-lg bg-white/5", className)} aria-hidden />;
+  }
 
   return (
     <div className={cn("inline-flex items-center gap-2", className)}>
@@ -66,12 +90,26 @@ export function CurrencyToggle({ enabled, code, fiatCurrency, className }: Props
               mode === m ? "bg-gold-500 text-ink-950" : "text-slate-300 hover:text-white"
             )}
           >
-            {m === "crypto" ? code : fiatCurrency}
+            {m === "crypto" ? cryptoCode : "Fiat"}
           </button>
         ))}
       </div>
-      <span className="hidden text-[11px] tabular-nums text-slate-400 lg:inline" title={hint}>
-        {mode === "fiat" && rate ? `1 ${code} ≈ ${formatFiat(rate, fiatCurrency)}` : ""}
+      {mode === "fiat" && (
+        <select
+          value={cur}
+          onChange={(e) => changeCurrency(e.target.value)}
+          aria-label="Fiat currency"
+          className="h-8 rounded-lg border border-white/10 bg-ink-900 px-2 text-[11px] font-semibold text-slate-200 focus:border-gold-500/60 focus:outline-none"
+        >
+          {currencies.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+      )}
+      <span className="hidden text-[11px] tabular-nums text-slate-400 xl:inline" title={hint}>
+        {mode === "fiat" && rate ? `1 ${cryptoCode} ≈ ${formatFiat(rate, cur)}` : ""}
       </span>
     </div>
   );

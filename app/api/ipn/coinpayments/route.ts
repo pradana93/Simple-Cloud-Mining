@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     await log("Transaction not found!", null, null, invoice);
     return new Response("IPN Error: Transaction not found!", { status: 400 });
   }
-  const t = tx as { id: number; status: string; amount: number; user_id: string; plan_id: number };
+  const t = tx as { id: number; status: string; amount: number; price_amount: number | null; user_id: string; plan_id: number };
   if (t.status === "paid") {
     await log("Transaction already paid!", t.id, null, invoice);
     return new Response("IPN Error: already paid");
@@ -59,27 +59,31 @@ export async function POST(req: Request) {
   const status = Number(g("status"));
   const txnId = g("txn_id");
 
-  if (currency1 !== settings.coin_cur1) {
+  // Invoices are billed in the site price currency so buyers can pay any coin.
+  if (currency1 !== settings.price_currency) {
     await log("Original currency mismatch!", t.id, null, currency1);
     return new Response("IPN Error: currency", { status: 400 });
   }
-  if (!(amount1 >= Number(t.amount))) {
+  const billed = Number(t.price_amount ?? t.amount);
+  if (!(amount1 >= billed)) {
     await log("Amount is less than order total!", t.id, null, String(amount1));
     return new Response("IPN Error: amount", { status: 400 });
   }
 
   if (status >= 100 || status === 2) {
     // Claim the invoice exactly once; a racing duplicate IPN gets no row back.
+    // Ledger values stay in the site crypto (t.amount is the converted price).
+    const paidCrypto = Number(t.amount);
     const { data: claimed } = await admin
       .from("transactions_history")
-      .update({ status: "paid", paid_amount: amount1, txid: txnId })
+      .update({ status: "paid", paid_amount: paidCrypto, txid: txnId })
       .eq("id", t.id)
       .neq("status", "paid")
       .select("id")
       .maybeSingle();
     if (!claimed) return new Response("IPN OK");
-    await recordEvent({ userId: t.user_id, kind: "deposit", detail: { amount: amount1, txid: txnId, planId: t.plan_id } });
-    await admin.from("user_deposits").insert({ user_id: t.user_id, amount: amount1, tx: txnId, status: "SUCCESS", date_paid: new Date().toISOString() });
+    await recordEvent({ userId: t.user_id, kind: "deposit", detail: { amount: paidCrypto, txid: txnId, planId: t.plan_id } });
+    await admin.from("user_deposits").insert({ user_id: t.user_id, amount: paidCrypto, tx: txnId, status: "SUCCESS", date_paid: new Date().toISOString() });
     const { data: plan } = await admin.from("plans").select("*").eq("id", t.plan_id).maybeSingle();
     if (plan) {
       const exp = expirationForPlan(Number((plan as { duration: number }).duration));
@@ -94,7 +98,7 @@ export async function POST(req: Request) {
       const { data: buyer } = await admin.from("profiles").select("id,reference_user_id").eq("id", t.user_id).maybeSingle();
       const refId = (buyer as { reference_user_id: string | null } | null)?.reference_user_id;
       if (refId) {
-        const commission = affiliateCommission(amount1, settings.aff_comission);
+        const commission = affiliateCommission(paidCrypto, settings.aff_comission);
         const { data: upline } = await admin.from("profiles").select("balance,affiliate_earns").eq("id", refId).maybeSingle();
         if (upline) {
           await admin.from("profiles").update({

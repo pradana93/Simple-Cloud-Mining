@@ -5,7 +5,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getCachedSettings } from "@/lib/catalog";
 import { getMoneyCfg } from "@/lib/currency";
-import { formatMoney, moneyUnit } from "@/lib/money";
+import { formatMoney, formatPrice, moneyUnit } from "@/lib/money";
 import { totalMiningRate } from "@/lib/mining";
 import { planEconomics } from "@/lib/plan-math";
 import { cn, formatDuration } from "@/lib/utils";
@@ -242,12 +242,12 @@ export default async function DashboardPage() {
 
   const paidEcon = paidPlans.map((p) => ({
     p,
-    e: planEconomics({ price: p.price, point_per_day: p.point_per_day, duration: p.duration }),
+    e: planEconomics({ price: p.price, point_per_day: p.point_per_day, duration: p.duration, cryptoToPrice: cfg.cryptoToPrice }),
   }));
   let bestId: number | null = null;
   let bestVal = -1;
   for (const x of paidEcon) {
-    const v = x.e.price > 0 ? x.e.payoutToUser / x.e.price : 0;
+    const v = x.e.price > 0 ? x.e.payoutInPrice / x.e.price : 0;
     if (v > bestVal) {
       bestVal = v;
       bestId = x.p.id;
@@ -449,7 +449,7 @@ export default async function DashboardPage() {
                       )}
                     </div>
                     <p className="mt-2 font-mono text-2xl font-medium tabular-nums text-gold-300">
-                      {formatMoney(Number(p.price), cfg)}
+                      {formatPrice(Number(p.price), cfg)}
                     </p>
                     <p className="mt-1 text-sm text-white">
                       <span className="font-mono text-emerald-300">

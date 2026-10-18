@@ -3,8 +3,7 @@ import { ArrowLeft, BadgeCheck, Coins, Timer } from "lucide-react";
 import { getCachedSettings } from "@/lib/catalog";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getMoneyCfg } from "@/lib/currency";
-import { formatMoney } from "@/lib/money";
-import { formatCrypto } from "@/lib/utils";
+import { formatMoney, formatPrice } from "@/lib/money";
 import { PurchaseButton } from "@/components/purchase-button";
 
 export const dynamic = "force-dynamic";
@@ -39,8 +38,8 @@ export default async function PurchasePage({ params }: { params: { planId: strin
         <p className="mt-1 text-sm text-slate-400">{plan.version ?? ""} · {plan.duration}-day contract</p>
         <div className="mt-6 grid gap-3 text-center sm:grid-cols-3">
           {[
-            ["Price", `${formatCrypto(Number(plan.price), s.currency_decimals)} ${s.currency_code}`],
-            ["Daily yield", `+${formatCrypto(Number(plan.point_per_day ?? 0), s.currency_decimals)}`],
+            ["Price", formatPrice(Number(plan.price), cfg)],
+            ["Daily yield", `+${formatMoney(Number(plan.point_per_day ?? 0), cfg)}`],
             ["Duration", `${plan.duration} days`],
           ].map(([k, v]) => (
             <div key={k} className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/10">
@@ -50,14 +49,12 @@ export default async function PurchasePage({ params }: { params: { planId: strin
           ))}
         </div>
         <div className="mt-6 space-y-2.5 rounded-2xl bg-white/[0.03] p-5 text-sm ring-1 ring-white/10">
-          <p className="flex items-center gap-2 text-slate-300"><Coins size={15} className="text-gold-300" /> Pay {s.coin_cur1}, credited in {s.coin_cur2}</p>
+          <p className="flex items-center gap-2 text-slate-300"><Coins size={15} className="text-gold-300" /> Pay with any coin CoinPayments accepts, credited in {s.currency_code}</p>
           <p className="flex items-center gap-2 text-slate-300"><BadgeCheck size={15} className="text-emerald-400" /> Miner activates automatically after CoinPayments confirms</p>
           <p className="flex items-center gap-2 text-slate-300"><Timer size={15} className="text-gold-400" /> Mode: {s.coin_mode === "api" ? "instant invoice" : "hosted gateway"}</p>
-          {cfg.mode === "fiat" && (
-            <p className="border-t border-white/10 pt-2.5 text-xs text-slate-400">
-              You pay in {s.currency_code}. At the current rate that is about {formatMoney(Number(plan.price), cfg)}, converted only for display.
-            </p>
-          )}
+          <p className="border-t border-white/10 pt-2.5 text-xs text-slate-400">
+            The plan is priced in {s.price_currency} and billed at checkout. CoinPayments converts it, so you can settle in the coin you hold.
+          </p>
         </div>
         <div className="mt-6">
           <PurchaseButton planId={Number(params.planId)} />

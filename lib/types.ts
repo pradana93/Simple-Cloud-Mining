@@ -114,6 +114,7 @@ export type SiteSettings = {
   currency_decimals: number;
   fiat_enabled: boolean;
   fiat_currency: string;
+  price_currency: string;
   coin_cur1: string;
   coin_cur2: string;
   coin_mode: "api" | "gateway";

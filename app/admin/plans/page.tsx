@@ -1,5 +1,6 @@
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
+import { getFxTable } from "@/lib/fx";
 import { PlansManager, type AdminPlan } from "@/components/admin/plans-manager";
 
 export const dynamic = "force-dynamic";
@@ -27,6 +28,12 @@ async function load() {
 
 export default async function AdminPlans() {
   const [{ plans, usage }, settings] = await Promise.all([load(), getSettings()]);
+  const priceCurrency = settings.price_currency.toUpperCase();
+  let cryptoToPrice = 1;
+  if (priceCurrency !== settings.currency_code.toUpperCase()) {
+    const table = await getFxTable(settings.currency_code);
+    cryptoToPrice = table?.rates[priceCurrency] ?? 0;
+  }
   return (
     <PlansManager
       plans={plans}
@@ -34,6 +41,8 @@ export default async function AdminPlans() {
       symbol={settings.currency_symbol}
       code={settings.currency_code}
       decimals={settings.currency_decimals}
+      priceCurrency={priceCurrency}
+      cryptoToPrice={cryptoToPrice}
     />
   );
 }

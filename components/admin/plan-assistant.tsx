@@ -4,6 +4,7 @@ import { Check, Loader2, Sparkles, TriangleAlert, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn, formatCrypto } from "@/lib/utils";
+import { formatFiat } from "@/lib/money";
 import type { PlanContext, PlanProposal } from "@/lib/plan-goal";
 
 const EXAMPLES = [
@@ -21,14 +22,14 @@ const SOURCE_LABEL: Record<string, string> = {
 export function PlanAssistant({
   context,
   code,
-  symbol,
   decimals,
+  priceCurrency,
   onApply,
 }: {
   context: PlanContext;
   code: string;
-  symbol: string;
   decimals: number;
+  priceCurrency: string;
   onApply: (p: PlanProposal) => void;
 }) {
   const [goal, setGoal] = useState("");
@@ -109,7 +110,7 @@ export function PlanAssistant({
           </p>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Readout label={`Price (${code})`} value={`${symbol}${formatCrypto(proposal.price, decimals)}`} />
+            <Readout label={`Price (${priceCurrency})`} value={formatFiat(proposal.price, priceCurrency)} />
             <Readout label={`Daily (${code})`} value={formatCrypto(proposal.point_per_day, decimals)} />
             <Readout label="Term" value={`${proposal.duration} days`} />
             <Readout

@@ -9,6 +9,7 @@ import { Modal } from "@/components/admin/modal";
 import { PlanAssistant } from "@/components/admin/plan-assistant";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 import { cn, formatCrypto } from "@/lib/utils";
+import { formatFiat } from "@/lib/money";
 import { earningRateFromDaily, planEconomics } from "@/lib/plan-math";
 import type { PlanProposal } from "@/lib/plan-goal";
 
@@ -70,15 +71,16 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "go
   );
 }
 
-function Calculator({ draft, symbol, code, decimals }: { draft: Draft; symbol: string; code: string; decimals: number }) {
+function Calculator({ draft, symbol, code, decimals, priceCurrency, cryptoToPrice }: { draft: Draft; symbol: string; code: string; decimals: number; priceCurrency: string; cryptoToPrice: number }) {
   const e = useMemo(
     () =>
       planEconomics({
         price: Number(draft.price || 0),
         point_per_day: Number(draft.point_per_day || 0),
         duration: Number(draft.duration || 0),
+        cryptoToPrice,
       }),
-    [draft.price, draft.point_per_day, draft.duration]
+    [draft.price, draft.point_per_day, draft.duration, cryptoToPrice]
   );
   const money = (v: number) => `${symbol}${formatCrypto(v, decimals)}`;
   const negative = e.ownerProfit < 0;
@@ -89,9 +91,9 @@ function Calculator({ draft, symbol, code, decimals }: { draft: Draft; symbol: s
         <TrendingUp size={14} className="text-gold-400" /> Owner economics
       </div>
       <div className="grid grid-cols-2 gap-2.5">
-        <Stat label={`Price (${code})`} value={money(e.price)} tone="mute" />
+        <Stat label={`Price (${priceCurrency})`} value={formatFiat(e.price, priceCurrency)} tone="mute" />
         <Stat label={`Payout to member (${code})`} value={money(e.payoutToUser)} tone="mute" />
-        <Stat label={`Profit per sale (${code})`} value={money(e.ownerProfit)} tone={negative ? "bad" : "good"} />
+        <Stat label={`Profit per sale (${priceCurrency})`} value={formatFiat(e.ownerProfit, priceCurrency)} tone={negative ? "bad" : "good"} />
         <Stat label="Owner margin" value={`${e.ownerMarginPct.toFixed(1)}%`} tone={negative ? "bad" : "good"} />
         <Stat label="Member ROI" value={`${e.userRoiPct >= 0 ? "+" : ""}${e.userRoiPct.toFixed(1)}%`} tone="mute" />
         <Stat label="Member break-even" value={e.breakEvenDays > 0 ? `${e.breakEvenDays.toFixed(1)} days` : "instant"} tone="mute" />
@@ -115,12 +117,16 @@ export function PlansManager({
   symbol,
   code,
   decimals,
+  priceCurrency,
+  cryptoToPrice,
 }: {
   plans: AdminPlan[];
   usage: Record<number, number>;
   symbol: string;
   code: string;
   decimals: number;
+  priceCurrency: string;
+  cryptoToPrice: number;
 }) {
   const { run, busy } = useAdminAction();
   const [editing, setEditing] = useState<AdminPlan | null | undefined>(undefined);
@@ -132,10 +138,10 @@ export function PlansManager({
   const totalOwnerProfit = useMemo(
     () =>
       plans.reduce((sum, p) => {
-        const e = planEconomics(p);
+        const e = planEconomics({ ...p, cryptoToPrice });
         return sum + (p.is_default ? 0 : e.ownerProfit);
       }, 0),
-    [plans]
+    [plans, cryptoToPrice]
   );
 
   function startCreate() {
@@ -206,8 +212,7 @@ export function PlansManager({
             <>
               {plans.length} plan{plans.length === 1 ? "" : "s"} selling · projected profit{" "}
               <span className={cn("font-mono", totalOwnerProfit < 0 ? "text-red-300" : "text-emerald-300")}>
-                {symbol}
-                {formatCrypto(totalOwnerProfit, decimals)} {code}
+                {formatFiat(totalOwnerProfit, priceCurrency)}
               </span>{" "}
               per paid sale
             </>
@@ -240,7 +245,7 @@ export function PlansManager({
               </thead>
               <tbody>
                 {plans.map((p) => {
-                  const e = planEconomics(p);
+                  const e = planEconomics({ ...p, cryptoToPrice });
                   return (
                     <tr key={p.id} className="border-t border-white/5">
                       <td className="py-3 pr-4">
@@ -252,8 +257,7 @@ export function PlansManager({
                         </span>
                       </td>
                       <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">
-                        {symbol}
-                        {formatCrypto(p.price, decimals)}
+                        {formatFiat(p.price, priceCurrency)}
                       </td>
                       <td className="font-mono py-3 pr-4 tabular-nums text-emerald-300">
                         +{formatCrypto(e.daily, decimals)}
@@ -265,7 +269,7 @@ export function PlansManager({
                           p.is_default ? "text-slate-400" : e.ownerProfit < 0 ? "text-red-300" : "text-emerald-300"
                         )}
                       >
-                        {p.is_default ? "free" : `${symbol}${formatCrypto(e.ownerProfit, decimals)}`}
+                        {p.is_default ? "free" : formatFiat(e.ownerProfit, priceCurrency)}
                       </td>
                       <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">
                         {p.is_default ? "—" : `${e.ownerMarginPct.toFixed(1)}%`}
@@ -321,12 +325,14 @@ export function PlansManager({
                 price: Number(draft.price || 0),
                 durationDays: Number(draft.duration || 0),
                 pointPerDay: Number(draft.point_per_day || 0),
-                currencyCode: code,
+                currencyCode: priceCurrency,
+                cryptoCode: code,
+                cryptoToPrice,
                 isEdit: Boolean(editing),
               }}
               code={code}
-              symbol={symbol}
               decimals={decimals}
+              priceCurrency={priceCurrency}
               onApply={applyProposal}
             />
             <div>
@@ -345,8 +351,8 @@ export function PlansManager({
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="p-price">Price ({code})</Label>
+            <div>
+              <Label htmlFor="p-price">Price ({priceCurrency})</Label>
                 <Input id="p-price" type="number" min={0} step="any" value={draft.price} onChange={(e) => set("price", e.target.value)} className={invalid("price")} />
                 {errors.price && <p className="mt-1.5 text-xs text-red-300">{errors.price}</p>}
               </div>
@@ -381,7 +387,7 @@ export function PlansManager({
               Default plan (the free starter rig)
             </label>
           </div>
-          <Calculator draft={draft} symbol={symbol} code={code} decimals={decimals} />
+          <Calculator draft={draft} symbol={symbol} code={code} decimals={decimals} priceCurrency={priceCurrency} cryptoToPrice={cryptoToPrice} />
         </div>
       </Modal>
 

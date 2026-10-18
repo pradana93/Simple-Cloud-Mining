@@ -12,30 +12,40 @@ export type PlanEconomics = {
   daily: number;
   durationDays: number;
   payoutToUser: number;
+  payoutInPrice: number;
   ownerProfit: number;
   ownerMarginPct: number;
   userRoiPct: number;
   breakEvenDays: number;
 };
 
+// Plan prices are set in a stable fiat while yields are credited in the site
+// crypto. Pass `cryptoToPrice` (price-currency units per 1 crypto) so profit,
+// margin, ROI and break-even all compare in one unit. Omit it only when price
+// and yield genuinely share a unit.
 export function planEconomics(input: {
   price: number | string | null | undefined;
   point_per_day: number | string | null | undefined;
   duration: number | string | null | undefined;
+  cryptoToPrice?: number | string | null | undefined;
 }): PlanEconomics {
   const price = Number(input.price ?? 0);
   const daily = Number(input.point_per_day ?? 0);
   const durationDays = Number(input.duration ?? 0);
+  const c2p = Number(input.cryptoToPrice ?? 1) || 0;
   const payoutToUser = daily * durationDays;
-  const ownerProfit = price - payoutToUser;
+  const payoutInPrice = payoutToUser * c2p;
+  const dailyInPrice = daily * c2p;
+  const ownerProfit = price - payoutInPrice;
   return {
     price,
     daily,
     durationDays,
     payoutToUser,
+    payoutInPrice,
     ownerProfit,
     ownerMarginPct: price > 0 ? (ownerProfit / price) * 100 : 0,
-    userRoiPct: price > 0 ? ((payoutToUser - price) / price) * 100 : 0,
-    breakEvenDays: daily > 0 ? price / daily : 0,
+    userRoiPct: price > 0 ? ((payoutInPrice - price) / price) * 100 : 0,
+    breakEvenDays: dailyInPrice > 0 ? price / dailyInPrice : 0,
   };
 }

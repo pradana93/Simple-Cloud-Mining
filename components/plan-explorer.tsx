@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { cn, formatCrypto } from "@/lib/utils";
-import { formatMoney, type MoneyCfg } from "@/lib/money";
+import { formatFiat, formatMoney, formatPrice, type MoneyCfg } from "@/lib/money";
 
 type PlanItem = {
   id: number;
@@ -27,17 +27,20 @@ export function PlanExplorer({
   plans,
   currencyCode,
   decimals,
+  priceCurrency = "USD",
   cfg,
 }: {
   plans: PlanItem[];
   currencyCode: string;
   decimals: number;
+  priceCurrency?: string;
   cfg?: MoneyCfg;
 }) {
   const all = useMemo(() => [...plans].sort((a, b) => Number(a.price) - Number(b.price)), [plans]);
   const [sort, setSort] = useState<"price" | "yield">("price");
   const [selectedId, setSelectedId] = useState<number | null>(all[0]?.id ?? null);
   const money = (v: number) => (cfg ? formatMoney(v, cfg, decimals) : `${formatCrypto(v, decimals)} ${currencyCode}`);
+  const priceOf = (v: number) => (cfg ? formatPrice(v, cfg) : formatFiat(v, priceCurrency));
 
   const sorted = useMemo(() => {
     const copy = [...all];
@@ -108,9 +111,8 @@ export function PlanExplorer({
                   </div>
                   <div className="text-right">
                     <div className="font-mono tabular-nums text-white">
-                      {free ? "Free" : cfg ? formatMoney(Number(p.price), cfg, decimals) : formatCrypto(Number(p.price), decimals)}
+                      {free ? "Free" : priceOf(Number(p.price))}
                     </div>
-                    {!free && !cfg && <div className="text-[10px] text-slate-400">{currencyCode}</div>}
                   </div>
                 </div>
               </button>
@@ -126,7 +128,7 @@ export function PlanExplorer({
           <Row label="Daily yield" value={`+${money(Number(sel.point_per_day ?? 0))}`} emerald />
           <Row label="Hashrate" value={String(sel.speed ?? "n/a")} />
           <Row label="Contract" value={`${sel.duration} days`} />
-          <Row label="Price" value={isFree ? "Free" : money(Number(sel.price))} />
+          <Row label="Price" value={isFree ? "Free" : priceOf(Number(sel.price))} />
         </dl>
         <div className="mt-5 rounded-2xl border border-white/10 p-4">
           <div className="text-xs text-slate-400">Projected over {sel.duration} days</div>

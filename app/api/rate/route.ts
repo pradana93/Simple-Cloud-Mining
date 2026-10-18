@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 import { getCachedSettings } from "@/lib/catalog";
-import { getFxRate } from "@/lib/fx";
+import { getMoneyCfg } from "@/lib/currency";
+import { cross, getFxTable, SUPPORTED_FIATS } from "@/lib/fx";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const s = await getCachedSettings();
-  if (!s.fiat_enabled) return NextResponse.json({ enabled: false });
-  const fx = await getFxRate(s.currency_code, s.fiat_currency);
+  const cfg = await getMoneyCfg();
+  const table = s.fiat_enabled ? await getFxTable(s.currency_code) : null;
   return NextResponse.json({
-    enabled: true,
+    enabled: s.fiat_enabled,
     crypto: s.currency_code,
-    fiat: s.fiat_currency,
-    rate: fx?.rate ?? null,
-    source: fx?.source ?? null,
-    fetchedAt: fx?.fetchedAt ?? null,
+    display: cfg.fiatCurrency,
+    priceCurrency: cfg.priceCurrency,
+    rate: table?.rates[cfg.fiatCurrency] ?? null,
+    priceToDisplay: table ? cross(table.rates, cfg.priceCurrency, cfg.fiatCurrency) || null : null,
+    source: table?.source ?? null,
+    fetchedAt: table?.fetchedAt ?? null,
+    currencies: SUPPORTED_FIATS,
   });
 }

@@ -21,6 +21,8 @@ import { AdminPageHeader } from "@/components/admin/page-header";
 import { CountUp } from "@/components/motion/count-up";
 import { Badge } from "@/components/ui/badge";
 import { planEconomics } from "@/lib/plan-math";
+import { getFxTable } from "@/lib/fx";
+import { formatFiat } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -91,6 +93,8 @@ export default async function AdminHome() {
   let code = "DOGE";
   let symbol = "Ð";
   let decimals = 8;
+  let priceCurrency = "USD";
+  let cryptoToPrice = 0;
   let failed = false;
   try {
     const [p, r, pl, w, d, t, s] = await Promise.all([
@@ -100,7 +104,7 @@ export default async function AdminHome() {
       admin.from("user_withdrawal").select("user_id,amount,status"),
       admin.from("user_deposits").select("user_id,amount,created_at"),
       admin.from("transactions_history").select("id", { count: "exact", head: true }).eq("status", "pending"),
-      admin.from("settings").select("currency_code,currency_symbol,currency_decimals").order("id").limit(1).maybeSingle(),
+      admin.from("settings").select("currency_code,currency_symbol,currency_decimals,price_currency").order("id").limit(1).maybeSingle(),
     ]);
     if ([p, r, pl, w, d, t, s].some((x) => (x as { error?: unknown }).error)) failed = true;
     profiles = ((p.data ?? []) as UserRow[]);
@@ -109,10 +113,17 @@ export default async function AdminHome() {
     withdrawals = ((w.data ?? []) as typeof withdrawals);
     deposits = ((d.data ?? []) as DepositRow[]);
     pendingInvoices = (t.count ?? 0);
-    const st = s.data as { currency_code?: string; currency_symbol?: string; currency_decimals?: number } | null;
+    const st = s.data as { currency_code?: string; currency_symbol?: string; currency_decimals?: number; price_currency?: string } | null;
     if (st?.currency_code) code = st.currency_code;
     if (st?.currency_symbol) symbol = st.currency_symbol;
     if (st?.currency_decimals != null) decimals = st.currency_decimals;
+    if (st?.price_currency) priceCurrency = st.price_currency.toUpperCase();
+    if (priceCurrency !== code.toUpperCase()) {
+      const table = await getFxTable(code);
+      cryptoToPrice = table?.rates[priceCurrency] ?? 0;
+    } else {
+      cryptoToPrice = 1;
+    }
   } catch {
     failed = true;
   }
@@ -163,10 +174,12 @@ export default async function AdminHome() {
     .filter((p) => !p.is_default)
     .map((p) => ({
       p,
-      e: planEconomics({ price: p.price ?? 0, point_per_day: p.point_per_day ?? 0, duration: p.duration ?? 0 }),
+      e: planEconomics({ price: p.price ?? 0, point_per_day: p.point_per_day ?? 0, duration: p.duration ?? 0, cryptoToPrice }),
     }));
   const avgMargin = catalogue.length ? catalogue.reduce((s, c) => s + c.e.ownerMarginPct, 0) / catalogue.length : 0;
   const money = (v: number) => `${symbol}${v.toFixed(decimals)}`;
+  const priceMoney = (v: number) => formatFiat(v, priceCurrency);
+  const signedPrice = (v: number) => `${v < 0 ? "-" : ""}${formatFiat(Math.abs(v), priceCurrency)}`;
 
   const rigCount = new Map<string, number>();
   for (const r of rigs) if (r.status === "active") rigCount.set(r.user_id, (rigCount.get(r.user_id) ?? 0) + 1);
@@ -336,12 +349,12 @@ export default async function AdminHome() {
                 {catalogue.map(({ p, e }) => (
                   <tr key={p.id} className="border-t border-white/5 transition-colors hover:bg-white/[0.03]">
                     <td className="py-3 pr-4 font-medium text-white">{p.plan_name}</td>
-                    <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{money(p.price ?? 0)}</td>
+                    <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{priceMoney(p.price ?? 0)}</td>
                     <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">{money(e.payoutToUser)}</td>
                     <td className={cn("font-mono py-3 pr-4 tabular-nums", e.ownerProfit < 0 ? "text-red-300" : "text-emerald-300")}>
                       <span className="inline-flex items-center gap-1">
                         {e.ownerProfit < 0 ? <TrendingDown size={13} /> : <TrendingUp size={13} />}
-                        {signed(symbol, e.ownerProfit, decimals)}
+                        {signedPrice(e.ownerProfit)}
                       </span>
                     </td>
                     <td className={cn("font-mono py-3 pr-4 tabular-nums", e.ownerMarginPct < 0 ? "text-red-300" : "text-emerald-300")}>

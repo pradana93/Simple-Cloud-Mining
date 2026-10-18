@@ -17,13 +17,11 @@ function isActive(pathname: string, href: string) {
 export function SiteHeaderClient({
   sitename,
   fiatEnabled,
-  currencyCode,
-  fiatCurrency,
+  cryptoCode,
 }: {
   sitename: string;
   fiatEnabled: boolean;
-  currencyCode: string;
-  fiatCurrency: string;
+  cryptoCode: string;
 }) {
   const pathname = usePathname();
   const supabase = useMemo(() => createClient(), []);
@@ -124,7 +122,7 @@ export function SiteHeaderClient({
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
-          <CurrencyToggle enabled={fiatEnabled} code={currencyCode} fiatCurrency={fiatCurrency} className="mr-1" />
+          <CurrencyToggle enabled={fiatEnabled} cryptoCode={cryptoCode} className="mr-1" />
           {authed === null ? (
             <span className="inline-block h-9 w-24" aria-hidden />
           ) : authed ? (
@@ -178,7 +176,7 @@ export function SiteHeaderClient({
             </Link>
           ))}
           <div className="mt-2 border-t border-white/10 pt-3 md:hidden">
-            <CurrencyToggle enabled={fiatEnabled} code={currencyCode} fiatCurrency={fiatCurrency} />
+            <CurrencyToggle enabled={fiatEnabled} cryptoCode={cryptoCode} />
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 border-t border-white/10 pt-3">
             {authed === null ? (

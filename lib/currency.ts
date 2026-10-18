@@ -1,27 +1,49 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getCachedSettings } from "./catalog";
-import { getFxRate } from "./fx";
-import { FX_COOKIE, type MoneyCfg } from "./money";
+import { cross, getFxTable, isSupportedFiat } from "./fx";
+import { detectCurrency } from "./geo";
+import { FX_COOKIE, CUR_COOKIE, type MoneyCfg } from "./money";
 
-// Resolves the display currency for the current request: the member's cookie
-// plus the live rate. Falls back to crypto whenever fiat is off or the feed is
-// down, so a page never renders a stale or guessed fiat figure.
+// Resolves how money renders for this request. The display currency is the
+// visitor's explicit pick, else their location, else the site default. Values
+// stay in crypto; conversion happens here and never fabricates a rate.
 
 export async function getMoneyCfg(): Promise<MoneyCfg> {
   const s = await getCachedSettings();
-  const crypto: MoneyCfg = {
+  const cookieStore = cookies();
+  const priceCurrency = (s.price_currency || "USD").toUpperCase();
+
+  const picked = cookieStore.get(CUR_COOKIE)?.value?.toUpperCase();
+  const headerStore = headers();
+  const geo = detectCurrency(headerStore.get("x-vercel-ip-country"), headerStore.get("accept-language"));
+  const displayCurrency =
+    (isSupportedFiat(picked) ? (picked as string) : null) ??
+    geo ??
+    (isSupportedFiat(s.fiat_currency) ? s.fiat_currency.toUpperCase() : "USD");
+
+  const base: MoneyCfg = {
     mode: "crypto",
     rate: 0,
     code: s.currency_code,
     symbol: s.currency_symbol,
     decimals: s.currency_decimals,
-    fiatCurrency: s.fiat_currency,
+    fiatCurrency: displayCurrency,
+    priceCurrency,
+    priceToDisplay: 1,
+    cryptoToPrice: 0,
   };
-  if (!s.fiat_enabled) return crypto;
-  if (cookies().get(FX_COOKIE)?.value !== "fiat") return crypto;
-  const fx = await getFxRate(s.currency_code, s.fiat_currency);
-  if (!fx) return crypto;
-  return { ...crypto, mode: "fiat", rate: fx.rate };
+
+  if (!s.fiat_enabled) return base;
+
+  const table = await getFxTable(s.currency_code);
+  if (!table) return base;
+
+  const rate = table.rates[displayCurrency] ?? 0;
+  const priceToDisplay = cross(table.rates, priceCurrency, displayCurrency) || 1;
+  const cryptoToPrice = table.rates[priceCurrency] ?? 0;
+  const mode = cookieStore.get(FX_COOKIE)?.value === "crypto" ? "crypto" : "fiat";
+
+  return { ...base, mode, rate, priceToDisplay, cryptoToPrice };
 }
 
 export type { MoneyCfg };

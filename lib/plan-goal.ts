@@ -10,6 +10,8 @@ export type PlanContext = {
   durationDays?: number;
   pointPerDay?: number;
   currencyCode?: string;
+  cryptoCode?: string;
+  cryptoToPrice?: number;
   isEdit?: boolean;
 };
 
@@ -171,6 +173,9 @@ export function solvePlan(intent: PlanIntent, context: PlanContext = {}): PlanPr
   const warnings: string[] = [];
   const understood: string[] = [];
   const code = context.currencyCode ?? "DOGE";
+  const cryptoCode = context.cryptoCode ?? "DOGE";
+  // price is set in the site price currency; yields credit in the site crypto.
+  const c2p = Number(context.cryptoToPrice ?? 1) || 1;
 
   let price = intent.price ?? null;
   if (price == null && context.price != null) {
@@ -205,7 +210,7 @@ export function solvePlan(intent: PlanIntent, context: PlanContext = {}): PlanPr
   let basis = "";
   if (intent.dailyYield != null) {
     payout = intent.dailyYield * duration;
-    basis = `${intent.dailyYield} ${code}/day`;
+    basis = `${intent.dailyYield} ${cryptoCode}/day`;
   } else if (intent.dailyRatePct != null) {
     payout = price * (intent.dailyRatePct / 100) * duration;
     basis = `${intent.dailyRatePct}% of price per day`;
@@ -224,16 +229,17 @@ export function solvePlan(intent: PlanIntent, context: PlanContext = {}): PlanPr
   }
   if (basis) understood.push(basis);
 
-  const daily = duration > 0 ? round(Math.max(0, payout) / duration) : 0;
+  const dailyPrice = duration > 0 ? round(Math.max(0, payout) / duration, 8) : 0;
+  const daily = round(dailyPrice / c2p);
   const totalPayout = round(daily * duration);
-  const e = planEconomics({ price, point_per_day: daily, duration });
+  const e = planEconomics({ price, point_per_day: daily, duration, cryptoToPrice: c2p });
 
   if (price <= 0 && !isDefault) warnings.push("Price is zero but this is not marked as the free plan.");
   if (price > 0 && e.ownerProfit < 0) {
-    warnings.push(`This pays out more than it charges: the house loses ${Math.abs(e.ownerProfit).toFixed(8)} ${code} per sale.`);
+    warnings.push(`This pays out more than it charges: the house loses ${Math.abs(e.ownerProfit).toFixed(2)} ${code} per sale.`);
   }
   if (e.ownerMarginPct > 90 && price > 0) warnings.push("Owner margin is above 90%; members barely earn anything.");
-  if (price > 0 && daily > price) warnings.push("A single day pays out more than the plan costs.");
+  if (price > 0 && dailyPrice > price) warnings.push("A single day pays out more than the plan costs.");
   if (price > 0 && e.breakEvenDays > 0 && e.breakEvenDays > duration) {
     warnings.push("Members would not recover the price inside the term.");
   }
@@ -251,9 +257,9 @@ export function solvePlan(intent: PlanIntent, context: PlanContext = {}): PlanPr
 
   const rationale = [
     `Price ${price} ${code}, term ${duration} days.`,
-    `Credits ${daily.toFixed(8)} ${code}/day (${round(daily * 1440, 8)}/min) for a total of ${totalPayout.toFixed(8)} ${code}.`,
+    `Credits ${daily.toFixed(8)} ${cryptoCode}/day (${round(daily * 1440, 8)}/min) for a total of ${totalPayout.toFixed(8)} ${cryptoCode}.`,
     price > 0
-      ? `House keeps ${e.ownerProfit.toFixed(8)} ${code} per sale (${e.ownerMarginPct.toFixed(1)}% margin).`
+      ? `House keeps ${e.ownerProfit.toFixed(2)} ${code} per sale (${e.ownerMarginPct.toFixed(1)}% margin).`
       : "Free plan: no revenue, used to on-board members.",
   ];
 
