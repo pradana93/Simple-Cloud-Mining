@@ -15,6 +15,7 @@ export type AuditAction =
   | "member.reset_password"
   | "withdrawal.approve"
   | "withdrawal.reject"
+  | "withdrawal.pass"
   | "invoice.cancel"
   | "risk.state"
   | "risk.rescan"
@@ -36,6 +37,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "member.reset_password": "Reset a password",
   "withdrawal.approve": "Approved a withdrawal",
   "withdrawal.reject": "Rejected a withdrawal",
+  "withdrawal.pass": "Ran a payout pass",
   "invoice.cancel": "Canceled an invoice",
   "risk.state": "Reviewed a risk flag",
   "risk.rescan": "Ran a risk rescan",

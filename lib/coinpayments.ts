@@ -68,8 +68,43 @@ export async function createApiTransaction(opts: {
   return (await res.json()) as Record<string, unknown>;
 }
 
-export function verifyIpnHmac(
-  rawBody: string,
+// Sends crypto out of the merchant wallet. Requires the account to hold the
+// currency being sent, so it only runs when auto-payout is on and the API keys
+// are configured.
+export async function createWithdrawal(opts: {
+  privateKey: string;
+  publicKey: string;
+  amount: number;
+  currency: string;
+  address: string;
+  ipnUrl: string;
+  autoConfirm?: number;
+}): Promise<Record<string, unknown>> {
+  const body = new URLSearchParams({
+    version: "1",
+    cmd: "create_withdrawal",
+    key: opts.publicKey,
+    amount: String(opts.amount),
+    currency: opts.currency,
+    address: opts.address,
+    auto_confirm: String(opts.autoConfirm ?? 1),
+    ipn_url: opts.ipnUrl,
+    format: "json",
+  });
+  const hmac = crypto
+    .createHmac("sha512", opts.privateKey)
+    .update(body.toString())
+    .digest("hex");
+  const res = await fetch("https://www.coinpayments.net/api.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", HMAC: hmac },
+    body: body.toString(),
+    cache: "no-store",
+  });
+  return (await res.json()) as Record<string, unknown>;
+}
+
+export function verifyIpnHmac(rawBody: string,
   sentHmac: string | null,
   ipnSecret: string
 ): boolean {
