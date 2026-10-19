@@ -1,0 +1,15 @@
+# Self-host option. Copy .env.example to .env.local and fill it in first.
+#
+#   docker compose up --build
+#
+# Scheduled jobs do not run themselves here. Call the four /api/cron/* routes
+# once a day from your own scheduler with the Authorization: Bearer header.
+services:
+  web:
+    build: .
+    image: simple-cloud-mining:latest
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.local
+    restart: unless-stopped

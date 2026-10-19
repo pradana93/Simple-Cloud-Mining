@@ -1,0 +1,86 @@
+Simple Cloud Mining - End User License Agreement
+
+This file is a starting template, not legal advice. Replace every bracketed
+field with your own details and have a lawyer review it before you sell. Delete
+this paragraph once you have adapted the rest.
+
+
+1. Parties
+
+Licensor: [YOUR NAME OR COMPANY], contact [YOUR EMAIL].
+Licensee: the person or business that purchased this software (you).
+
+
+2. What you receive
+
+The source code, scripts, documentation and assets in this package, together
+referred to as the Software. You receive a license to use the Software. You do
+not receive ownership of it.
+
+
+3. What you may do
+
+[CHOOSE ONE AND DELETE THE OTHER]
+
+Option A, single deployment: You may install, run, modify and host the Software
+for one live production website. Development and staging copies of that same
+website do not count as additional deployments.
+
+Option B, unlimited deployments: You may install, run, modify and host the
+Software on any number of websites that you own or operate.
+
+In both options you may customize the source, rebrand the interface, and keep
+any revenue the website earns.
+
+
+4. What you may not do
+
+a. You may not resell, redistribute, sublicense or give away the source code,
+   in whole or in part, as source code, as a template, or as part of a starter
+   kit or competing product.
+b. You may not sell the Software as a hosted service where the Software itself
+   is the product being resold to other businesses, unless you hold a separate
+   written agreement with the Licensor.
+c. You may not remove or alter this license file or the copyright notices.
+
+
+5. Your responsibilities
+
+a. The Software connects to third-party services such as Supabase and
+   CoinPayments. You are responsible for those accounts, their fees, their terms
+   and their security.
+b. You are responsible for keeping your keys, passwords and secrets private.
+c. You are responsible for complying with the laws that apply to your business,
+   including any rules on money transmission, anti-money laundering, consumer
+   protection and tax. The Software is a tool. It is not legal, financial or
+   tax advice.
+d. You are responsible for the content you publish and the plans you offer.
+
+
+6. No warranty
+
+The Software is provided "as is", without warranty of any kind. The Licensor
+does not promise that it is free of defects or fit for a particular purpose.
+You use it at your own risk.
+
+
+7. Limitation of liability
+
+To the maximum extent permitted by law, the Licensor is not liable for any lost
+profit, lost data, or indirect or consequential damages arising from the
+Software. The Licensor's total liability is limited to the amount you paid for
+the license.
+
+
+8. Termination
+
+This license ends if you break these terms. On termination you must stop using
+the Software and remove it from your systems. Sections 4, 6, 7 and 8 survive.
+
+
+9. Governing law
+
+This agreement is governed by the laws of [YOUR JURISDICTION].
+
+
+Copyright [YEAR] [YOUR NAME OR COMPANY]. All rights reserved.

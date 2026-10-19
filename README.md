@@ -22,18 +22,39 @@ Migrated from [`pradana93/Simple-Cloud-Mining`](https://github.com/pradana93/Sim
 
 ## Setup
 
-1. **Supabase** — in SQL Editor run `supabase/schema.sql`, then `supabase/seed.sql`.
-   Create an admin user via Authentication, then set `profiles.is_admin = true` for your id.
-2. **Env** — copy `.env.example` to `.env.local` and fill:
-   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` (server only)
-   - `COINPAYMENTS_MERCHANT_ID`, `COINPAYMENTS_IPN_SECRET`, (+ API keys if `coin_mode=api`)
-   - `NEXT_PUBLIC_SITE_URL`, `CRON_SECRET`
-3. **Run** — `npm install`, `npm run dev`. Verify with `npm run build`.
-4. **Deploy (Vercel)** — import repo, add the same env vars, deploy. Cron (`vercel.json`) hits `/api/cron/accrue` daily at 00:00 UTC (Vercel Hobby free-tier limit is one cron run per day); per-request accrual in `lib/accrue-user.ts` keeps balances fresh between runs. Set `CRON_SECRET`. CoinPayments IPN URL: `https://YOUR-DOMAIN/api/ipn/coinpayments`.
+See [docs/INSTALL.md](docs/INSTALL.md) for the full guide. The short version:
+
+1. `npm install`
+2. `npm run setup` — the wizard writes `.env.local` and applies every file in
+   `supabase/`, in order, through the Supabase API
+3. `npm run dev` — sign up at `/register`, then run
+   `npm run make-admin -- you@example.com`
+4. Deploy to Vercel (or Docker) with the same env vars, then set the
+   CoinPayments IPN URL to `https://YOUR-DOMAIN/api/ipn/coinpayments`
+
+`vercel.json` schedules four daily jobs: `/api/cron/accrue`, `/api/cron/risk`,
+`/api/cron/security` and `/api/cron/payouts`. Per-request accrual in
+`lib/accrue-user.ts` keeps balances fresh between runs.
+
+## Docs and tooling
+
+| File | Purpose |
+|---|---|
+| [docs/INSTALL.md](docs/INSTALL.md) | Installation and deploy guide |
+| [docs/BUYER-README.md](docs/BUYER-README.md) | What ships with a license |
+| [LICENSE.txt](LICENSE.txt) | License template to adapt before selling |
+| `scripts/install.mjs` | Setup wizard (`npm run setup`) |
+| `scripts/make-admin.mjs` | Promote an account (`npm run make-admin`) |
+| `scripts/package.mjs` | Build the buyer zip (`npm run bundle`) |
+| `Dockerfile`, `docker-compose.yml` | Self-host option |
 
 ## Security notes
 
 - Never commit `.env` / `.env.local` (gitignored). Only `.env.example` with placeholders is tracked.
-- Rotate any secret that was ever pasted into chat.
-- Protect `/admin` with an `is_admin` check before production (layout currently lists pages; add a server-side guard).
+- Rotate any secret that was ever pasted into a chat.
+- `/admin` is guarded server-side in `app/admin/layout.tsx`, with a fast
+  redirect in `middleware.ts`. Set `is_admin = true` only on your own account
+  (`npm run make-admin`).
+- `006_security_lockdown.sql` revokes client write access to money tables, so
+  balances, withdrawals and invoices can only change through the service-role
+  API routes.

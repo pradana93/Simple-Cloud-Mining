@@ -16,6 +16,9 @@
 # production
 /build
 
+# resale packages built by scripts/package.mjs
+/dist
+
 # misc
 .DS_Store
 *.pem

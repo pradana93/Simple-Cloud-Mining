@@ -1,0 +1,19 @@
+# Keep the image small and keep secrets out of it.
+node_modules
+.next
+out
+.git
+.gitignore
+.vercel
+dist
+coverage
+.env
+.env.local
+.env*.local
+RESET-CREDENTIALS.local.txt
+*.local.json
+tests
+docs
+anti-slop
+Dockerfile
+docker-compose.yml

@@ -1,7 +1,10 @@
 {
   "name": "scm-modern",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": ">=18.17"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,7 +12,11 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "setup": "node scripts/install.mjs",
+    "setup:check": "node scripts/install.mjs --check",
+    "make-admin": "node scripts/make-admin.mjs",
+    "bundle": "node scripts/package.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
