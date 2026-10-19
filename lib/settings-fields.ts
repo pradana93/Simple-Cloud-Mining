@@ -49,6 +49,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { key: "keywords", label: "Keywords", type: "text", maxLength: 191, help: "Comma separated." },
       { key: "description", label: "Meta description", type: "textarea", maxLength: 191 },
       { key: "theme", label: "Theme", type: "select", options: [{ value: "dogeminer", label: "Doge miner (dark)" }] },
+      { key: "default_theme", label: "Default appearance", type: "segmented", options: [{ value: "dark", label: "Dark" }, { value: "light", label: "Light" }], help: "First-visit appearance. Members can switch any time." },
     ],
   },
   {
@@ -80,11 +81,24 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
+    id: "engagement",
+    title: "Engagement",
+    blurb: "Announcement banner and the daily check-in bonus.",
+    fields: [
+      { key: "announce_enabled", label: "Announcement banner", type: "switch", boolean: true, help: "Show a dismissible banner above the header." },
+      { key: "announce_text", label: "Banner message", type: "textarea", maxLength: 280, nullable: true },
+      { key: "announce_link", label: "Banner link", type: "url", maxLength: 191, nullable: true },
+      { key: "checkin_enabled", label: "Daily check-in", type: "switch", boolean: true, help: "Let members claim a small bonus once a day." },
+      { key: "checkin_amount", label: "Check-in bonus", type: "number", min: 0, step: 0.00000001, help: "Credited in the site currency each claim." },
+    ],
+  },
+  {
     id: "payments",
     title: "Payments",
     blurb: "CoinPayments mode and network confirmations.",
     fields: [
       { key: "coin_mode", label: "Checkout mode", type: "segmented", options: [{ value: "gateway", label: "Gateway" }, { value: "api", label: "API" }] },
+      { key: "pay_coins", label: "Buyer coin options", type: "text", maxLength: 191, help: "Comma separated coins the buyer can pick at checkout, for example BTC,DOGE,LTC." },
       { key: "coin_email", label: "Buyer email", type: "segmented", options: [{ value: "user", label: "Member" }, { value: "admin", label: "Admin" }] },
       { key: "blockchain", label: "Confirmations", type: "slider", min: 0, max: 12, step: 1, integer: true },
     ],
@@ -99,6 +113,15 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { key: "show_start_date", label: "Show launch countdown", type: "switch" },
       { key: "start_date", label: "Launch date", type: "date", nullable: true },
       { key: "start_date_increment", label: "Countdown increment (days)", type: "number", min: 0, integer: true },
+    ],
+  },
+  {
+    id: "automation",
+    title: "Automation",
+    blurb: "Optional auto-payout for small, allowlisted withdrawals.",
+    fields: [
+      { key: "auto_payout_enabled", label: "Auto-payout", type: "switch", boolean: true, help: "Send approved requests automatically when the wallet API is configured." },
+      { key: "auto_payout_max", label: "Auto-payout ceiling", type: "number", min: 0, step: 0.00000001, help: "Only requests at or below this amount are sent automatically. 0 disables the ceiling." },
     ],
   },
   {

@@ -138,4 +138,13 @@ export type SiteSettings = {
   start_date_increment: number;
   header_codes: string | null;
   footer_codes: string | null;
+  announce_enabled: boolean;
+  announce_text: string | null;
+  announce_link: string | null;
+  checkin_enabled: boolean;
+  checkin_amount: number;
+  pay_coins: string;
+  default_theme: string;
+  auto_payout_enabled: boolean;
+  auto_payout_max: number;
 };

@@ -11,6 +11,8 @@ import { planEconomics } from "@/lib/plan-math";
 import { cn, formatDuration } from "@/lib/utils";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { ensureProfile } from "@/lib/ensure-profile";
+import { checkinBonus, computeStreak, utcDay } from "@/lib/checkin";
+import { isTwoFactorEnabled } from "@/lib/two-factor";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
@@ -20,6 +22,8 @@ import { ProjectionChart } from "@/components/dashboard/projection-chart";
 import { RigReadout, type RigView } from "@/components/dashboard/rig-readout";
 import { ActivityFeed, type ActivityItem } from "@/components/dashboard/activity-feed";
 import { AffiliatePanel } from "@/components/dashboard/affiliate-panel";
+import { CheckinCard } from "@/components/dashboard/checkin-card";
+import { Onboarding } from "@/components/dashboard/onboarding";
 
 export const dynamic = "force-dynamic";
 
@@ -181,6 +185,32 @@ export default async function DashboardPage() {
   const balance = stored + pending;
   const perDay = rate * 1440;
 
+  let checkinLast: { day: string; streak: number } | null = null;
+  let hasAllowlist = false;
+  let twoFactorOn = false;
+  try {
+    const [ck, al, tfa] = await Promise.all([
+      supabase.from("checkins").select("day,streak").eq("user_id", userId).order("day", { ascending: false }).limit(1).maybeSingle(),
+      supabase.from("withdrawal_allowlist").select("id", { count: "exact", head: true }).eq("user_id", userId),
+      isTwoFactorEnabled(userId),
+    ]);
+    checkinLast = (ck.data as { day: string; streak: number } | null) ?? null;
+    hasAllowlist = ((al as { count: number | null }).count ?? 0) > 0;
+    twoFactorOn = tfa;
+  } catch {
+    // leave the checklist steps pending
+  }
+  const today = utcDay(new Date());
+  const claimedToday = checkinLast?.day === today;
+  const nextStreak = computeStreak(checkinLast, today);
+  const nextBonus = checkinBonus(Number(s.checkin_amount), nextStreak);
+  const onboardingSteps = [
+    { id: "rig", label: "Deploy hashrate", hint: "Claim the free plan or buy a miner.", href: "/#plans", done: activeRows.length > 0 },
+    { id: "payout", label: "Save a payout address", hint: "Lock withdrawals to a wallet you trust.", href: "/withdrawal", done: hasAllowlist },
+    { id: "2fa", label: "Turn on two-factor", hint: "Add a second step at sign-in and payouts.", href: "/account", done: twoFactorOn },
+    { id: "bonus", label: "Claim a daily bonus", hint: "A small credit on every day you visit.", href: "/dashboard", done: checkinLast != null },
+  ];
+
   const earnedFor = (r: HistoryRow) => {
     const ratePerMin = Number(planOf(r)?.earning_rate ?? 0);
     if (ratePerMin <= 0) return 0;
@@ -278,6 +308,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      <Onboarding steps={onboardingSteps} />
+
       <Reveal>
         <div className="panel rounded-3xl border-t-2 border-t-gold-500/70 p-6 sm:p-7">
           <div className="grid gap-7 lg:grid-cols-[1.25fr_1fr]">
@@ -313,6 +345,19 @@ export default async function DashboardPage() {
           </div>
         </div>
       </Reveal>
+
+      {s.checkin_enabled && Number(s.checkin_amount) > 0 ? (
+        <Reveal>
+          <CheckinCard
+            claimedToday={claimedToday}
+            nextAmount={nextBonus}
+            streak={nextStreak}
+            symbol={s.currency_symbol}
+            decimals={s.currency_decimals}
+            code={s.currency_code}
+          />
+        </Reveal>
+      ) : null}
 
       <Reveal>
         <div className="grid gap-6 lg:grid-cols-3 lg:items-start">

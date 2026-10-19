@@ -3,16 +3,22 @@ import { Wallet } from "lucide-react";
 import { getCachedSettings } from "@/lib/catalog";
 import { NAV_LINKS } from "./nav-links";
 import { SiteHeaderClient } from "./site-header";
+import { AnnouncementBanner } from "./announcement";
 import { Logo } from "./logo";
 
 export async function SiteHeader() {
   const s = await getCachedSettings();
   return (
-    <SiteHeaderClient
-      sitename={s.sitename}
-      fiatEnabled={s.fiat_enabled}
-      cryptoCode={s.currency_code}
-    />
+    <>
+      {s.announce_enabled && s.announce_text ? (
+        <AnnouncementBanner text={s.announce_text} link={s.announce_link} />
+      ) : null}
+      <SiteHeaderClient
+        sitename={s.sitename}
+        fiatEnabled={s.fiat_enabled}
+        cryptoCode={s.currency_code}
+      />
+    </>
   );
 }
 
