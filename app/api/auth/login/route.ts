@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { createClient } from "@supabase/supabase-js";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { recordEvent } from "@/lib/risk-telemetry";
+import { isTwoFactorEnabled } from "@/lib/two-factor";
 import type { Database } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -63,6 +65,33 @@ export async function POST(req: Request) {
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+    // Verify the password on a throwaway client so no session is granted yet.
+    const plain = createClient<Database>(url, anon, { auth: { persistSession: false } });
+    const { data: signIn, error } = await plain.auth.signInWithPassword({ email: row.email, password });
+    if (error || !signIn.session || !signIn.user) {
+      await admin.from("login_attempts").insert({ ip_address: ip, login: raw, time: Date.now() });
+      return NextResponse.json({ ok: false, error: "Invalid username or password" }, { status: 401 });
+    }
+    await admin.from("login_attempts").delete().eq("login", raw);
+    await recordEvent({ userId: signIn.user.id, kind: "login", req });
+
+    // Members with 2FA on are not signed in until they clear the code gate.
+    if (await isTwoFactorEnabled(signIn.user.id)) {
+      const { data: pending } = await admin
+        .from("login_pending_2fa")
+        .insert({
+          user_id: signIn.user.id,
+          access_token: signIn.session.access_token,
+          refresh_token: signIn.session.refresh_token,
+          exp: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+        })
+        .select("id")
+        .maybeSingle();
+      const ticket = (pending as { id: string } | null)?.id ?? null;
+      return NextResponse.json({ ok: true, totpRequired: true, ticket });
+    }
+
     const res = NextResponse.json({ ok: true, isAdmin: Boolean(row.is_admin) });
     const supabase = createServerClient<Database>(url, anon, {
       cookies: {
@@ -74,14 +103,10 @@ export async function POST(req: Request) {
         },
       },
     });
-
-    const { data: signIn, error } = await supabase.auth.signInWithPassword({ email: row.email, password });
-    if (error) {
-      await admin.from("login_attempts").insert({ ip_address: ip, login: raw, time: Date.now() });
-      return NextResponse.json({ ok: false, error: "Invalid username or password" }, { status: 401 });
-    }
-    await admin.from("login_attempts").delete().eq("login", raw);
-    if (signIn.user) await recordEvent({ userId: signIn.user.id, kind: "login", req });
+    await supabase.auth.setSession({
+      access_token: signIn.session.access_token,
+      refresh_token: signIn.session.refresh_token,
+    });
     return res;
   } catch {
     return NextResponse.json({ ok: false, error: "Sign-in is unavailable right now" }, { status: 500 });

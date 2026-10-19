@@ -4,7 +4,9 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getMoneyCfg } from "@/lib/currency";
 import { formatMoney } from "@/lib/money";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
+import { isTwoFactorEnabled } from "@/lib/two-factor";
 import { Badge } from "@/components/ui/badge";
+import { TwoFactorPanel } from "@/components/2fa/two-factor-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +47,7 @@ export default async function AccountPage() {
     );
   }
   const cfg = await getMoneyCfg();
+  const twoFactorOn = await isTwoFactorEnabled(userId);
   const empty = { data: [] as Array<Record<string, number | string | null>> };
   let referrals = empty;
   let aff = empty;
@@ -115,6 +118,8 @@ export default async function AccountPage() {
           <ArrowLeft size={15} /> Console
         </Link>
       </div>
+
+      <TwoFactorPanel enabled={twoFactorOn} />
 
       <div className="grid gap-4 md:grid-cols-2">
         {sections.map((sec) => (

@@ -3,6 +3,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
 import { LABEL_MAX, MAX_ALLOWLIST, validAddress } from "@/lib/allowlist";
+import { requireFreshMfa } from "@/lib/mfa-guard";
 
 async function sessionUser() {
   const supabase = createServerSupabase();
@@ -27,6 +28,9 @@ export async function POST(req: Request) {
   if (!validAddress(address)) {
     return NextResponse.json({ ok: false, error: "Enter a valid wallet address" }, { status: 400 });
   }
+
+  const mfa = await requireFreshMfa(user.id);
+  if (mfa) return mfa;
 
   const admin = createAdminSupabase();
   const { count } = await admin
@@ -70,6 +74,9 @@ export async function DELETE(req: Request) {
   if (!Number.isInteger(id) || id <= 0) {
     return NextResponse.json({ ok: false, error: "Invalid address" }, { status: 400 });
   }
+
+  const mfa = await requireFreshMfa(user.id);
+  if (mfa) return mfa;
 
   const admin = createAdminSupabase();
   const { error } = await admin

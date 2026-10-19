@@ -18,6 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/admin/modal";
+import { MfaModal } from "@/components/2fa/mfa-modal";
 import { CopyButton } from "@/components/copy-button";
 import { LiveBalance } from "@/components/motion/live-balance";
 import { useToast } from "@/components/ui/toast";
@@ -168,6 +169,7 @@ export function WithdrawConsole({
   const [spent, setSpent] = useState(0);
   const [filter, setFilter] = useState<Filter>("All");
   const [openId, setOpenId] = useState<number | null>(null);
+  const [mfaOpen, setMfaOpen] = useState(false);
 
   // Re-anchor the optimistic debit once the server hands back a fresh balance.
   useEffect(() => setSpent(0), [balance]);
@@ -203,13 +205,16 @@ export function WithdrawConsole({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: parsed, address: address.trim() }),
       });
-      const j = (await res.json()) as { ok: boolean; error?: string; id?: number };
+      const j = (await res.json()) as { ok: boolean; error?: string; id?: number; mfaRequired?: boolean };
       if (j.ok) {
         push("Withdrawal requested", "success");
         setSpent((s) => s + parsed);
         setConfirming(false);
         setAmount("");
         router.refresh();
+      } else if (j.mfaRequired) {
+        setConfirming(false);
+        setMfaOpen(true);
       } else {
         push(j.error ?? "Withdrawal failed", "error");
       }
@@ -553,6 +558,15 @@ export function WithdrawConsole({
           The amount leaves your balance now. If the request is rejected, it is refunded in full.
         </p>
       </Modal>
+
+      <MfaModal
+        open={mfaOpen}
+        onClose={() => setMfaOpen(false)}
+        onDone={() => {
+          setMfaOpen(false);
+          submit();
+        }}
+      />
     </div>
   );
 }

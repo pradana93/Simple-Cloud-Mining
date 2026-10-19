@@ -3,6 +3,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
 import { recordEvent } from "@/lib/risk-telemetry";
+import { requireFreshMfa } from "@/lib/mfa-guard";
 
 const ADDRESS_MIN = 8;
 const ADDRESS_MAX = 200;
@@ -32,6 +33,9 @@ export async function POST(req: Request) {
   if (address.length < ADDRESS_MIN || address.length > ADDRESS_MAX || /\s/.test(address)) {
     return NextResponse.json({ ok: false, error: "Enter a valid payout wallet address" }, { status: 400 });
   }
+
+  const mfa = await requireFreshMfa(user.id);
+  if (mfa) return mfa;
 
   const admin = createAdminSupabase();
 

@@ -5,6 +5,7 @@ import { Loader2, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { Modal } from "@/components/admin/modal";
+import { MfaModal } from "@/components/2fa/mfa-modal";
 import { CopyButton } from "@/components/copy-button";
 import { useToast } from "@/components/ui/toast";
 import type { AllowlistEntry } from "@/lib/allowlist";
@@ -24,11 +25,13 @@ export function AllowlistManager({
   const [saving, setSaving] = useState(false);
   const [removing, setRemoving] = useState<AllowlistEntry | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mfaOpen, setMfaOpen] = useState(false);
+  const [pendingStep, setPendingStep] = useState<null | "add" | "remove">(null);
 
   const full = entries.length >= MAX_ALLOWLIST;
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
+  async function add(e?: React.FormEvent) {
+    e?.preventDefault();
     setSaving(true);
     try {
       const res = await fetch("/api/allowlist", {
@@ -36,12 +39,15 @@ export function AllowlistManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ label, address: address.trim() }),
       });
-      const j = (await res.json()) as { ok: boolean; error?: string };
+      const j = (await res.json()) as { ok: boolean; error?: string; mfaRequired?: boolean };
       if (j.ok) {
         push("Address saved to your allowlist", "success");
         setLabel("");
         setAddress("");
         router.refresh();
+      } else if (j.mfaRequired) {
+        setPendingStep("add");
+        setMfaOpen(true);
       } else {
         push(j.error ?? "Could not save the address", "error");
       }
@@ -61,11 +67,14 @@ export function AllowlistManager({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: removing.id }),
       });
-      const j = (await res.json()) as { ok: boolean; error?: string };
+      const j = (await res.json()) as { ok: boolean; error?: string; mfaRequired?: boolean };
       if (j.ok) {
         push("Address removed", "success");
         setRemoving(null);
         router.refresh();
+      } else if (j.mfaRequired) {
+        setPendingStep("remove");
+        setMfaOpen(true);
       } else {
         push(j.error ?? "Could not remove the address", "error");
       }
@@ -192,6 +201,18 @@ export function AllowlistManager({
           <p className="break-all font-mono text-sm text-slate-200">{removing.address}</p>
         )}
       </Modal>
+
+      <MfaModal
+        open={mfaOpen}
+        onClose={() => setMfaOpen(false)}
+        onDone={() => {
+          setMfaOpen(false);
+          const step = pendingStep;
+          setPendingStep(null);
+          if (step === "add") add();
+          else if (step === "remove") remove();
+        }}
+      />
     </section>
   );
 }
