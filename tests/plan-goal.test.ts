@@ -1,0 +1,63 @@
+import { describe, expect, it } from "vitest";
+import { parseGoal, solvePlan } from "@/lib/plan-goal";
+
+describe("parseGoal", () => {
+  it("reads an explicit price", () => {
+    expect(parseGoal("price 25 plan for 30 days").price).toBe(25);
+  });
+
+  it("reads a term in days, weeks and months", () => {
+    expect(parseGoal("30 day plan").durationDays).toBe(30);
+    expect(parseGoal("2 weeks plan").durationDays).toBe(14);
+    expect(parseGoal("1 month plan").durationDays).toBe(30);
+  });
+
+  it("reads an ROI target and a margin target", () => {
+    const intent = parseGoal("plan with 200% ROI and 40% margin");
+    expect(intent.userRoiPct).toBe(200);
+    expect(intent.ownerMarginPct).toBe(40);
+  });
+
+  it("reads a free/default flag", () => {
+    expect(parseGoal("free starter plan").isDefault).toBe(true);
+  });
+
+  it("only fills what was stated", () => {
+    const intent = parseGoal("hello there");
+    expect(Object.keys(intent)).toHaveLength(0);
+  });
+});
+
+describe("solvePlan", () => {
+  it("derives the payout from a user ROI target", () => {
+    const p = solvePlan({ price: 100, userRoiPct: 100, durationDays: 30 });
+    expect(p.point_per_day).toBeCloseTo(200 / 30, 6);
+    expect(p.ownerProfit).toBeCloseTo(-100, 4);
+    expect(p.ownerMarginPct).toBeCloseTo(-100, 4);
+  });
+
+  it("derives the payout from an owner margin", () => {
+    const p = solvePlan({ price: 100, ownerMarginPct: 50, durationDays: 10 });
+    expect(p.payoutToUser).toBeCloseTo(50, 6);
+  });
+
+  it("defaults a 50% margin when nothing is specified", () => {
+    const p = solvePlan({ price: 100, durationDays: 10 });
+    expect(p.ownerMarginPct).toBe(50);
+  });
+
+  it("converts a fiat price into a crypto yield via cryptoToPrice", () => {
+    // $5 plan, 2x payout in USD = $10; 1 DOGE = $0.08 => 125 DOGE total.
+    const p = solvePlan(
+      { price: 5, userMultiple: 2, durationDays: 90 },
+      { cryptoToPrice: 0.08 }
+    );
+    expect(p.payoutToUser).toBeCloseTo(125, 3);
+    expect(p.point_per_day).toBeCloseTo(125 / 90, 5);
+  });
+
+  it("flags a plan that loses money", () => {
+    const p = solvePlan({ price: 100, userRoiPct: 200, durationDays: 30 });
+    expect(p.warnings.length).toBeGreaterThan(0);
+  });
+});

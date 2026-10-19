@@ -105,14 +105,14 @@ export function parseGoal(goal: string, context: PlanContext = {}): PlanIntent {
 
   if (intent.dailyRatePct == null) {
     const roi = firstMatch(text, [
-      /(?:roi|return|back|gain|profit\s+for\s+(?:the\s+)?(?:miner|user|member))\D{0,12}?([\d]+(?:\.\d+)?)\s*%/,
       /([\d]+(?:\.\d+)?)\s*%\s*(?:roi|return|back|gain|apy)/,
+      /(?:roi|return|back|gain|profit\s+for\s+(?:the\s+)?(?:miner|user|member))\D{0,12}?([\d]+(?:\.\d+)?)\s*%/,
     ]);
     if (roi != null) intent.userRoiPct = roi;
 
     const margin = firstMatch(text, [
-      /(?:margin|keep|take|cut|profit\s+margin)\D{0,14}?([\d]+(?:\.\d+)?)\s*%/,
       /([\d]+(?:\.\d+)?)\s*%\s*(?:margin|for\s+(?:us|me|the\s+house)|ours)/,
+      /(?:margin|keep|take|cut|profit\s+margin)\D{0,14}?([\d]+(?:\.\d+)?)\s*%/,
     ]);
     if (margin != null) intent.ownerMarginPct = margin;
 

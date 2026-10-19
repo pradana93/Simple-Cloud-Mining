@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { getPublicSupabase } from "./supabase/public";
+import { createAdminSupabase } from "./supabase/admin";
 import { FALLBACK, PUBLIC_SETTINGS_COLUMNS } from "./settings";
 import type { Plan, SiteSettings } from "./types";
 
@@ -79,10 +80,13 @@ export type PayoutEntry = {
   status?: string;
 };
 
+// The public feed deliberately shows recent deposits and payouts, but the RLS
+// lockdown revoked anon reads on these tables. Read them with the service-role
+// client server-side and expose only the safe columns below.
 export const getCachedPayouts = unstable_cache(
   async (): Promise<{ deposits: PayoutEntry[]; withdrawals: PayoutEntry[] }> => {
     try {
-      const supabase = getPublicSupabase();
+      const supabase = createAdminSupabase();
       const [d, w] = await Promise.all([
         supabase.from("user_deposits").select("amount,tx,created_at").order("created_at", { ascending: false }).limit(12),
         supabase.from("user_withdrawal").select("amount,tx,created_at,status").order("created_at", { ascending: false }).limit(12),
@@ -102,7 +106,7 @@ export const getCachedPayouts = unstable_cache(
 export const getCachedStats = unstable_cache(
   async (): Promise<{ miners: number; totalDeposits: number; totalPaid: number }> => {
     try {
-      const supabase = getPublicSupabase();
+      const supabase = createAdminSupabase();
       const [u, d, w] = await Promise.all([
         supabase.from("profiles").select("id", { count: "exact", head: true }),
         supabase.from("user_deposits").select("amount").limit(5000),
