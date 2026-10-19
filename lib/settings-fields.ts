@@ -93,6 +93,16 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     ],
   },
   {
+    id: "casino",
+    title: "Casino",
+    blurb: "Provably fair games members play with their balance.",
+    fields: [
+      { key: "games_enabled", label: "Casino", type: "switch", boolean: true, help: "Open the games lobby. Off hides every game and closes the bet API." },
+      { key: "games_min_bet", label: "Minimum bet", type: "number", min: 0, step: 0.00000001, help: "Smallest stake per round, in the site currency. 0 disables the floor." },
+      { key: "games_max_bet", label: "Maximum bet", type: "number", min: 0, step: 0.00000001, help: "Largest stake per round, in the site currency. 0 disables the cap." },
+    ],
+  },
+  {
     id: "payments",
     title: "Payments",
     blurb: "CoinPayments mode and network confirmations.",

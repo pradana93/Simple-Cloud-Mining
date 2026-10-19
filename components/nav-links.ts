@@ -1,5 +1,6 @@
 export const NAV_LINKS = [
   { label: "Plans", href: "/#plans" },
+  { label: "Games", href: "/games" },
   { label: "Payouts", href: "/payouts" },
   { label: "Affiliate", href: "/affiliate" },
   { label: "FAQ", href: "/faq" },

@@ -42,7 +42,7 @@ function uaInfo(req: Request): { uaHash: string | null; headless: boolean } {
   return { uaHash: hmac(ua), headless: HEADLESS_UA.test(ua) };
 }
 
-export type EventKind = "login" | "accrue" | "withdraw" | "deposit" | "checkin";
+export type EventKind = "login" | "accrue" | "withdraw" | "deposit" | "checkin" | "bet";
 
 export async function recordEvent(opts: {
   userId: string;

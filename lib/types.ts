@@ -147,4 +147,7 @@ export type SiteSettings = {
   default_theme: string;
   auto_payout_enabled: boolean;
   auto_payout_max: number;
+  games_enabled: boolean;
+  games_min_bet: number;
+  games_max_bet: number;
 };

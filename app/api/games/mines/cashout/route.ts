@@ -1,0 +1,24 @@
+import { NextResponse } from "next/server";
+import { requirePlayer } from "@/lib/games/api-guard";
+import { cashoutMines } from "@/lib/games/mines-engine";
+
+export async function POST(req: Request) {
+  const gate = await requirePlayer();
+  if ("error" in gate) return gate.error;
+
+  let body: { roundId?: unknown };
+  try {
+    body = (await req.json()) as { roundId?: unknown };
+  } catch {
+    return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });
+  }
+
+  const roundId = Number(body.roundId);
+  if (!Number.isInteger(roundId)) {
+    return NextResponse.json({ ok: false, error: "Invalid round" }, { status: 400 });
+  }
+
+  const outcome = await cashoutMines({ userId: gate.player.id, roundId, req });
+  if (!outcome.ok) return NextResponse.json({ ok: false, error: outcome.error }, { status: outcome.status });
+  return NextResponse.json(outcome);
+}
