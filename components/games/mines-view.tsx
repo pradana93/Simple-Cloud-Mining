@@ -5,6 +5,7 @@ import { Bomb, Gem, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCrypto } from "@/lib/utils";
+import { useCountUp } from "./anim";
 import { MINES_MAX, MINES_TILES } from "@/lib/games/mines";
 
 type Play = {
@@ -159,11 +160,13 @@ export function MinesView({
   const stakeNum = active ? active.stake : Number(stake);
   const cashValue = active ? active.stake * active.multiplier : 0;
   const playing = Boolean(active) && !done;
+  const shownBalance = useCountUp(balance, 650);
+  const shownMult = useCountUp(multiplier, 450);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="panel rounded-2xl p-5 sm:p-6">
-        <div className="mx-auto grid max-w-md grid-cols-5 gap-2">
+        <div className={cn("mx-auto grid max-w-md grid-cols-5 gap-2", done === "busted" && "animate-shake")}>
           {Array.from({ length: MINES_TILES }, (_, i) => {
             const isMine = mines.includes(i);
             const open = revealed.includes(i);
@@ -178,9 +181,9 @@ export function MinesView({
                 className={cn(
                   "grid aspect-square place-items-center rounded-xl text-lg ring-1 transition",
                   showMine
-                    ? "bg-red-600/30 text-red-200 ring-red-500/40"
+                    ? "animate-pop bg-red-600/30 text-red-200 ring-red-500/40"
                     : open
-                      ? "bg-emerald-500/20 text-emerald-200 ring-emerald-500/40"
+                      ? "animate-pop bg-emerald-500/20 text-emerald-200 ring-emerald-500/40"
                       : playing
                         ? "bg-ink-900/70 text-slate-500 ring-white/10 hover:bg-ink-800 hover:text-gold-300"
                         : "bg-ink-900/50 text-slate-600 ring-white/5"
@@ -200,7 +203,7 @@ export function MinesView({
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-slate-500">Current</p>
-                  <p className="font-display text-2xl font-bold text-gold-300">{multiplier.toFixed(2)}x</p>
+                  <p className="font-display text-2xl font-bold text-gold-300">{shownMult.toFixed(2)}x</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs uppercase tracking-wide text-slate-500">Next tile</p>
@@ -259,8 +262,8 @@ export function MinesView({
         </div>
         <div className="panel rounded-2xl p-5 text-sm text-slate-400">
           <p className="font-display text-sm font-bold text-white">Balance</p>
-          <p className="mt-1 font-display text-xl font-bold text-white">
-            {formatCrypto(balance, decimals)} <span className="text-slate-400">{symbol}</span>
+          <p className="mt-1 font-display text-xl font-bold tabular-nums text-white">
+            {formatCrypto(shownBalance, decimals)} <span className="text-slate-400">{symbol}</span>
           </p>
           <p className="mt-3 text-xs text-slate-500">
             Every tile is drawn from the committed seed at the start. One percent house edge.

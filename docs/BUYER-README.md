@@ -22,7 +22,9 @@ Included features:
 - Optional two-factor auth and a withdrawal address allowlist.
 - Daily check-in bonus, announcement banner, and a first-run walkthrough.
 - A provably fair casino with ten games that wager the member balance, each
-  carrying a house edge. Off by default, switched on in Settings.
+  carrying a house edge. Animated rounds, verifiable seeds, and operator
+  controls for extra edge, a win cap and per-game switches. Off by default,
+  switched on in Settings.
 - Installable as a phone app (PWA) with a light and dark theme.
 - Optional automated payouts with a reconciliation pass and a payout log.
 

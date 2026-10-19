@@ -100,6 +100,9 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       { key: "games_enabled", label: "Casino", type: "switch", boolean: true, help: "Open the games lobby. Off hides every game and closes the bet API." },
       { key: "games_min_bet", label: "Minimum bet", type: "number", min: 0, step: 0.00000001, help: "Smallest stake per round, in the site currency. 0 disables the floor." },
       { key: "games_max_bet", label: "Maximum bet", type: "number", min: 0, step: 0.00000001, help: "Largest stake per round, in the site currency. 0 disables the cap." },
+      { key: "games_edge_boost", label: "Extra house edge", type: "slider", min: 0, max: 50, step: 1, help: "Percent trimmed from every payout. 0 is the game's own edge. Outcomes stay provably fair; only the paid amount changes." },
+      { key: "games_max_win", label: "Max win", type: "number", min: 0, step: 0.00000001, help: "Ceiling on a single payout, in the site currency. 0 leaves wins uncapped." },
+      { key: "games_disabled", label: "Disabled games", type: "text", maxLength: 191, help: "Comma separated ids to hide and close, for example crash,plinko. Empty turns nothing off." },
     ],
   },
   {

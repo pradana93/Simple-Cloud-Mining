@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
-import { requirePlayer, validateStake } from "@/lib/games/api-guard";
+import { requirePlayer, validateStake, gameClosed } from "@/lib/games/api-guard";
 import { startMines } from "@/lib/games/mines-engine";
 
 export async function POST(req: Request) {
   const gate = await requirePlayer();
   if ("error" in gate) return gate.error;
+
+  const closed = gameClosed(gate.econ, "mines");
+  if (closed) return closed;
 
   let body: { stake?: unknown; mines?: unknown };
   try {
@@ -21,6 +24,7 @@ export async function POST(req: Request) {
     stake: stake.stake,
     mines: body.mines,
     req,
+    econ: gate.econ,
   });
   if (!outcome.ok) {
     return NextResponse.json(

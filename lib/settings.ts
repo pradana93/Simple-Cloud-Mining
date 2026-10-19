@@ -5,7 +5,7 @@ import type { SiteSettings } from "./types";
 // Columns safe for public/anon reads. The SMTP credentials are excluded and the
 // matching column grants on `settings` are withheld from anon/authenticated.
 export const PUBLIC_SETTINGS_COLUMNS =
-  "id,sitename,siteslogan,keywords,description,pagination,max_pending_transactions,min_withdraw,max_withdraw,aff_comission,currency_name,currency_symbol,currency_code,currency_decimals,fiat_enabled,fiat_currency,price_currency,coin_cur1,coin_cur2,coin_mode,coin_email,facebook,telegram,twitter,vk,wallet_min,wallet_max,blockchain,theme,start_date,show_start_date,start_date_increment,header_codes,footer_codes,announce_enabled,announce_text,announce_link,checkin_enabled,checkin_amount,pay_coins,default_theme,auto_payout_enabled,auto_payout_max,games_enabled,games_min_bet,games_max_bet";
+  "id,sitename,siteslogan,keywords,description,pagination,max_pending_transactions,min_withdraw,max_withdraw,aff_comission,currency_name,currency_symbol,currency_code,currency_decimals,fiat_enabled,fiat_currency,price_currency,coin_cur1,coin_cur2,coin_mode,coin_email,facebook,telegram,twitter,vk,wallet_min,wallet_max,blockchain,theme,start_date,show_start_date,start_date_increment,header_codes,footer_codes,announce_enabled,announce_text,announce_link,checkin_enabled,checkin_amount,pay_coins,default_theme,auto_payout_enabled,auto_payout_max,games_enabled,games_min_bet,games_max_bet,games_disabled";
 
 export const FALLBACK: SiteSettings = {
   id: 1,
@@ -60,6 +60,9 @@ export const FALLBACK: SiteSettings = {
   games_enabled: false,
   games_min_bet: 0,
   games_max_bet: 0,
+  games_edge_boost: 0,
+  games_max_win: 0,
+  games_disabled: "",
 };
 
 export async function getSettings(): Promise<SiteSettings> {

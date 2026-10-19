@@ -4,6 +4,7 @@ import { ChevronLeft } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getCachedSettings } from "@/lib/catalog";
 import { gameMeta } from "@/lib/games/registry";
+import { casinoEcon, isGameDisabled } from "@/lib/games/econ";
 import { Badge } from "@/components/ui/badge";
 import { GameView } from "@/components/games/game-view";
 import { MinesView } from "@/components/games/mines-view";
@@ -18,7 +19,7 @@ export function generateMetadata({ params }: { params: { game: string } }) {
 export default async function GamePage({ params }: { params: { game: string } }) {
   const meta = gameMeta(params.game);
   const s = await getCachedSettings();
-  if (!meta || !s.games_enabled) notFound();
+  if (!meta || !s.games_enabled || isGameDisabled(casinoEcon(s), params.game)) notFound();
 
   const supabase = createServerSupabase();
   const {

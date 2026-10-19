@@ -2,7 +2,7 @@ import { createAdminSupabase } from "../supabase/admin";
 import { recordEvent } from "../risk-telemetry";
 import { floatStream, hashServerSeed, randomServerSeed } from "./rng";
 import { getInstantGame } from "./registry";
-import { toLedger } from "./util";
+import { applyPayout, type CasinoEcon } from "./econ";
 import type { PlayResult } from "./types";
 
 // Server-only settle path for the casino. The client never sends an outcome and
@@ -101,6 +101,7 @@ export async function playInstant(opts: {
   stake: number;
   params: unknown;
   req?: Request;
+  econ: CasinoEcon;
 }): Promise<PlayOutcome> {
   const game = getInstantGame(opts.gameId);
   if (!game) return { ok: false, error: "Unknown game", status: 404 };
@@ -137,7 +138,9 @@ export async function playInstant(opts: {
       game.floats(normalized)
     );
     const result = game.play(normalized, floats);
-    const payout = toLedger(opts.stake * result.multiplier);
+    const paid = applyPayout(opts.econ, opts.stake, result.multiplier);
+    const payout = paid.payout;
+    const settled = { ...result, multiplier: paid.multiplier };
 
     if (payout > 0) {
       const { error: creditError } = await admin.rpc("credit_balance", {
@@ -151,7 +154,7 @@ export async function playInstant(opts: {
       user_id: opts.userId,
       game: opts.gameId,
       stake: opts.stake,
-      multiplier: result.multiplier,
+      multiplier: paid.multiplier,
       payout,
       won: result.won,
       params: normalized as object,
@@ -171,12 +174,12 @@ export async function playInstant(opts: {
       userId: opts.userId,
       kind: "bet",
       req: opts.req,
-      detail: { game: opts.gameId, stake: opts.stake, payout, multiplier: result.multiplier },
+      detail: { game: opts.gameId, stake: opts.stake, payout, multiplier: paid.multiplier },
     });
 
     return {
       ok: true,
-      result,
+      result: settled,
       payout,
       balance: Number((profile as { balance?: number } | null)?.balance ?? 0),
       seed: {

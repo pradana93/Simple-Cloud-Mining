@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCrypto } from "@/lib/utils";
+import { useCountUp } from "./anim";
 import { Board } from "./boards";
 import { SeedManager } from "./seed-manager";
 import type { BetRow, PlayResponse, SeedView } from "./types";
@@ -41,9 +42,15 @@ export function GameView({
   const [seed, setSeed] = useState<SeedView | null>(null);
   const [stake, setStake] = useState("1");
   const [params, setParams] = useState<Record<string, unknown>>(() => DEFAULTS[id] ?? {});
-  const [last, setLast] = useState<PlayResponse | null>(null);
+  const [pending, setPending] = useState<PlayResponse | null>(null);
+  const [result, setResult] = useState<PlayResponse | null>(null);
+  const [seq, setSeq] = useState(0);
   const [busy, setBusy] = useState(false);
+  const [animating, setAnimating] = useState(false);
   const [bets, setBets] = useState<BetRow[]>([]);
+
+  const pendingRef = useRef<PlayResponse | null>(null);
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const set = useCallback((patch: Record<string, unknown>) => setParams((p) => ({ ...p, ...patch })), []);
 
@@ -55,6 +62,18 @@ export function GameView({
     } catch {
       /* history is best-effort */
     }
+  }, []);
+
+  const settle = useCallback(() => {
+    if (settleTimer.current) {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
+    const r = pendingRef.current;
+    pendingRef.current = null;
+    setPending(null);
+    setAnimating(false);
+    if (r) setResult(r);
   }, []);
 
   useEffect(() => {
@@ -74,6 +93,10 @@ export function GameView({
     };
   }, [loadHistory]);
 
+  useEffect(() => () => {
+    if (settleTimer.current) clearTimeout(settleTimer.current);
+  }, []);
+
   async function bet() {
     const stakeNum = Number(stake);
     if (!Number.isFinite(stakeNum) || stakeNum <= 0) {
@@ -81,7 +104,7 @@ export function GameView({
       return;
     }
     setBusy(true);
-    setLast(null);
+    setResult(null);
     try {
       const res = await fetch("/api/games/play", {
         method: "POST",
@@ -95,8 +118,12 @@ export function GameView({
       }
       const r = j as PlayResponse;
       setBalance(r.balance);
-      setLast(r);
       setSeed((s) => ({ ...r.seed, previous: r.seed.previous ?? s?.previous ?? null }));
+      pendingRef.current = r;
+      setPending(r);
+      setAnimating(true);
+      setSeq((n) => n + 1);
+      settleTimer.current = setTimeout(settle, 3600);
       void loadHistory();
       if (r.won && r.multiplier > 1) {
         push(`Win ${formatCrypto(r.payout, decimals)} ${symbol} at ${r.multiplier}x`, "success");
@@ -110,13 +137,24 @@ export function GameView({
 
   const stakeNum = Number(stake);
   const valid = Number.isFinite(stakeNum) && stakeNum > 0;
+  const spinning = busy || animating;
+  const shownBalance = useCountUp(balance, 650);
   const fmt = useMemo(() => (v: number) => formatCrypto(v, decimals), [decimals]);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="space-y-6">
         <div className="panel rounded-2xl p-5 sm:p-6">
-          <Board id={id} params={params} set={set} last={last} symbol={symbol} decimals={decimals} />
+          <Board
+            id={id}
+            params={params}
+            set={set}
+            last={pending ?? result}
+            symbol={symbol}
+            decimals={decimals}
+            seq={seq}
+            onSettled={settle}
+          />
         </div>
 
         <div className="panel rounded-2xl p-5 sm:p-6">
@@ -135,49 +173,54 @@ export function GameView({
                 className="h-11 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 text-sm text-slate-100 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25"
               />
             </div>
-            <Button size="lg" disabled={busy || !valid} onClick={bet} className="sm:w-40">
-              {busy ? <Loader2 className="animate-spin" size={18} /> : `Bet ${valid ? formatCrypto(stakeNum, decimals) : ""}`}
+            <Button size="lg" disabled={spinning || !valid} onClick={bet} className="sm:w-40">
+              {spinning ? <Loader2 className="animate-spin" size={18} /> : `Bet ${valid ? formatCrypto(stakeNum, decimals) : ""}`}
             </Button>
           </div>
           <div className="mt-3 flex items-center justify-between text-sm">
             <span className="text-slate-400">
-              Balance <span className="font-display font-bold text-white">{fmt(balance)} {symbol}</span>
+              Balance{" "}
+              <span className="font-display font-bold tabular-nums text-white">
+                {fmt(shownBalance)} {symbol}
+              </span>
             </span>
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => setStake((s) => String(Math.max(0, Number(s) / 2 || 0)))}
-                className="rounded-lg bg-ink-900/80 px-3 py-1 text-xs font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white"
+                className="tap rounded-lg bg-ink-900/80 px-3 py-1 text-xs font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white"
               >
                 1/2
               </button>
               <button
                 type="button"
                 onClick={() => setStake((s) => String(Number(s) * 2 || 0))}
-                className="rounded-lg bg-ink-900/80 px-3 py-1 text-xs font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white"
+                className="tap rounded-lg bg-ink-900/80 px-3 py-1 text-xs font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white"
               >
                 2x
               </button>
               <button
                 type="button"
                 onClick={() => setStake(String(balance))}
-                className="rounded-lg bg-ink-900/80 px-3 py-1 text-xs font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white"
+                className="tap rounded-lg bg-ink-900/80 px-3 py-1 text-xs font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white"
               >
                 Max
               </button>
             </div>
           </div>
 
-          {last && (
+          {result && !animating && (
             <div
               className={cn(
-                "mt-4 rounded-xl px-4 py-3 text-sm ring-1",
-                last.won ? "bg-emerald-500/10 text-emerald-200 ring-emerald-500/30" : "bg-red-500/10 text-red-200 ring-red-500/30"
+                "mt-4 animate-rise rounded-xl px-4 py-3 text-sm ring-1",
+                result.won
+                  ? "animate-win-glow bg-emerald-500/10 text-emerald-200 ring-emerald-500/30"
+                  : "bg-red-500/10 text-red-200 ring-red-500/30"
               )}
             >
-              {last.won
-                ? `Won ${fmt(last.payout)} ${symbol} at ${last.multiplier}x`
-                : `No win this round, ${fmt(last.stake)} ${symbol} staked.`}
+              {result.won
+                ? `Won ${fmt(result.payout)} ${symbol} at ${result.multiplier}x`
+                : `No win this round, ${fmt(result.stake)} ${symbol} staked.`}
             </div>
           )}
         </div>
@@ -201,7 +244,7 @@ export function GameView({
                 <span className={cn("font-display font-bold", b.won ? "text-emerald-300" : "text-slate-400")}>
                   {b.multiplier.toFixed(2)}x
                 </span>
-                <span className="w-20 text-right text-slate-300">{formatCrypto(b.payout, decimals)}</span>
+                <span className="w-20 text-right tabular-nums text-slate-300">{formatCrypto(b.payout, decimals)}</span>
               </li>
             ))}
           </ul>

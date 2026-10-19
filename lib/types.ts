@@ -150,4 +150,7 @@ export type SiteSettings = {
   games_enabled: boolean;
   games_min_bet: number;
   games_max_bet: number;
+  games_edge_boost: number;
+  games_max_win: number;
+  games_disabled: string;
 };

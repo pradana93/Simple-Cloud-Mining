@@ -41,4 +41,6 @@ export type BoardProps = {
   last: PlayResponse | null;
   symbol: string;
   decimals: number;
+  seq: number;
+  onSettled: () => void;
 };

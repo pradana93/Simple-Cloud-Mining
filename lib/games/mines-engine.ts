@@ -1,9 +1,10 @@
 import { createAdminSupabase } from "../supabase/admin";
 import { recordEvent } from "../risk-telemetry";
 import { floatStream } from "./rng";
-import { pickIndices, toLedger } from "./util";
+import { pickIndices } from "./util";
 import { MINES_TILES, minesMultiplier, minesNormalize } from "./mines";
 import { ensureSeedRow } from "./engine";
+import { applyPayout, scaleMultiplier, type CasinoEcon } from "./econ";
 
 // Interactive Mines. The layout is drawn once at start from the committed seed
 // and kept server-side, so the client can only learn a mine by hitting it. The
@@ -73,7 +74,7 @@ export type MinesActive =
 
 // Recover an open round after a reload. The layout stays server-side, so this
 // only reports what the member has already revealed.
-export async function getActiveRound(userId: string): Promise<MinesActive> {
+export async function getActiveRound(userId: string, econ: CasinoEcon): Promise<MinesActive> {
   const { data } = await createAdminSupabase()
     .from("game_rounds")
     .select("*")
@@ -87,8 +88,8 @@ export async function getActiveRound(userId: string): Promise<MinesActive> {
     roundId: round.id,
     mineCount: round.mine_count,
     revealed: round.revealed,
-    multiplier: minesMultiplier(round.mine_count, round.revealed.length),
-    nextMultiplier: minesMultiplier(round.mine_count, round.revealed.length + 1),
+    multiplier: scaleMultiplier(econ, minesMultiplier(round.mine_count, round.revealed.length)),
+    nextMultiplier: scaleMultiplier(econ, minesMultiplier(round.mine_count, round.revealed.length + 1)),
     stake: round.stake,
     balance: await balanceOf(userId),
   };
@@ -115,6 +116,7 @@ export async function startMines(opts: {
   stake: number;
   mines: unknown;
   req?: Request;
+  econ: CasinoEcon;
 }): Promise<MinesOutcome> {
   let normalized;
   try {
@@ -196,7 +198,7 @@ export async function startMines(opts: {
       status: "active",
       payout: 0,
       balance: await balanceOf(opts.userId),
-      nextMultiplier: minesMultiplier(normalized.mines, 1),
+      nextMultiplier: scaleMultiplier(opts.econ, minesMultiplier(normalized.mines, 1)),
     };
   } catch (err) {
     await admin.rpc("credit_balance", { p_user_id: opts.userId, p_amount: opts.stake });
@@ -220,6 +222,7 @@ export async function revealMines(opts: {
   roundId: number;
   tile: number;
   req?: Request;
+  econ: CasinoEcon;
 }): Promise<MinesOutcome> {
   const admin = createAdminSupabase();
   const round = await loadActive(opts.userId, opts.roundId);
@@ -261,10 +264,11 @@ export async function revealMines(opts: {
     };
   }
 
-  const multiplier = minesMultiplier(round.mine_count, revealed.length);
+  const rawMult = minesMultiplier(round.mine_count, revealed.length);
+  const multiplier = scaleMultiplier(opts.econ, rawMult);
   const safeTotal = MINES_TILES - round.mine_count;
   const finished = revealed.length >= safeTotal;
-  const payout = finished ? toLedger(round.stake * multiplier) : 0;
+  const payout = finished ? applyPayout(opts.econ, round.stake, rawMult).payout : 0;
 
   if (payout > 0) {
     await admin.rpc("credit_balance", { p_user_id: opts.userId, p_amount: payout });
@@ -301,7 +305,7 @@ export async function revealMines(opts: {
     payout,
     balance: await balanceOf(opts.userId),
     mines: finished ? round.mines : undefined,
-    nextMultiplier: minesMultiplier(round.mine_count, revealed.length + 1),
+    nextMultiplier: scaleMultiplier(opts.econ, minesMultiplier(round.mine_count, revealed.length + 1)),
   };
 }
 
@@ -309,6 +313,7 @@ export async function cashoutMines(opts: {
   userId: string;
   roundId: number;
   req?: Request;
+  econ: CasinoEcon;
 }): Promise<MinesOutcome> {
   const admin = createAdminSupabase();
   const round = await loadActive(opts.userId, opts.roundId);
@@ -317,8 +322,10 @@ export async function cashoutMines(opts: {
     return { ok: false, error: "Reveal at least one tile first", status: 400 };
   }
 
-  const multiplier = minesMultiplier(round.mine_count, round.revealed.length);
-  const payout = toLedger(round.stake * multiplier);
+  const rawMult = minesMultiplier(round.mine_count, round.revealed.length);
+  const paid = applyPayout(opts.econ, round.stake, rawMult);
+  const multiplier = paid.multiplier;
+  const payout = paid.payout;
   if (payout > 0) {
     await admin.rpc("credit_balance", { p_user_id: opts.userId, p_amount: payout });
   }

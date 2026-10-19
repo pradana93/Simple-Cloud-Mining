@@ -86,9 +86,10 @@ from the `supabase/` folder, in this exact order. Paste one file at a time.
 | 12 | `012_2fa.sql` | Two-factor auth tables |
 | 13 | `013_saas.sql` | Announcement, check-in, audit log, payout events |
 | 14 | `014_games.sql` | Provably fair casino tables and settings |
-| 15 | `seed.sql` | Starter plans, settings and sample content |
+| 15 | `015_casino_control.sql` | Casino operator controls (extra edge, win cap, disabled games) |
+| 16 | `seed.sql` | Starter plans, settings and sample content |
 
-Order matters. Files 2 through 14 assume the tables from `schema.sql`, and
+Order matters. Files 2 through 15 assume the tables from `schema.sql`, and
 `006_security_lockdown.sql` assumes the functions from `005`.
 
 ## 6. Environment variables
@@ -148,7 +149,10 @@ Two features are off until you enable them in Settings: the announcement banner
 and the daily check-in bonus. Automated payouts also stay off until you enable
 them there and add the CoinPayments API keys. The casino is off by default too:
 turn on **Casino** in Settings and set a minimum and maximum bet before members
-can play.
+can play. The same section holds the operator controls: an extra house edge, a
+per-round win cap, and a comma separated list of game ids to switch off. These
+adjust the payout only. Every round still resolves from the committed seed and
+the raw roll, pocket or draw is stored, so members can keep verifying results.
 
 ## 9. Deploy
 

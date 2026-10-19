@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getCachedSettings } from "@/lib/catalog";
 import { GAME_CATALOG } from "@/lib/games/registry";
+import { casinoEcon, isGameDisabled } from "@/lib/games/econ";
 import { Reveal } from "@/components/motion/reveal";
 import { Badge } from "@/components/ui/badge";
 
@@ -26,6 +27,8 @@ export default async function GamesPage() {
     .eq("id", user.id)
     .maybeSingle();
   const balance = Number((profile as { balance?: number } | null)?.balance ?? 0);
+  const econ = casinoEcon(s);
+  const games = GAME_CATALOG.filter((g) => !isGameDisabled(econ, g.id));
 
   return (
     <div className="space-y-8 py-8 sm:py-10">
@@ -48,7 +51,7 @@ export default async function GamesPage() {
       </Reveal>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {GAME_CATALOG.map((g, i) => (
+        {games.map((g, i) => (
           <Reveal key={g.id} delay={i * 40}>
             <Link
               href={`/games/${g.id}`}
