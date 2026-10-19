@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader, SiteFooter } from "@/components/site-chrome";
 import { ToastProvider } from "@/components/ui/toast";
 import { ChatDock } from "@/components/chat/chat-dock";
+import { PwaRegister } from "@/components/pwa-register";
 
 const body = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -28,6 +29,15 @@ export const metadata: Metadata = {
   },
   description:
     "Cloud mining console with live hashrate plans, per-block accrual, affiliate rewards, and on-chain payouts.",
+  applicationName: "Simple Cloud Mining",
+  appleWebApp: { capable: true, title: "Cloud Mining", statusBarStyle: "black-translucent" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#070a10",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -45,6 +55,7 @@ export default function RootLayout({
           <main className="mx-auto w-full max-w-6xl px-4 sm:px-6">{children}</main>
           <SiteFooter />
           <ChatDock />
+          <PwaRegister />
         </ToastProvider>
       </body>
     </html>
