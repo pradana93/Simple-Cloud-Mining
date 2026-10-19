@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { NAV_LINKS } from "./nav-links";
 import { Logo } from "./logo";
 import { CurrencyToggle } from "./fx/currency-toggle";
+import { ThemeToggle } from "./theme-toggle";
 import { cn } from "@/lib/utils";
 
 function isActive(pathname: string, href: string) {
@@ -123,6 +124,7 @@ export function SiteHeaderClient({
 
         <div className="hidden items-center gap-2 md:flex">
           <CurrencyToggle enabled={fiatEnabled} cryptoCode={cryptoCode} className="mr-1" />
+          <ThemeToggle />
           {authed === null ? (
             <span className="inline-block h-9 w-24" aria-hidden />
           ) : authed ? (
@@ -175,7 +177,11 @@ export function SiteHeaderClient({
               {l.label}
             </Link>
           ))}
-          <div className="mt-2 border-t border-white/10 pt-3 md:hidden">
+          <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-3 md:hidden">
+            <span className="text-xs font-medium text-slate-400">Appearance</span>
+            <ThemeToggle />
+          </div>
+          <div className="mt-2 border-t border-white/10 pt-3">
             <CurrencyToggle enabled={fiatEnabled} cryptoCode={cryptoCode} />
           </div>
           <div className="mt-2 grid grid-cols-2 gap-2 border-t border-white/10 pt-3">

@@ -130,3 +130,207 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+
+/*
+ * Light theme. The interface is built from a small set of utilities, so the
+ * palette is remapped in one place instead of threading a theme prop through
+ * every component. Attribute + class beats the single-class utility, so these
+ * win without !important. Anything outside this list keeps its dark value on
+ * purpose (gold buttons, destructive red, modal scrims).
+ */
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="light"] body {
+  background-color: #f4f6f9;
+  color: #334155;
+}
+
+/* Surfaces */
+:root[data-theme="light"] .panel {
+  background: #ffffff;
+  border-color: rgba(15, 23, 42, 0.1);
+}
+:root[data-theme="light"] .glass-nav {
+  background: rgba(255, 255, 255, 0.85);
+}
+:root[data-theme="light"] .bg-\[\#0d1117\] {
+  background-color: #ffffff;
+}
+:root[data-theme="light"] .bg-ink-950 {
+  background-color: #f4f6f9;
+}
+:root[data-theme="light"] .bg-ink-900 {
+  background-color: #ffffff;
+}
+:root[data-theme="light"] .bg-ink-800 {
+  background-color: #f1f4f8;
+}
+:root[data-theme="light"] .bg-ink-700 {
+  background-color: #e9edf3;
+}
+:root[data-theme="light"] .bg-ink-900\/80 {
+  background-color: rgba(255, 255, 255, 0.9);
+}
+:root[data-theme="light"] .bg-white\/5 {
+  background-color: rgba(15, 23, 42, 0.05);
+}
+:root[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.08);
+}
+:root[data-theme="light"] .bg-white\/\[0\.02\] {
+  background-color: rgba(15, 23, 42, 0.02);
+}
+:root[data-theme="light"] .bg-white\/\[0\.03\] {
+  background-color: rgba(15, 23, 42, 0.035);
+}
+:root[data-theme="light"] .bg-slate-700 {
+  background-color: #e2e8f0;
+}
+:root[data-theme="light"] .bg-slate-600 {
+  background-color: #e2e8f0;
+}
+:root[data-theme="light"] .bg-slate-500 {
+  background-color: #cbd5e1;
+}
+
+/* Borders and dividers */
+:root[data-theme="light"] .border-white\/5 {
+  border-color: rgba(15, 23, 42, 0.06);
+}
+:root[data-theme="light"] .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.1);
+}
+:root[data-theme="light"] .border-slate-700 {
+  border-color: #cbd5e1;
+}
+:root[data-theme="light"] .border-slate-700\/80 {
+  border-color: rgba(148, 163, 184, 0.6);
+}
+:root[data-theme="light"] .border-slate-600 {
+  border-color: #cbd5e1;
+}
+:root[data-theme="light"] .divide-white\/5 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(15, 23, 42, 0.08);
+}
+:root[data-theme="light"] .divide-white\/10 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgba(15, 23, 42, 0.1);
+}
+:root[data-theme="light"] .ring-white\/10 {
+  --tw-ring-color: rgba(15, 23, 42, 0.1);
+}
+:root[data-theme="light"] .ring-white\/5 {
+  --tw-ring-color: rgba(15, 23, 42, 0.06);
+}
+:root[data-theme="light"] .ring-slate-500 {
+  --tw-ring-color: rgba(100, 116, 139, 0.4);
+}
+:root[data-theme="light"] .ring-offset-ink-950 {
+  --tw-ring-offset-color: #ffffff;
+}
+
+/* Text */
+:root[data-theme="light"] .text-white {
+  color: #0f172a;
+}
+:root[data-theme="light"] .text-slate-100 {
+  color: #0f172a;
+}
+:root[data-theme="light"] .text-slate-200 {
+  color: #1e293b;
+}
+:root[data-theme="light"] .text-slate-300 {
+  color: #334155;
+}
+:root[data-theme="light"] .text-slate-400 {
+  color: #64748b;
+}
+:root[data-theme="light"] .text-gold-200 {
+  color: #92400e;
+}
+:root[data-theme="light"] .text-gold-300 {
+  color: #a16207;
+}
+:root[data-theme="light"] .text-gold-400 {
+  color: #b45309;
+}
+:root[data-theme="light"] .text-gold-500 {
+  color: #a16207;
+}
+:root[data-theme="light"] .text-gold-600 {
+  color: #92400e;
+}
+:root[data-theme="light"] .text-emerald-200 {
+  color: #047857;
+}
+:root[data-theme="light"] .text-emerald-300 {
+  color: #047857;
+}
+:root[data-theme="light"] .text-emerald-400 {
+  color: #059669;
+}
+:root[data-theme="light"] .text-red-200 {
+  color: #b91c1c;
+}
+:root[data-theme="light"] .text-red-300 {
+  color: #b91c1c;
+}
+:root[data-theme="light"] .text-red-400 {
+  color: #dc2626;
+}
+
+/* Keep white text on the destructive action, where a dark ink would fail */
+:root[data-theme="light"] .bg-red-600 .text-white,
+:root[data-theme="light"] .bg-red-500 .text-white {
+  color: #ffffff;
+}
+
+/* Hover variants resolve as separate classes, so they need their own pass */
+:root[data-theme="light"] .hover\:text-white:hover {
+  color: #0f172a;
+}
+:root[data-theme="light"] .hover\:text-gold-200:hover {
+  color: #92400e;
+}
+:root[data-theme="light"] .hover\:text-gold-300:hover {
+  color: #a16207;
+}
+:root[data-theme="light"] .hover\:text-gold-400:hover {
+  color: #b45309;
+}
+:root[data-theme="light"] .hover\:text-emerald-200:hover {
+  color: #047857;
+}
+:root[data-theme="light"] .hover\:text-red-200:hover {
+  color: #b91c1c;
+}
+:root[data-theme="light"] .hover\:text-red-300:hover {
+  color: #b91c1c;
+}
+:root[data-theme="light"] .hover\:bg-white\/5:hover {
+  background-color: rgba(15, 23, 42, 0.05);
+}
+:root[data-theme="light"] .hover\:bg-white\/\[0\.03\]:hover {
+  background-color: rgba(15, 23, 42, 0.035);
+}
+
+/* Chrome */
+:root[data-theme="light"] .shimmer {
+  background: rgba(15, 23, 42, 0.06);
+}
+:root[data-theme="light"] .shimmer::after {
+  background: linear-gradient(90deg, transparent, rgba(15, 23, 42, 0.08), transparent);
+}
+:root[data-theme="light"] .prose-dark p {
+  color: #334155;
+}
+:root[data-theme="light"] .prose-dark h2 {
+  color: #0f172a;
+}
+:root[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #eaeef4;
+}
+:root[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #c4ccd9;
+}

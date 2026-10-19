@@ -5,6 +5,7 @@ import { SiteHeader, SiteFooter } from "@/components/site-chrome";
 import { ToastProvider } from "@/components/ui/toast";
 import { ChatDock } from "@/components/chat/chat-dock";
 import { PwaRegister } from "@/components/pwa-register";
+import { getCachedSettings } from "@/lib/catalog";
 
 const body = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -40,13 +41,21 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({
+// Runs before paint so a saved theme never flashes the wrong background.
+const THEME_BOOT = `(function(){try{var m=document.cookie.match(/(?:^|; )scm_theme=(light|dark)/);var t=(m&&m[1])||localStorage.getItem('scm_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();`;
+
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const settings = await getCachedSettings();
+  const theme = settings.default_theme === "light" ? "light" : "dark";
   return (
-    <html lang="en" className="dark">
+    <html lang="en" data-theme={theme} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+      </head>
       <body
         className={`${body.variable} ${display.variable} ${mono.variable} min-h-screen bg-ink-950 font-body text-slate-200 antialiased`}
       >
