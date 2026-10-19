@@ -34,6 +34,10 @@ export type BetRow = {
   result: Record<string, unknown> | null;
 };
 
+// The board animation state, produced once per round by useSpin.
+export type SpinPhase = "idle" | "spin" | "land";
+export type Spin = { phase: SpinPhase; p: number; clock: number };
+
 export type BoardProps = {
   id: string;
   params: Record<string, unknown>;
@@ -41,6 +45,5 @@ export type BoardProps = {
   last: PlayResponse | null;
   symbol: string;
   decimals: number;
-  seq: number;
-  onSettled: () => void;
+  spin: Spin;
 };

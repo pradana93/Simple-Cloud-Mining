@@ -5,6 +5,7 @@ import { clientIp } from "./risk-telemetry";
 // block the action it describes, so every write is wrapped.
 export type AuditAction =
   | "settings.update"
+  | "casino.update"
   | "plan.create"
   | "plan.update"
   | "plan.delete"
@@ -27,6 +28,7 @@ export type AuditActor = { id: string; name: string | null };
 
 export const AUDIT_LABELS: Record<string, string> = {
   "settings.update": "Updated site settings",
+  "casino.update": "Updated casino controls",
   "plan.create": "Created a plan",
   "plan.update": "Edited a plan",
   "plan.delete": "Removed a plan",

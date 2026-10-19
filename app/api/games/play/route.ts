@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requirePlayer, validateStake, gameClosed } from "@/lib/games/api-guard";
+import { requirePlayer, playerEcon, validateStake, gameClosed } from "@/lib/games/api-guard";
 import { playInstant } from "@/lib/games/engine";
 
 export async function POST(req: Request) {
@@ -14,9 +14,10 @@ export async function POST(req: Request) {
   }
 
   const gameId = String(body.game ?? "");
-  const closed = gameClosed(gate.econ, gameId);
+  const econ = await playerEcon(gate.player, gate.settings, gameId);
+  const closed = gameClosed(econ, gameId);
   if (closed) return closed;
-  const stake = validateStake(body.stake, gate.settings);
+  const stake = validateStake(body.stake, econ, gate.settings.currency_code);
   if ("error" in stake) return NextResponse.json({ ok: false, error: stake.error }, { status: 400 });
 
   const outcome = await playInstant({
@@ -25,7 +26,7 @@ export async function POST(req: Request) {
     stake: stake.stake,
     params: body.params,
     req,
-    econ: gate.econ,
+    econ,
   });
 
   if (!outcome.ok) {

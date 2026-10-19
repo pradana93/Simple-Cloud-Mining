@@ -87,9 +87,10 @@ from the `supabase/` folder, in this exact order. Paste one file at a time.
 | 13 | `013_saas.sql` | Announcement, check-in, audit log, payout events |
 | 14 | `014_games.sql` | Provably fair casino tables and settings |
 | 15 | `015_casino_control.sql` | Casino operator controls (extra edge, win cap, disabled games) |
-| 16 | `seed.sql` | Starter plans, settings and sample content |
+| 16 | `016_casino_pro.sql` | Per-game overrides, player tiers, promo window, reporting |
+| 17 | `seed.sql` | Starter plans, settings and sample content |
 
-Order matters. Files 2 through 15 assume the tables from `schema.sql`, and
+Order matters. Files 2 through 16 assume the tables from `schema.sql`, and
 `006_security_lockdown.sql` assumes the functions from `005`.
 
 ## 6. Environment variables
@@ -149,10 +150,14 @@ Two features are off until you enable them in Settings: the announcement banner
 and the daily check-in bonus. Automated payouts also stay off until you enable
 them there and add the CoinPayments API keys. The casino is off by default too:
 turn on **Casino** in Settings and set a minimum and maximum bet before members
-can play. The same section holds the operator controls: an extra house edge, a
-per-round win cap, and a comma separated list of game ids to switch off. These
-adjust the payout only. Every round still resolves from the committed seed and
-the raw roll, pocket or draw is stored, so members can keep verifying results.
+can play. The same section holds the basic operator controls: an extra house
+edge, a per-round win cap, and a comma separated list of game ids to switch off.
+For finer control open **Admin > Casino**. There you can set per-game edge, win
+cap and bet bounds, define player tiers by lifetime wager, and run a promo window
+that shifts the edge for a range of UTC hours. The panel also reports wagers,
+payouts and hold for the last day and week. These adjust the payout only. Every
+round still resolves from the committed seed and the raw roll, pocket or draw is
+stored, so members can keep verifying results.
 
 ## 9. Deploy
 

@@ -4,7 +4,7 @@ import { createServerSupabase } from "../supabase/server";
 import { getAdminSettings } from "../settings";
 import type { SiteSettings } from "../types";
 import { toLedger } from "./util";
-import { casinoEcon, isGameDisabled, type CasinoEcon } from "./econ";
+import { isGameDisabled, resolveEcon, wagerOf, type CasinoEcon } from "./econ";
 
 // Shared gate for every casino route: a signed-in member, the casino switched
 // on, and a stake inside the configured bounds. The operator economy is read
@@ -13,7 +13,7 @@ import { casinoEcon, isGameDisabled, type CasinoEcon } from "./econ";
 export type Player = { id: string };
 
 export async function requirePlayer(): Promise<
-  { player: Player; settings: SiteSettings; econ: CasinoEcon } | { error: NextResponse }
+  { player: Player; settings: SiteSettings } | { error: NextResponse }
 > {
   const supabase = createServerSupabase();
   const {
@@ -26,7 +26,14 @@ export async function requirePlayer(): Promise<
   if (!settings.games_enabled) {
     return { error: NextResponse.json({ ok: false, error: "The casino is closed" }, { status: 403 }) };
   }
-  return { player: { id: (user as User).id }, settings, econ: casinoEcon(settings) };
+  return { player: { id: (user as User).id }, settings };
+}
+
+// Resolves the economy for this player and game: per-game overrides, their
+// wager tier, and the current promo window.
+export async function playerEcon(player: Player, settings: SiteSettings, gameId: string): Promise<CasinoEcon> {
+  const wager = await wagerOf(player.id);
+  return resolveEcon(settings, gameId, wager, new Date());
 }
 
 // Blocks a route when the owner has switched that game off.
@@ -39,17 +46,18 @@ export function gameClosed(econ: CasinoEcon, gameId: string): NextResponse | nul
 
 export function validateStake(
   raw: unknown,
-  settings: SiteSettings
+  econ: CasinoEcon,
+  currencyCode: string
 ): { stake: number } | { error: string } {
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) return { error: "Enter a stake above zero" };
   const stake = toLedger(n);
   if (stake <= 0) return { error: "Enter a stake above zero" };
-  if (settings.games_min_bet > 0 && stake < settings.games_min_bet) {
-    return { error: `Minimum stake is ${settings.games_min_bet} ${settings.currency_code}` };
+  if (econ.minBet > 0 && stake < econ.minBet) {
+    return { error: `Minimum stake is ${econ.minBet} ${currencyCode}` };
   }
-  if (settings.games_max_bet > 0 && stake > settings.games_max_bet) {
-    return { error: `Maximum stake is ${settings.games_max_bet} ${settings.currency_code}` };
+  if (econ.maxBet > 0 && stake > econ.maxBet) {
+    return { error: `Maximum stake is ${econ.maxBet} ${currencyCode}` };
   }
   return { stake };
 }

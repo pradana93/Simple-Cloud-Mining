@@ -63,6 +63,9 @@ export const FALLBACK: SiteSettings = {
   games_edge_boost: 0,
   games_max_win: 0,
   games_disabled: "",
+  games_config: {},
+  games_tiers: [],
+  games_schedule: { enabled: false, startHour: 0, endHour: 0, edgeDelta: 0 },
 };
 
 export async function getSettings(): Promise<SiteSettings> {

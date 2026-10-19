@@ -153,4 +153,7 @@ export type SiteSettings = {
   games_edge_boost: number;
   games_max_win: number;
   games_disabled: string;
+  games_config: Record<string, unknown>;
+  games_tiers: unknown[];
+  games_schedule: Record<string, unknown>;
 };

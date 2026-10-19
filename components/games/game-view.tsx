@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCrypto } from "@/lib/utils";
-import { useCountUp } from "./anim";
+import { useCountUp, useSpin } from "./anim";
 import { Board } from "./boards";
 import { SeedManager } from "./seed-manager";
 import type { BetRow, PlayResponse, SeedView } from "./types";
@@ -20,6 +20,21 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
   keno: { picks: [] },
   roulette: { bet: "red", number: 0 },
   slots: {},
+};
+
+// Spin time per game, then the landing time. The spin starts the moment Bet is
+// pressed and holds until the server result is back, so a slow round still reads
+// as real time rather than a stall.
+const SPIN: Record<string, [number, number]> = {
+  dice: [1300, 520],
+  limbo: [1500, 640],
+  crash: [1650, 680],
+  coinflip: [1400, 560],
+  wheel: [3000, 950],
+  plinko: [2600, 950],
+  keno: [1800, 720],
+  roulette: [3200, 1000],
+  slots: [1900, 720],
 };
 
 export function GameView({
@@ -42,15 +57,17 @@ export function GameView({
   const [seed, setSeed] = useState<SeedView | null>(null);
   const [stake, setStake] = useState("1");
   const [params, setParams] = useState<Record<string, unknown>>(() => DEFAULTS[id] ?? {});
-  const [pending, setPending] = useState<PlayResponse | null>(null);
   const [result, setResult] = useState<PlayResponse | null>(null);
-  const [seq, setSeq] = useState(0);
-  const [busy, setBusy] = useState(false);
-  const [animating, setAnimating] = useState(false);
+  const [runId, setRunId] = useState(0);
   const [bets, setBets] = useState<BetRow[]>([]);
 
-  const pendingRef = useRef<PlayResponse | null>(null);
-  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readyRef = useRef(false);
+  const resultRef = useRef<PlayResponse | null>(null);
+  const bettingRef = useRef(false);
+
+  const [spinMs, landMs] = SPIN[id] ?? [1500, 600];
+  const spin = useSpin(runId, spinMs, landMs, readyRef);
+  const spinning = spin.phase !== "idle";
 
   const set = useCallback((patch: Record<string, unknown>) => setParams((p) => ({ ...p, ...patch })), []);
 
@@ -62,18 +79,6 @@ export function GameView({
     } catch {
       /* history is best-effort */
     }
-  }, []);
-
-  const settle = useCallback(() => {
-    if (settleTimer.current) {
-      clearTimeout(settleTimer.current);
-      settleTimer.current = null;
-    }
-    const r = pendingRef.current;
-    pendingRef.current = null;
-    setPending(null);
-    setAnimating(false);
-    if (r) setResult(r);
   }, []);
 
   useEffect(() => {
@@ -93,18 +98,27 @@ export function GameView({
     };
   }, [loadHistory]);
 
-  useEffect(() => () => {
-    if (settleTimer.current) clearTimeout(settleTimer.current);
-  }, []);
+  // Announce a win once the reels finish, not while they are still spinning.
+  useEffect(() => {
+    if (spin.phase !== "idle") return;
+    const r = resultRef.current;
+    resultRef.current = null;
+    if (r && r.won && r.multiplier > 1) {
+      push(`Win ${formatCrypto(r.payout, decimals)} ${symbol} at ${r.multiplier}x`, "success");
+    }
+  }, [spin.phase, push, decimals, symbol]);
 
   async function bet() {
+    if (spinning || bettingRef.current) return;
     const stakeNum = Number(stake);
     if (!Number.isFinite(stakeNum) || stakeNum <= 0) {
       push("Enter a stake above zero", "error");
       return;
     }
-    setBusy(true);
+    bettingRef.current = true;
+    readyRef.current = false;
     setResult(null);
+    setRunId((n) => n + 1);
     try {
       const res = await fetch("/api/games/play", {
         method: "POST",
@@ -114,30 +128,26 @@ export function GameView({
       const j = (await res.json()) as PlayResponse | { ok: false; error: string };
       if (!j.ok) {
         push((j as { error: string }).error || "Bet failed", "error");
+        readyRef.current = true;
         return;
       }
       const r = j as PlayResponse;
       setBalance(r.balance);
       setSeed((s) => ({ ...r.seed, previous: r.seed.previous ?? s?.previous ?? null }));
-      pendingRef.current = r;
-      setPending(r);
-      setAnimating(true);
-      setSeq((n) => n + 1);
-      settleTimer.current = setTimeout(settle, 3600);
+      resultRef.current = r;
+      setResult(r);
+      readyRef.current = true;
       void loadHistory();
-      if (r.won && r.multiplier > 1) {
-        push(`Win ${formatCrypto(r.payout, decimals)} ${symbol} at ${r.multiplier}x`, "success");
-      }
     } catch {
       push("Network error", "error");
+      readyRef.current = true;
     } finally {
-      setBusy(false);
+      bettingRef.current = false;
     }
   }
 
   const stakeNum = Number(stake);
   const valid = Number.isFinite(stakeNum) && stakeNum > 0;
-  const spinning = busy || animating;
   const shownBalance = useCountUp(balance, 650);
   const fmt = useMemo(() => (v: number) => formatCrypto(v, decimals), [decimals]);
 
@@ -145,16 +155,7 @@ export function GameView({
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="space-y-6">
         <div className="panel rounded-2xl p-5 sm:p-6">
-          <Board
-            id={id}
-            params={params}
-            set={set}
-            last={pending ?? result}
-            symbol={symbol}
-            decimals={decimals}
-            seq={seq}
-            onSettled={settle}
-          />
+          <Board id={id} params={params} set={set} last={result} symbol={symbol} decimals={decimals} spin={spin} />
         </div>
 
         <div className="panel rounded-2xl p-5 sm:p-6">
@@ -209,7 +210,7 @@ export function GameView({
             </div>
           </div>
 
-          {result && !animating && (
+          {result && !spinning && (
             <div
               className={cn(
                 "mt-4 animate-rise rounded-xl px-4 py-3 text-sm ring-1",

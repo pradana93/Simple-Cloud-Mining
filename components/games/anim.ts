@@ -1,21 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { MutableRefObject } from "react";
+import type { Spin, SpinPhase } from "./types";
 
-// Small animation primitives shared by the game boards. Everything is driven
-// from a progress value so a reveal always lands on the value the server
-// returned, never on a random one. Motion stands down when the visitor asks for
-// reduced motion.
+// Animation primitives for the game boards. The bet spin is functional feedback
+// rather than decoration, so it always runs; reduced motion only shortens it and
+// strips the extra flourishes.
 
 export const clamp01 = (n: number) => (n < 0 ? 0 : n > 1 ? 1 : n);
 export const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 export const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
-export const easeOutBack = (t: number) => {
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
-};
 export const easeInOutCubic = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+const IDLE: Spin = { phase: "idle", p: 0, clock: 0 };
 
 export function usePrefersReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
@@ -29,40 +27,55 @@ export function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-// Runs 0 to 1 whenever `seq` changes, then calls onDone. Skipped on mount and
-// when reduced motion is on, where it resolves instantly.
-export function useReveal(seq: number, duration: number, onDone?: () => void): number {
-  const [p, setP] = useState(1);
-  const doneRef = useRef(onDone);
-  doneRef.current = onDone;
+// One rAF loop per round. Spins the moment `runId` changes, keeps spinning until
+// the server result is ready, then lands over `landMs` and settles to idle.
+export function useSpin(
+  runId: number,
+  spinMs: number,
+  landMs: number,
+  ready: MutableRefObject<boolean>
+): Spin {
+  const [state, setState] = useState<Spin>(IDLE);
+  const lastRun = useRef(runId);
   const reduced = usePrefersReducedMotion();
-  const mounted = useRef(false);
 
   useEffect(() => {
-    if (!mounted.current) {
-      mounted.current = true;
-      return;
-    }
-    if (reduced) {
-      setP(1);
-      doneRef.current?.();
-      return;
-    }
+    // Only a new round starts a spin. A change in motion preference or timing
+    // must not replay the last one.
+    if (runId === lastRun.current) return;
+    lastRun.current = runId;
+    const spinFor = reduced ? Math.min(spinMs, 260) : spinMs;
+    const landFor = reduced ? Math.min(landMs, 160) : landMs;
     let raf = 0;
-    let start = 0;
-    setP(0);
+    let t0 = 0;
+    let landStart = 0;
+    let phase: SpinPhase = "spin";
+    setState({ phase: "spin", p: 0, clock: 0 });
+
     const tick = (t: number) => {
-      if (!start) start = t;
-      const k = clamp01((t - start) / duration);
-      setP(easeOutCubic(k));
-      if (k < 1) raf = requestAnimationFrame(tick);
-      else doneRef.current?.();
+      if (!t0) t0 = t;
+      if (phase === "spin") {
+        const clock = t - t0;
+        if (clock >= spinFor && ready.current) {
+          phase = "land";
+          landStart = t;
+        }
+        setState({ phase: "spin", p: 0, clock });
+      } else {
+        const k = clamp01((t - landStart) / landFor);
+        if (k >= 1) {
+          setState(IDLE);
+          return;
+        }
+        setState({ phase: "land", p: easeOutCubic(k), clock: t - t0 });
+      }
+      raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [seq, duration, reduced]);
+  }, [runId, spinMs, landMs, reduced, ready]);
 
-  return p;
+  return state;
 }
 
 // Eases a number toward its target whenever the target changes.
@@ -70,27 +83,23 @@ export function useCountUp(value: number, duration = 650): number {
   const [display, setDisplay] = useState(value);
   const fromRef = useRef(value);
   const reduced = usePrefersReducedMotion();
+  const d = reduced ? Math.min(duration, 200) : duration;
 
   useEffect(() => {
-    if (reduced) {
-      setDisplay(value);
-      fromRef.current = value;
-      return;
-    }
     const from = fromRef.current;
     if (from === value) return;
     let raf = 0;
     let start = 0;
     const tick = (t: number) => {
       if (!start) start = t;
-      const k = clamp01((t - start) / duration);
+      const k = clamp01((t - start) / d);
       setDisplay(lerp(from, value, easeOutCubic(k)));
       if (k < 1) raf = requestAnimationFrame(tick);
       else fromRef.current = value;
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [value, duration, reduced]);
+  }, [value, d]);
 
   return display;
 }
