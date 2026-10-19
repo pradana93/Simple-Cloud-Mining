@@ -35,6 +35,21 @@ export async function POST(req: Request) {
 
   const admin = createAdminSupabase();
 
+  // Refuse anything not on the member's allowlist. An empty list is not locked,
+  // so first-time withdrawals are unaffected until they save an address.
+  const { data: allowedRows, error: allowError } = await admin
+    .from("withdrawal_allowlist")
+    .select("address")
+    .eq("user_id", user.id);
+  if (allowError) return NextResponse.json({ ok: false, error: allowError.message }, { status: 500 });
+  const allowed = (allowedRows ?? []) as Array<{ address: string }>;
+  if (allowed.length > 0 && !allowed.some((r) => (r.address ?? "").trim() === address)) {
+    return NextResponse.json(
+      { ok: false, error: "This address is not on your allowlist. Add it before requesting a payout." },
+      { status: 403 }
+    );
+  }
+
   // Atomic reserve: one guarded UPDATE so concurrent requests can't overspend.
   const { data: debited, error: debitError } = await admin.rpc("debit_balance", {
     p_user_id: user.id,

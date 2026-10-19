@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -21,6 +22,7 @@ import { CopyButton } from "@/components/copy-button";
 import { LiveBalance } from "@/components/motion/live-balance";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCrypto } from "@/lib/utils";
+import { findAllowed, isAllowed, shortAddress, type AllowlistEntry } from "@/lib/allowlist";
 
 export type MemberWithdrawal = {
   id: number;
@@ -138,6 +140,7 @@ export function WithdrawConsole({
   max,
   defaultAddress,
   withdrawals,
+  allowlist,
 }: {
   balance: number;
   rate: number;
@@ -149,11 +152,16 @@ export function WithdrawConsole({
   max: number;
   defaultAddress: string;
   withdrawals: MemberWithdrawal[];
+  allowlist: AllowlistEntry[];
 }) {
   const router = useRouter();
   const { push } = useToast();
   const [amount, setAmount] = useState("");
-  const [address, setAddress] = useState(defaultAddress);
+  const locked = allowlist.length > 0;
+  const [address, setAddress] = useState(() => {
+    const saved = findAllowed(allowlist, defaultAddress);
+    return saved ? saved.address : allowlist[0]?.address ?? defaultAddress;
+  });
   const [addressTouched, setAddressTouched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -172,7 +180,7 @@ export function WithdrawConsole({
   const hasAmount = Number.isFinite(parsed) && parsed > 0;
   const withinLimits = hasAmount && parsed >= min && parsed <= max;
   const withinBalance = hasAmount && parsed <= available + 1e-9;
-  const hasAddress = address.trim().length >= 8 && !/\s/.test(address.trim());
+  const hasAddress = address.trim().length >= 8 && !/\s/.test(address.trim()) && isAllowed(allowlist, address);
   const canSubmit = withinLimits && withinBalance && hasAddress;
 
   const rows = useMemo(() => withdrawals.filter((w) => matches(w, filter)), [withdrawals, filter]);
@@ -310,21 +318,52 @@ export function WithdrawConsole({
             </div>
 
             <div>
-              <Label htmlFor="address">Payout wallet address</Label>
-              <Input
-                id="address"
-                value={address}
-                onChange={(e) => {
-                  setAddress(e.target.value);
-                  setAddressTouched(true);
-                }}
-                onBlur={() => setAddressTouched(true)}
-                placeholder={`Your ${code} wallet address`}
-                spellCheck={false}
-                autoComplete="off"
-              />
-              {defaultAddress && address.trim() === defaultAddress && (
-                <p className="mt-1.5 text-xs text-slate-400">Prefilled with the address from your last request.</p>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="address">Payout wallet address</Label>
+                <Link href="#payout-addresses" className="text-xs font-semibold text-gold-300 hover:text-gold-400">
+                  Manage addresses
+                </Link>
+              </div>
+              {locked ? (
+                <>
+                  <select
+                    id="address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="h-11 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-3 text-sm text-slate-100 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25"
+                  >
+                    {allowlist.map((a) => (
+                      <option key={a.id} value={a.address}>
+                        {a.label ? `${a.label} (${shortAddress(a.address)})` : shortAddress(a.address)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-xs text-slate-400">Payouts are limited to the addresses on your list.</p>
+                </>
+              ) : (
+                <>
+                  <Input
+                    id="address"
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      setAddressTouched(true);
+                    }}
+                    onBlur={() => setAddressTouched(true)}
+                    placeholder={`Your ${code} wallet address`}
+                    spellCheck={false}
+                    autoComplete="off"
+                  />
+                  <p className="mt-1.5 text-xs text-slate-400">
+                    {defaultAddress && address.trim() === defaultAddress
+                      ? "Prefilled with the address from your last request. "
+                      : ""}
+                    <Link href="#payout-addresses" className="font-semibold text-gold-300 hover:text-gold-400">
+                      Save this address
+                    </Link>{" "}
+                    to lock payouts to it.
+                  </p>
+                </>
               )}
             </div>
 
@@ -336,8 +375,8 @@ export function WithdrawConsole({
               <CheckLine ok={withinBalance} touched={hasAmount}>
                 Not more than your available balance
               </CheckLine>
-              <CheckLine ok={hasAddress} touched={addressTouched}>
-                Wallet address filled in
+              <CheckLine ok={hasAddress} touched={addressTouched || locked}>
+                {locked ? "Address is on your allowlist" : "Wallet address filled in"}
               </CheckLine>
             </ul>
 

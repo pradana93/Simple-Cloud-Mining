@@ -5,6 +5,8 @@ import { getCachedSettings } from "@/lib/catalog";
 import { totalMiningRate } from "@/lib/mining";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { WithdrawConsole, type MemberWithdrawal } from "@/components/withdraw/withdraw-console";
+import { AllowlistManager } from "@/components/withdraw/allowlist-manager";
+import type { AllowlistEntry } from "@/lib/allowlist";
 
 export const dynamic = "force-dynamic";
 
@@ -48,8 +50,9 @@ export default async function WithdrawalPage() {
   let stored = 0;
   let withdrawals: MemberWithdrawal[] = [];
   let activePlans: AccrualRow[] = [];
+  let allowlist: AllowlistEntry[] = [];
   try {
-    const [p, w, a] = await Promise.all([
+    const [p, w, a, l] = await Promise.all([
       supabase.from("profiles").select("balance").eq("id", userId).maybeSingle(),
       supabase
         .from("user_withdrawal")
@@ -62,10 +65,16 @@ export default async function WithdrawalPage() {
         .select("id,expire_date,last_sum,created_at,plan:plans(earning_rate)")
         .eq("user_id", userId)
         .eq("status", "active"),
+      supabase
+        .from("withdrawal_allowlist")
+        .select("id,label,currency,address,created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: true }),
     ]);
     stored = Number((p.data as { balance: number } | null)?.balance ?? 0);
     withdrawals = ((w.data ?? []) as MemberWithdrawal[]);
     activePlans = ((a.data ?? []) as AccrualRow[]);
+    allowlist = ((l.data ?? []) as AllowlistEntry[]);
   } catch {
     // render with an empty balance and no history
   }
@@ -97,7 +106,9 @@ export default async function WithdrawalPage() {
         max={Number(s.max_withdraw)}
         defaultAddress={defaultAddress}
         withdrawals={withdrawals}
+        allowlist={allowlist}
       />
+      <AllowlistManager entries={allowlist} code={s.currency_code} />
     </div>
   );
 }
