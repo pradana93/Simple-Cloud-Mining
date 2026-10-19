@@ -5,15 +5,21 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
 import { buildGatewayUrl, createApiTransaction } from "@/lib/coinpayments";
 import { getFxTable } from "@/lib/fx";
+import { isPayableCoin } from "@/lib/checkout";
 
 export async function POST(req: Request) {
   const supabase = createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
 
-  const { planId } = (await req.json()) as { planId: number };
+  const { planId, coin } = (await req.json()) as { planId: number; coin?: string };
   const settings = await getSettings();
   const admin = createAdminSupabase();
+
+  if (coin && !isPayableCoin(coin, settings.pay_coins)) {
+    return NextResponse.json({ ok: false, error: "That coin is not available for checkout." }, { status: 400 });
+  }
+  const payCoin = isPayableCoin(coin, settings.pay_coins) ? (coin as string).trim().toUpperCase() : null;
 
   const { data: plan } = await admin.from("plans").select("*").eq("id", planId).maybeSingle();
   if (!plan) return NextResponse.json({ ok: false, error: "Plan not found" }, { status: 404 });
@@ -84,7 +90,7 @@ export async function POST(req: Request) {
     publicKey: process.env.COINPAYMENTS_PUBLIC_KEY ?? "",
     amount: price,
     currency1: settings.price_currency,
-    currency2: settings.coin_cur2,
+    currency2: payCoin ?? settings.coin_cur2,
     buyerEmail,
     itemName: `Purchase of Mining Plan ${(plan as { version: string }).version} on ${settings.sitename}`,
     itemNumber: (plan as { id: number }).id,
@@ -101,7 +107,7 @@ export async function POST(req: Request) {
     price_amount: price,
     price_currency: settings.price_currency,
     hash,
-    params: result.result as never,
+    params: { ...(result.result as Record<string, unknown>), payCoin: payCoin ?? settings.coin_cur2 } as never,
   });
   return NextResponse.json({ ok: true, hash });
 }

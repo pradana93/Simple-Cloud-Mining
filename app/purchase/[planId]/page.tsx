@@ -4,6 +4,7 @@ import { getCachedSettings } from "@/lib/catalog";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getMoneyCfg } from "@/lib/currency";
 import { formatMoney, formatPrice } from "@/lib/money";
+import { coinOptions } from "@/lib/checkout";
 import { PurchaseButton } from "@/components/purchase-button";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export default async function PurchasePage({ params }: { params: { planId: strin
           ))}
         </div>
         <div className="mt-6 space-y-2.5 rounded-2xl bg-white/[0.03] p-5 text-sm ring-1 ring-white/10">
-          <p className="flex items-center gap-2 text-slate-300"><Coins size={15} className="text-gold-300" /> Pay with any coin CoinPayments accepts, credited in {s.currency_code}</p>
+          <p className="flex items-center gap-2 text-slate-300"><Coins size={15} className="text-gold-300" /> {s.coin_mode === "api" ? "Pick the coin you hold, credited" : "Pay with any coin CoinPayments accepts, credited"} in {s.currency_code}</p>
           <p className="flex items-center gap-2 text-slate-300"><BadgeCheck size={15} className="text-emerald-400" /> Miner activates automatically after CoinPayments confirms</p>
           <p className="flex items-center gap-2 text-slate-300"><Timer size={15} className="text-gold-400" /> Mode: {s.coin_mode === "api" ? "instant invoice" : "hosted gateway"}</p>
           <p className="border-t border-white/10 pt-2.5 text-xs text-slate-400">
@@ -57,7 +58,7 @@ export default async function PurchasePage({ params }: { params: { planId: strin
           </p>
         </div>
         <div className="mt-6">
-          <PurchaseButton planId={Number(params.planId)} />
+          <PurchaseButton planId={Number(params.planId)} coins={s.coin_mode === "api" ? coinOptions(s.pay_coins) : []} />
         </div>
       </div>
     </div>
