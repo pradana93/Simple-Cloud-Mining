@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/api-admin";
 import { runSecurityProbes } from "@/lib/security-probe";
+import { recordAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,7 @@ export async function POST(req: Request) {
   try {
     const results = await runSecurityProbes();
     const failing = results.filter((r) => !r.passed).length;
+    await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "security.run", detail: { checks: results.length, failing }, req });
     return NextResponse.json({
       ok: failing === 0,
       error: failing === 0 ? undefined : `${failing} check(s) failing`,

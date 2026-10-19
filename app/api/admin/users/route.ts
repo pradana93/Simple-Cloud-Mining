@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/api-admin";
+import { recordAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,7 @@ export async function POST(req: Request) {
   }
   const action = String(body.action ?? "");
   const admin = createAdminSupabase();
+  const actor = { id: gate.userId, name: gate.name };
 
   try {
     if (action === "grant") {
@@ -41,6 +43,7 @@ export async function POST(req: Request) {
         last_sum: now.toISOString(),
       });
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      await recordAudit({ actor, action: "member.grant_rig", target: userId, detail: { planId, durationDays }, req });
       return NextResponse.json({ ok: true, message: `${(plan as { plan_name: string }).plan_name} granted for ${durationDays} days` });
     }
 
@@ -49,6 +52,7 @@ export async function POST(req: Request) {
       if (!Number.isFinite(rigId)) return NextResponse.json({ ok: false, error: "Rig id is required" }, { status: 400 });
       const { error } = await admin.from("user_plan_history").update({ status: "inactive" }).eq("id", rigId);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      await recordAudit({ actor, action: "member.revoke_rig", target: String(rigId), detail: { rigId }, req });
       return NextResponse.json({ ok: true, message: "Rig stopped" });
     }
 
@@ -64,6 +68,7 @@ export async function POST(req: Request) {
         if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
         if (nb == null) return NextResponse.json({ ok: false, error: "Member not found" }, { status: 404 });
         const next = Number(nb);
+        await recordAudit({ actor, action: "member.balance", target: userId, detail: { mode, amount, balance: next }, req });
         return NextResponse.json({ ok: true, balance: next, message: `Balance set to ${next.toFixed(8)}` });
       }
       const { data: profile } = await admin.from("profiles").select("balance").eq("id", userId).maybeSingle();
@@ -71,6 +76,7 @@ export async function POST(req: Request) {
       const next = Math.max(0, amount);
       const { error } = await admin.from("profiles").update({ balance: next }).eq("id", userId);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      await recordAudit({ actor, action: "member.balance", target: userId, detail: { mode, amount, balance: next }, req });
       return NextResponse.json({ ok: true, balance: next, message: `Balance set to ${next.toFixed(8)}` });
     }
 
@@ -83,6 +89,7 @@ export async function POST(req: Request) {
       }
       const { error } = await admin.from("profiles").update({ is_admin: isAdmin }).eq("id", userId);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      await recordAudit({ actor, action: "member.role", target: userId, detail: { isAdmin }, req });
       return NextResponse.json({ ok: true, message: isAdmin ? "Admin access granted" : "Admin access removed" });
     }
 

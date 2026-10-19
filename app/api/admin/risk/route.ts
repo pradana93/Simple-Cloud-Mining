@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/api-admin";
 import { rescanAll } from "@/lib/risk";
+import { recordAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
   try {
     if (action === "rescan") {
       const scanned = await rescanAll();
+      await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "risk.rescan", detail: { scanned }, req });
       return NextResponse.json({ ok: true, message: `Rescanned ${scanned} account${scanned === 1 ? "" : "s"}` });
     }
 
@@ -36,6 +38,7 @@ export async function POST(req: Request) {
         .update({ state, reviewed_by: gate.userId, reviewed_at: new Date().toISOString() })
         .eq("user_id", userId);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "risk.state", target: userId, detail: { state }, req });
       return NextResponse.json({ ok: true, message: `Marked ${state}` });
     }
 

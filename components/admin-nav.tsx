@@ -3,6 +3,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
+  ClipboardList,
   Contact,
   CreditCard,
   HelpCircle,
@@ -24,6 +26,7 @@ import { ChatUnread } from "@/components/admin/chat-unread";
 
 const links = [
   ["Overview", "/admin", Home],
+  ["Analytics", "/admin/analytics", BarChart3],
   ["Live chat", "/admin/chat", MessagesSquare],
   ["Plans", "/admin/plans", Package],
   ["Users", "/admin/users", Users],
@@ -35,6 +38,7 @@ const links = [
   ["FAQs", "/admin/faqs", HelpCircle],
   ["URL chains", "/admin/urlchains", Link2],
   ["IPN logs", "/admin/ipnlogs", ScrollText],
+  ["Audit log", "/admin/audit", ClipboardList],
   ["Settings", "/admin/settings", Settings],
 ] as const;
 

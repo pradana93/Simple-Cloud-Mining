@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/api-admin";
+import { recordAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export async function POST(req: Request) {
         .eq("id", id);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
       revalidateTag("payouts");
+      await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "withdrawal.approve", target: String(id), detail: { user: w.user_id, amount: Number(w.amount), tx }, req });
       return NextResponse.json({ ok: true, message: "Withdrawal marked paid" });
     }
 
@@ -48,6 +50,7 @@ export async function POST(req: Request) {
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
       await admin.rpc("credit_balance", { p_user_id: w.user_id, p_amount: Number(w.amount) });
       revalidateTag("payouts");
+      await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "withdrawal.reject", target: String(id), detail: { user: w.user_id, amount: Number(w.amount) }, req });
       return NextResponse.json({ ok: true, message: `Rejected and refunded ${Number(w.amount).toFixed(8)}` });
     }
 

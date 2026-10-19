@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/api-admin";
 import { ALL_FIELDS, type SettingsField } from "@/lib/settings-fields";
+import { recordAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -100,6 +101,7 @@ export async function POST(req: Request) {
     revalidateTag("site-settings");
     revalidateTag("site-stats");
     const { data: saved } = await admin.from("settings").select("*").order("id").limit(1).maybeSingle();
+    await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "settings.update", detail: { keys: Object.keys(update) }, req });
     return NextResponse.json({ ok: true, settings: saved });
   } catch {
     return NextResponse.json({ ok: false, error: "Save failed" }, { status: 500 });

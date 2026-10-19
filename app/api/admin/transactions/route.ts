@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/api-admin";
+import { recordAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export async function POST(req: Request) {
 
     const { error } = await admin.from("transactions_history").update({ status: "canceled" }).eq("id", id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "invoice.cancel", target: String(id), req });
     return NextResponse.json({ ok: true, message: "Invoice canceled" });
   } catch {
     return NextResponse.json({ ok: false, error: "Action failed" }, { status: 500 });

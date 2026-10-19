@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/api-admin";
 import { earningRateFromDaily } from "@/lib/plan-math";
+import { recordAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -81,6 +82,7 @@ export async function POST(req: Request) {
     const id = (data as { id: number } | null)?.id ?? null;
     if (value.is_default && id != null) await clearOtherDefaults(id);
     revalidateTag("plans");
+    await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "plan.create", target: value.plan_name, detail: { id }, req });
     return NextResponse.json({ ok: true, id, message: "Plan created" });
   } catch {
     return NextResponse.json({ ok: false, error: "Create failed" }, { status: 500 });
@@ -108,6 +110,7 @@ export async function PATCH(req: Request) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     if (value.is_default) await clearOtherDefaults(id);
     revalidateTag("plans");
+    await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "plan.update", target: value.plan_name, detail: { id }, req });
     return NextResponse.json({ ok: true, message: "Plan updated" });
   } catch {
     return NextResponse.json({ ok: false, error: "Update failed" }, { status: 500 });
@@ -141,6 +144,7 @@ export async function DELETE(req: Request) {
     const { error } = await admin.from("plans").delete().eq("id", id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     revalidateTag("plans");
+    await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "plan.delete", target: String(id), req });
     return NextResponse.json({ ok: true, message: "Plan removed" });
   } catch {
     return NextResponse.json({ ok: false, error: "Delete failed" }, { status: 500 });
