@@ -27,8 +27,9 @@ export function usePrefersReducedMotion(): boolean {
   return reduced;
 }
 
-// One rAF loop per round. Spins the moment `runId` changes, keeps spinning until
-// the server result is ready, then lands over `landMs` and settles to idle.
+// One rAF loop per round. Spins the moment `runId` changes, holds only while the
+// server result is not ready (or the optional minimum), then lands over `landMs`
+// and settles to idle.
 export function useSpin(
   runId: number,
   spinMs: number,

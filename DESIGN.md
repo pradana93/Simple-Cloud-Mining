@@ -62,7 +62,8 @@ Motion is the round, not decoration. Each animation shows the object that decide
 - Roulette: the European pocket order and incoming ball make the wheel physical; the winning pocket is highlighted where the ball stops.
 - Slots: icon strips, staggered stops, a payline, and a win glow replace text-only reels and show which line paid.
 - Mines: the settled board stays visible after a bust or cashout, so the member can audit what was revealed and where the mines were.
-- Shared timing: the spin holds until the server result arrives, then the landing is short and decisive. A slow response cannot skip the result.
+- Shared timing: there is no fixed spin minimum. The landing starts as soon as the server result arrives, over 160ms to 380ms, so the object still reports how the result happened without making the player wait for a clock. A slow response still cannot skip the result.
+- Auto-bet reuses the same settlement path and locks its settings while a session runs. It resets both stake rules by default; increase rules and stop targets are opt-in. The session reports completed rounds and cumulative P/L.
 
 ## What we said no to
 

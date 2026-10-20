@@ -2,10 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { ChevronDown, Loader2, Repeat2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCrypto } from "@/lib/utils";
+import {
+  AUTO_DEFAULTS,
+  autoStopReason,
+  nextAutoStake,
+  parseAutoConfig,
+  type AutoConfig,
+  type AutoPlan,
+} from "@/lib/games/auto";
 import { useCountUp, useSpin } from "./anim";
 import { Board } from "./boards";
 import { SeedManager } from "./seed-manager";
@@ -23,20 +31,24 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
   slots: {},
 };
 
-// Spin time per game, then the landing time. The spin starts the moment Bet is
-// pressed and holds until the server result is back, so a slow round still reads
-// as real time rather than a stall.
-const SPIN: Record<string, [number, number]> = {
-  dice: [1300, 520],
-  limbo: [1500, 640],
-  crash: [1650, 680],
-  coinflip: [1400, 560],
-  wheel: [3000, 950],
-  plinko: [2600, 950],
-  keno: [1800, 720],
-  roulette: [3200, 1000],
-  slots: [1900, 720],
+// No fixed minimum spin. The landing starts as soon as the server result is
+// ready; each board keeps a short object-specific landing so the result stays
+// readable without making the player wait for a clock.
+const LAND: Record<string, number> = {
+  dice: 160,
+  limbo: 180,
+  coinflip: 240,
+  wheel: 320,
+  plinko: 380,
+  keno: 240,
+  roulette: 340,
+  slots: 260,
 };
+
+const FIELD_CLASS =
+  "h-11 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-3 text-sm text-slate-100 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25";
+
+type AutoProgress = { done: number; rounds: number; profit: number; note: string | null };
 
 export function GameView({
   id,
@@ -66,13 +78,22 @@ export function GameView({
   const [result, setResult] = useState<PlayResponse | null>(null);
   const [runId, setRunId] = useState(0);
   const [bets, setBets] = useState<BetRow[]>([]);
+  const [autoOpen, setAutoOpen] = useState(false);
+  const [autoCfg, setAutoCfg] = useState<AutoConfig>(AUTO_DEFAULTS);
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [autoProgress, setAutoProgress] = useState<AutoProgress | null>(null);
 
   const readyRef = useRef(false);
   const resultRef = useRef<PlayResponse | null>(null);
   const bettingRef = useRef(false);
+  const balanceRef = useRef(initialBalance);
+  const autoRunningRef = useRef(false);
+  const autoSessionRef = useRef(0);
+  const autoCancelRef = useRef(false);
+  const suppressWinToastRef = useRef(false);
 
-  const [spinMs, landMs] = SPIN[id] ?? [1500, 600];
-  const spin = useSpin(runId, spinMs, landMs, readyRef);
+  const landMs = LAND[id] ?? 240;
+  const spin = useSpin(runId, 0, landMs, readyRef);
   const spinning = spin.phase !== "idle";
 
   const set = useCallback((patch: Record<string, unknown>) => setParams((p) => ({ ...p, ...patch })), []);
@@ -83,18 +104,37 @@ export function GameView({
   const overBalance = Number.isFinite(stakeNum) && stakeNum > balance;
   const valid = Number.isFinite(stakeNum) && stakeNum > 0 && !belowMin && !aboveMax && !overBalance;
   const fmt = useMemo(() => (v: number) => formatCrypto(v, decimals), [decimals]);
-  const shownBalance = useCountUp(balance, 650);
+  const shownBalance = useCountUp(balance, 350);
   const rounds = useMemo(() => bets.filter((b) => b.game === id), [bets, id]);
+  const autoParsed = useMemo(() => parseAutoConfig(autoCfg), [autoCfg]);
+  const autoProfit = autoProgress?.profit ?? 0;
+  const autoDone = autoProgress?.done ?? 0;
+  const autoTotal = autoProgress?.rounds ?? (autoParsed.ok ? autoParsed.plan.rounds : 10);
+  const autoPct = autoTotal > 0 ? Math.min(100, (autoDone / autoTotal) * 100) : 0;
+  const profitLabel = `${autoProfit > 0 ? "+" : autoProfit < 0 ? "-" : ""}${fmt(Math.abs(autoProfit))} ${symbol}`;
+  const profitTone =
+    autoProfit > 0 ? "text-emerald-300" : autoProfit < 0 ? "text-red-300" : "text-slate-200";
 
   const clampStake = useCallback(
-    (n: number) => {
+    (n: number, capBalance = balance) => {
       let v = Number.isFinite(n) && n > 0 ? n : minBet > 0 ? minBet : 0;
       if (minBet > 0 && v < minBet) v = minBet;
       if (maxBet > 0 && v > maxBet) v = maxBet;
-      if (balance > 0 && v > balance) v = balance;
+      if (Number.isFinite(capBalance) && v > capBalance) v = capBalance;
       return Number(v.toFixed(decimals));
     },
     [balance, decimals, maxBet, minBet]
+  );
+
+  const stakeError = useCallback(
+    (value: number): string | null => {
+      if (!Number.isFinite(value) || value <= 0) return "Enter a stake above zero";
+      if (minBet > 0 && value < minBet) return `Minimum stake is ${fmt(minBet)} ${symbol}`;
+      if (maxBet > 0 && value > maxBet) return `Maximum stake is ${fmt(maxBet)} ${symbol}`;
+      if (value > balanceRef.current) return "Stake is above your balance";
+      return null;
+    },
+    [fmt, maxBet, minBet, symbol]
   );
 
   const loadHistory = useCallback(async () => {
@@ -128,70 +168,182 @@ export function GameView({
     void loadHistory();
   }, [loadSeed, loadHistory]);
 
-  // Announce a win once the reels finish, not while they are still spinning.
+  // Announce a manual win once the object lands. Auto sessions report
+  // cumulative P/L instead of one toast per round.
   useEffect(() => {
     if (spin.phase !== "idle") return;
     const r = resultRef.current;
     resultRef.current = null;
-    if (r && r.won && r.multiplier > 1) {
+    if (r && !autoRunningRef.current && !suppressWinToastRef.current && r.won && r.multiplier > 1) {
       push(`Win ${formatCrypto(r.payout, decimals)} ${symbol} at ${r.multiplier.toFixed(2)}x`, "success");
     }
   }, [spin.phase, push, decimals, symbol]);
 
-  async function bet() {
-    if (spinning || bettingRef.current) return;
-    if (!Number.isFinite(stakeNum) || stakeNum <= 0) {
-      push("Enter a stake above zero", "error");
-      return;
-    }
-    if (belowMin) {
-      push(`Minimum stake is ${fmt(minBet)} ${symbol}`, "error");
-      return;
-    }
-    if (aboveMax) {
-      push(`Maximum stake is ${fmt(maxBet)} ${symbol}`, "error");
-      return;
-    }
-    if (overBalance) {
-      push("Stake is above your balance", "error");
-      return;
-    }
-    bettingRef.current = true;
-    readyRef.current = false;
-    setResult(null);
-    setRunId((n) => n + 1);
-    try {
-      const res = await fetch("/api/games/play", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ game: id, stake: stakeNum, params }),
-      });
-      const j = (await res.json()) as PlayResponse | { ok: false; error: string };
-      if (!j.ok) {
-        push((j as { error: string }).error || "Bet failed", "error");
-        readyRef.current = true;
-        return;
+  useEffect(() => {
+    return () => {
+      autoSessionRef.current += 1;
+      autoCancelRef.current = true;
+      autoRunningRef.current = false;
+    };
+  }, []);
+
+  function patchAuto(patch: Partial<AutoConfig>) {
+    setAutoCfg((c) => ({ ...c, ...patch }));
+    setAutoProgress((p) => (p ? { ...p, note: null } : p));
+  }
+
+  const placeBet = useCallback(
+    async (betStake: number, betParams: Record<string, unknown>): Promise<PlayResponse | null> => {
+      if (bettingRef.current) return null;
+      const error = stakeError(betStake);
+      if (error) {
+        push(error, "error");
+        return null;
       }
-      const r = j as PlayResponse;
-      setBalance(r.balance);
-      setSeed((s) => ({ ...r.seed, previous: r.seed.previous ?? s?.previous ?? null }));
-      resultRef.current = r;
-      setResult(r);
-      readyRef.current = true;
-      void loadHistory();
-    } catch {
-      push("Network error", "error");
-      readyRef.current = true;
-    } finally {
-      bettingRef.current = false;
+      bettingRef.current = true;
+      readyRef.current = false;
+      setResult(null);
+      setRunId((n) => n + 1);
+      try {
+        const res = await fetch("/api/games/play", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ game: id, stake: betStake, params: betParams }),
+        });
+        const j = (await res.json()) as PlayResponse | { ok: false; error: string };
+        if (!j.ok) {
+          push((j as { error: string }).error || "Bet failed", "error");
+          readyRef.current = true;
+          return null;
+        }
+        const r = j as PlayResponse;
+        balanceRef.current = r.balance;
+        setBalance(r.balance);
+        setSeed((s) => ({ ...r.seed, previous: r.seed.previous ?? s?.previous ?? null }));
+        resultRef.current = r;
+        setResult(r);
+        readyRef.current = true;
+        void loadHistory();
+        return r;
+      } catch {
+        push("Network error", "error");
+        readyRef.current = true;
+        return null;
+      } finally {
+        bettingRef.current = false;
+      }
+    },
+    [id, loadHistory, push, stakeError]
+  );
+
+  async function runAuto(
+    session: number,
+    plan: AutoPlan,
+    baseStake: number,
+    betParams: Record<string, unknown>
+  ) {
+    let currentStake = baseStake;
+    let profit = 0;
+    let note: string | null = null;
+
+    for (let i = 0; i < plan.rounds; i++) {
+      if (autoSessionRef.current !== session || autoCancelRef.current) {
+        note = "Auto stopped.";
+        break;
+      }
+      const r = await placeBet(currentStake, betParams);
+      if (autoSessionRef.current !== session) return;
+      if (!r) {
+        note = "Auto stopped before the next bet could be placed.";
+        break;
+      }
+      profit = Number((profit + (r.payout - r.stake)).toFixed(decimals));
+      setAutoProgress({ done: i + 1, rounds: plan.rounds, profit, note: null });
+
+      const stop = autoStopReason(plan, profit, fmt, symbol);
+      if (stop) {
+        note = stop;
+        break;
+      }
+      if (i + 1 >= plan.rounds) {
+        note = `Auto finished after ${plan.rounds} bet${plan.rounds === 1 ? "" : "s"}.`;
+        break;
+      }
+
+      currentStake = nextAutoStake({
+        current: currentStake,
+        base: baseStake,
+        won: r.won,
+        plan,
+        minBet,
+        maxBet,
+        balance: r.balance,
+        decimals,
+      });
+      if (currentStake <= 0 || (minBet > 0 && currentStake < minBet)) {
+        note = "Auto stopped: balance is below the minimum stake.";
+        break;
+      }
+      setStake(String(currentStake));
+      await new Promise((resolve) => setTimeout(resolve, landMs + 80));
     }
+
+    if (autoSessionRef.current !== session) return;
+    autoRunningRef.current = false;
+    setAutoRunning(false);
+    setAutoProgress((p) => (p ? { ...p, note } : { done: 0, rounds: plan.rounds, profit, note }));
+  }
+
+  function startAuto() {
+    if (autoRunningRef.current || spinning || bettingRef.current) return;
+    const betProblem = stakeError(stakeNum);
+    if (betProblem) {
+      push(betProblem, "error");
+      return;
+    }
+    if (!autoParsed.ok) {
+      push(autoParsed.error, "error");
+      return;
+    }
+
+    const session = autoSessionRef.current + 1;
+    autoSessionRef.current = session;
+    autoCancelRef.current = false;
+    suppressWinToastRef.current = true;
+    autoRunningRef.current = true;
+    setAutoRunning(true);
+    setAutoOpen(true);
+    setAutoProgress({ done: 0, rounds: autoParsed.plan.rounds, profit: 0, note: null });
+    setResult(null);
+    void runAuto(session, autoParsed.plan, stakeNum, params);
+  }
+
+  function stopAuto() {
+    if (!autoRunningRef.current) return;
+    autoCancelRef.current = true;
+    autoSessionRef.current += 1;
+    autoRunningRef.current = false;
+    setAutoRunning(false);
+    setAutoProgress((p) => (p ? { ...p, note: "Auto stopped." } : p));
+  }
+
+  async function bet() {
+    if (spinning || autoRunningRef.current || bettingRef.current) return;
+    suppressWinToastRef.current = false;
+    await placeBet(stakeNum, params);
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="space-y-6">
         <div className="panel rounded-2xl p-5 sm:p-6">
-          <Board id={id} params={params} set={set} last={result} symbol={symbol} decimals={decimals} spin={spin} />
+          <fieldset
+            disabled={autoRunning}
+            className="m-0 min-w-0 border-0 p-0 [&_button:disabled]:cursor-not-allowed [&_button:disabled]:opacity-50 [&_input:disabled]:opacity-60 [&_select:disabled]:opacity-60"
+          >
+            <legend className="sr-only">Game settings</legend>
+            <Board id={id} params={params} set={set} last={result} symbol={symbol} decimals={decimals} spin={spin} />
+          </fieldset>
         </div>
 
         <div className="panel rounded-2xl p-5 sm:p-6">
@@ -207,9 +359,10 @@ export function GameView({
                 step="any"
                 value={stake}
                 onChange={(e) => setStake(e.target.value)}
+                disabled={autoRunning}
                 aria-invalid={belowMin || aboveMax || overBalance}
                 aria-describedby="stake-help"
-                className="h-11 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 text-sm text-slate-100 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25"
+                className="h-11 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 text-sm text-slate-100 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25 disabled:cursor-not-allowed disabled:opacity-60"
               />
               <p
                 id="stake-help"
@@ -244,12 +397,18 @@ export function GameView({
             </div>
             <Button
               size="lg"
-              disabled={spinning || !valid}
+              disabled={spinning || autoRunning || !valid}
               onClick={bet}
               className="sm:w-40"
               aria-busy={spinning}
             >
-              {spinning ? <Loader2 className="animate-spin" size={18} /> : `Bet ${valid ? formatCrypto(stakeNum, decimals) : ""}`}
+              {spinning ? (
+                <Loader2 className="animate-spin" size={18} />
+              ) : autoRunning ? (
+                "Auto running"
+              ) : (
+                `Bet ${valid ? formatCrypto(stakeNum, decimals) : ""}`
+              )}
             </Button>
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -263,29 +422,34 @@ export function GameView({
               <button
                 type="button"
                 onClick={() => setStake(String(clampStake((Number(stake) || 0) / 2)))}
-                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+                disabled={autoRunning}
+                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 1/2
               </button>
               <button
                 type="button"
                 onClick={() => setStake(String(clampStake((Number(stake) || 0) * 2)))}
-                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+                disabled={autoRunning}
+                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 2x
               </button>
               <button
                 type="button"
                 onClick={() => setStake(String(clampStake(balance)))}
-                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+                disabled={autoRunning}
+                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Max
               </button>
             </div>
           </div>
 
-          {result && !spinning && (
+          {result && spin.phase !== "spin" && (
             <div
+              role="status"
+              aria-live={autoRunning ? "off" : "polite"}
               className={cn(
                 "mt-4 animate-rise rounded-xl px-4 py-3 text-sm ring-1",
                 result.won
@@ -298,6 +462,262 @@ export function GameView({
                 : `No win this round, ${fmt(result.stake)} ${symbol} staked.`}
             </div>
           )}
+
+          <div className="mt-4 border-t border-slate-800/80 pt-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {autoRunning ? (
+                <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Repeat2 size={16} className="text-gold-300" aria-hidden />
+                  Auto bet
+                  <span className="font-display text-xs font-bold text-gold-300">
+                    {autoDone}/{autoTotal}
+                  </span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAutoOpen((v) => !v)}
+                  aria-expanded={autoOpen}
+                  aria-controls="auto-bet-panel"
+                  className="tap inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-slate-300 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+                >
+                  <Repeat2 size={16} className="text-gold-300" aria-hidden />
+                  Auto bet
+                  <ChevronDown
+                    size={15}
+                    className={cn("transition-transform", autoOpen && "rotate-180")}
+                    aria-hidden
+                  />
+                </button>
+              )}
+              {autoRunning && (
+                <Button type="button" variant="outline" size="sm" onClick={stopAuto}>
+                  Stop auto
+                </Button>
+              )}
+            </div>
+
+            {autoOpen && (
+              <div
+                id="auto-bet-panel"
+                role="group"
+                aria-labelledby="auto-bet-heading"
+                className="mt-3 rounded-xl bg-ink-900/60 p-3 ring-1 ring-white/10 sm:p-4"
+              >
+                <h3 id="auto-bet-heading" className="mb-3 font-display text-sm font-bold text-white">
+                  {autoRunning ? "Auto session" : "Auto settings"}
+                </h3>
+
+                {autoRunning ? (
+                  <div role="status" aria-live="polite" className="space-y-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                      <span className="text-slate-300">
+                        Completed <span className="font-display font-bold text-white">{autoDone}</span> of{" "}
+                        <span className="font-display font-bold text-white">{autoTotal}</span>
+                      </span>
+                      <span className="text-slate-300">
+                        P/L{" "}
+                        <span className={cn("font-display font-bold tabular-nums", profitTone)}>{profitLabel}</span>
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-ink-800" aria-hidden>
+                      <div
+                        className="h-full rounded-full bg-gold-500 transition-[width] duration-300"
+                        style={{ width: `${autoPct}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-slate-400">
+                      Stake {fmt(stakeNum)} {symbol}. Settings lock while auto runs.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {autoProgress?.note && (
+                      <p
+                        role="status"
+                        aria-live="polite"
+                        className="mb-3 rounded-lg bg-ink-950/70 px-3 py-2 text-xs text-slate-200 ring-1 ring-white/10"
+                      >
+                        {autoProgress.note}
+                      </p>
+                    )}
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label
+                          htmlFor="auto-rounds"
+                          className="mb-1.5 block text-xs font-semibold text-slate-300"
+                        >
+                          Number of bets
+                        </label>
+                        <input
+                          id="auto-rounds"
+                          type="number"
+                          min={1}
+                          max={100}
+                          step={1}
+                          inputMode="numeric"
+                          value={autoCfg.rounds}
+                          onChange={(e) => patchAuto({ rounds: e.target.value })}
+                          aria-describedby="auto-help"
+                          className={FIELD_CLASS}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="auto-stop-profit"
+                          className="mb-1.5 block text-xs font-semibold text-slate-300"
+                        >
+                          Stop on profit ({symbol})
+                        </label>
+                        <input
+                          id="auto-stop-profit"
+                          type="number"
+                          min={0}
+                          step="any"
+                          inputMode="decimal"
+                          value={autoCfg.stopProfit}
+                          onChange={(e) => patchAuto({ stopProfit: e.target.value })}
+                          aria-describedby="auto-help"
+                          className={FIELD_CLASS}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="auto-stop-loss"
+                          className="mb-1.5 block text-xs font-semibold text-slate-300"
+                        >
+                          Stop on loss ({symbol})
+                        </label>
+                        <input
+                          id="auto-stop-loss"
+                          type="number"
+                          min={0}
+                          step="any"
+                          inputMode="decimal"
+                          value={autoCfg.stopLoss}
+                          onChange={(e) => patchAuto({ stopLoss: e.target.value })}
+                          aria-describedby="auto-help"
+                          className={FIELD_CLASS}
+                        />
+                      </div>
+
+                      <div>
+                        <label
+                          htmlFor="auto-win-rule"
+                          className="mb-1.5 block text-xs font-semibold text-slate-300"
+                        >
+                          After a win
+                        </label>
+                        <select
+                          id="auto-win-rule"
+                          value={autoCfg.onWin}
+                          onChange={(e) =>
+                            patchAuto({ onWin: e.target.value === "increase" ? "increase" : "reset" })
+                          }
+                          aria-describedby="auto-help"
+                          className={FIELD_CLASS}
+                        >
+                          <option value="reset">Reset to start stake</option>
+                          <option value="increase">Increase stake</option>
+                        </select>
+                      </div>
+
+                      {autoCfg.onWin === "increase" && (
+                        <div>
+                          <label
+                            htmlFor="auto-win-increase"
+                            className="mb-1.5 block text-xs font-semibold text-slate-300"
+                          >
+                            Win increase (%)
+                          </label>
+                          <input
+                            id="auto-win-increase"
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="any"
+                            inputMode="decimal"
+                            value={autoCfg.winIncrease}
+                            onChange={(e) => patchAuto({ winIncrease: e.target.value })}
+                            aria-describedby="auto-help"
+                            className={FIELD_CLASS}
+                          />
+                        </div>
+                      )}
+
+                      <div>
+                        <label
+                          htmlFor="auto-loss-rule"
+                          className="mb-1.5 block text-xs font-semibold text-slate-300"
+                        >
+                          After a loss
+                        </label>
+                        <select
+                          id="auto-loss-rule"
+                          value={autoCfg.onLoss}
+                          onChange={(e) =>
+                            patchAuto({ onLoss: e.target.value === "increase" ? "increase" : "reset" })
+                          }
+                          aria-describedby="auto-help"
+                          className={FIELD_CLASS}
+                        >
+                          <option value="reset">Reset to start stake</option>
+                          <option value="increase">Increase stake</option>
+                        </select>
+                      </div>
+
+                      {autoCfg.onLoss === "increase" && (
+                        <div>
+                          <label
+                            htmlFor="auto-loss-increase"
+                            className="mb-1.5 block text-xs font-semibold text-slate-300"
+                          >
+                            Loss increase (%)
+                          </label>
+                          <input
+                            id="auto-loss-increase"
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="any"
+                            inputMode="decimal"
+                            value={autoCfg.lossIncrease}
+                            onChange={(e) => patchAuto({ lossIncrease: e.target.value })}
+                            aria-describedby="auto-help"
+                            className={FIELD_CLASS}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                      <p
+                        id="auto-help"
+                        aria-live="polite"
+                        className={cn("text-xs", autoParsed.ok ? "text-slate-400" : "text-red-300")}
+                      >
+                        {autoParsed.ok
+                          ? "0 turns a stop target off. Stops compare session P/L; the game settings lock when auto starts."
+                          : autoParsed.error}
+                      </p>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={startAuto}
+                        disabled={!autoParsed.ok || !valid || spinning}
+                        className="w-full sm:w-auto"
+                      >
+                        Start auto
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
