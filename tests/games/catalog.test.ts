@@ -10,16 +10,19 @@ describe("catalog", () => {
     expect(ids.size).toBe(10);
   });
 
-  it("has an instant engine for every game except mines", () => {
+  it("has an instant engine for every game except the two round games", () => {
     for (const meta of GAME_CATALOG) {
       if (meta.id === "mines") {
         expect(meta.interactive).toBe(true);
         expect(getInstantGame("mines")).toBeNull();
+      } else if (meta.id === "crash") {
+        expect(getInstantGame("crash")).toBeNull();
       } else {
         expect(INSTANT_GAMES[meta.id]).toBeTruthy();
       }
     }
     expect(gameMeta("mines")?.name).toBe("Mines");
+    expect(gameMeta("crash")?.name).toBe("Crash");
     expect(getInstantGame("nope")).toBeNull();
   });
 });

@@ -2,7 +2,6 @@ import type { InstantGame, PlayResult } from "./types";
 import { dice } from "./dice";
 import { limbo } from "./limbo";
 import { coinflip } from "./coinflip";
-import { crash } from "./crash";
 import { wheel } from "./wheel";
 import { plinko } from "./plinko";
 import { keno } from "./keno";
@@ -19,7 +18,6 @@ export const INSTANT_GAMES: Record<string, AnyInstantGame> = {
   dice,
   limbo,
   coinflip,
-  crash,
   wheel,
   plinko,
   keno,
@@ -60,7 +58,7 @@ export const GAME_CATALOG: GameMeta[] = [
   {
     id: "crash",
     name: "Crash",
-    blurb: "Set a cashout line and watch where the round crashes.",
+    blurb: "The line climbs. Cash out before it crashes, or lose the stake.",
     edge: "Base 1% house edge",
     category: "Instant",
     pace: "fast",
@@ -118,7 +116,7 @@ export const GAME_CATALOG: GameMeta[] = [
     id: "slots",
     name: "Slots",
     blurb: "Three reels. Line up a triple or catch two cherries.",
-    edge: "About 5% base house edge",
+    edge: "Base 8% house edge",
     category: "Reels",
     pace: "pick",
   },

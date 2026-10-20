@@ -12,9 +12,9 @@ import { isGameDisabled, resolveEcon, wagerOf, type CasinoEcon } from "./econ";
 
 export type Player = { id: string };
 
-export async function requirePlayer(): Promise<
-  { player: Player; settings: SiteSettings } | { error: NextResponse }
-> {
+export async function requirePlayer(
+  opts: { allowClosed?: boolean } = {}
+): Promise<{ player: Player; settings: SiteSettings } | { error: NextResponse }> {
   const supabase = createServerSupabase();
   const {
     data: { user },
@@ -23,7 +23,7 @@ export async function requirePlayer(): Promise<
     return { error: NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 }) };
   }
   const settings = await getAdminSettings();
-  if (!settings.games_enabled) {
+  if (!settings.games_enabled && !opts.allowClosed) {
     return { error: NextResponse.json({ ok: false, error: "The casino is closed" }, { status: 403 }) };
   }
   return { player: { id: (user as User).id }, settings };

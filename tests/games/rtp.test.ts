@@ -107,7 +107,6 @@ describe("roulette edge", () => {
 describe("simulated returns", () => {
   it("lands near 0.99 for the single number games", () => {
     expect(simulate("limbo", { target: 2 })).toBeCloseTo(0.99, 1);
-    expect(simulate("crash", { target: 2 })).toBeCloseTo(0.99, 1);
     expect(simulate("coinflip", { side: "heads" })).toBeCloseTo(0.99, 1);
     expect(simulate("dice", { target: 50, mode: "under" })).toBeCloseTo(0.99, 1);
   });

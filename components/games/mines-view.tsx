@@ -70,7 +70,6 @@ export function MinesView({
     setPayout(r.payout);
     if (r.status === "busted" || r.status === "cashed") {
       setDone(r.status);
-      setActive(null);
       if (r.status === "busted") push("Hit a mine. Round over.", "error");
       else push(`Cashed out ${formatCrypto(r.payout, decimals)} ${symbol}`, "success");
     }

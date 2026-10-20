@@ -8,6 +8,7 @@ import { casinoEcon, isGameDisabled } from "@/lib/games/econ";
 import { Badge } from "@/components/ui/badge";
 import { GameView } from "@/components/games/game-view";
 import { MinesView } from "@/components/games/mines-view";
+import { CrashView } from "@/components/games/crash-view";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +53,15 @@ export default async function GamePage({ params }: { params: { game: string } })
         <p className="mt-2 max-w-2xl text-slate-400">{meta.blurb}</p>
       </div>
 
-      {meta.interactive ? (
+      {meta.id === "crash" ? (
+        <CrashView
+          symbol={s.currency_symbol}
+          decimals={s.currency_decimals}
+          balance={balance}
+          minBet={econ.minBet}
+          maxBet={econ.maxBet}
+        />
+      ) : meta.interactive ? (
         <MinesView
           symbol={s.currency_symbol}
           decimals={s.currency_decimals}

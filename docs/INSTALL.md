@@ -89,9 +89,10 @@ from the `supabase/` folder, in this exact order. Paste one file at a time.
 | 15 | `015_casino_control.sql` | Casino operator controls (extra edge, win cap, disabled games) |
 | 16 | `016_casino_pro.sql` | Per-game overrides, player tiers, promo window, reporting |
 | 17 | `017_game_profit.sql` | Per-game owner profit reporting |
-| 17 | `seed.sql` | Starter plans, settings and sample content |
+| 18 | `018_crash.sql` | Live crash rounds and atomic cashout settlement |
+| 19 | `seed.sql` | Starter plans, settings and sample content |
 
-Order matters. Files 2 through 17 assume the tables from `schema.sql`, and
+Order matters. Files 2 through 18 assume the tables from `schema.sql`, and
 `006_security_lockdown.sql` assumes the functions from `005`.
 
 ## 6. Environment variables

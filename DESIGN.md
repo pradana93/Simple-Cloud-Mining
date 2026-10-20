@@ -48,6 +48,22 @@ The mark is an agent-authored placeholder: a pick-and-rule monogram in a gold ti
 - The lobby groups games by pace (one press, choose and spin, round by round) because a player picks by session length, not by the category label.
 - Admin > Casino reports owner profit per game because the operator needs to know which table earns, not only the site total.
 
+## Casino motion reasons
+
+Motion is the round, not decoration. Each animation shows the object that decided the bet, then stops. Reduced motion shortens the same sequence and keeps the result.
+
+- Dice: a continuous triangle sweep avoids the misleading wrap from 99 to 0, and the eased landing shows the roll crossing the target band.
+- Limbo: the server draw appears at once. A fake count-up would suggest a clock that does not exist.
+- Crash: the line is drawn from the recorded server start time, the dot marks the live multiplier, and a dashed ghost line reveals the crash point only after settle.
+- Coin flip: rotation, lift, and shadow show the coin leaving the hand and landing on the called face.
+- Wheel: weighted sectors and labels show why the top prize is rare; the rim and ball settle together under the pointer.
+- Plinko: pegs, ball path, and payout slots share one coordinate system, so the bounce sequence predicts the slot instead of drifting beside it.
+- Keno: picks lock before the draw and the ten drawn numbers reveal in order, because the draw is the event.
+- Roulette: the European pocket order and incoming ball make the wheel physical; the winning pocket is highlighted where the ball stops.
+- Slots: icon strips, staggered stops, a payline, and a win glow replace text-only reels and show which line paid.
+- Mines: the settled board stays visible after a bust or cashout, so the member can audit what was revealed and where the mines were.
+- Shared timing: the spin holds until the server result arrives, then the landing is short and decisive. A slow response cannot skip the result.
+
 ## What we said no to
 
 Decorative grid backgrounds, radial orb glows, glassmorphism on every surface, infinite marquee and pulse loops, large soft shadows on every card, and uppercase-tracked eyebrow pills above headlines.
