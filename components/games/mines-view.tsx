@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Bomb, Gem, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -36,15 +37,19 @@ export function MinesView({
   symbol,
   decimals,
   balance: initialBalance,
+  minBet = 0,
+  maxBet = 0,
 }: {
   symbol: string;
   decimals: number;
   balance: number;
+  minBet?: number;
+  maxBet?: number;
 }) {
   const { push } = useToast();
   const [balance, setBalance] = useState(initialBalance);
   const [mineCount, setMineCount] = useState(3);
-  const [stake, setStake] = useState("1");
+  const [stake, setStake] = useState(() => String(minBet > 0 ? minBet : 1));
   const [busy, setBusy] = useState(false);
   const [active, setActive] = useState<Active | null>(null);
   const [mines, setMines] = useState<number[]>([]);
@@ -135,6 +140,18 @@ export function MinesView({
       push("Enter a stake above zero", "error");
       return;
     }
+    if (minBet > 0 && s < minBet) {
+      push(`Minimum stake is ${formatCrypto(minBet, decimals)} ${symbol}`, "error");
+      return;
+    }
+    if (maxBet > 0 && s > maxBet) {
+      push(`Maximum stake is ${formatCrypto(maxBet, decimals)} ${symbol}`, "error");
+      return;
+    }
+    if (s > balance) {
+      push("Stake is above your balance", "error");
+      return;
+    }
     setDone(null);
     setMines([]);
     const r = await post("start", { stake: s, mines: mineCount });
@@ -158,6 +175,18 @@ export function MinesView({
   const multiplier = active?.multiplier ?? (done === "cashed" ? payout : 0);
   const nextMultiplier = active?.nextMultiplier ?? 0;
   const stakeNum = active ? active.stake : Number(stake);
+  const belowMin = minBet > 0 && Number.isFinite(stakeNum) && stakeNum < minBet;
+  const aboveMax = maxBet > 0 && Number.isFinite(stakeNum) && stakeNum > maxBet;
+  const overBalance = !active && Number.isFinite(stakeNum) && stakeNum > balance;
+  const badStake = belowMin || aboveMax || overBalance;
+  const stakeOk = !active && Number.isFinite(stakeNum) && stakeNum > 0 && !badStake;
+  const clampStake = (n: number) => {
+    let v = Number.isFinite(n) && n > 0 ? n : minBet > 0 ? minBet : 0;
+    if (minBet > 0 && v < minBet) v = minBet;
+    if (maxBet > 0 && v > maxBet) v = maxBet;
+    if (balance > 0 && v > balance) v = balance;
+    return Number(v.toFixed(decimals));
+  };
   const cashValue = active ? active.stake * active.multiplier : 0;
   const playing = Boolean(active) && !done;
   const shownBalance = useCountUp(balance, 650);
@@ -178,6 +207,7 @@ export function MinesView({
                 type="button"
                 disabled={!playing || open || busy}
                 onClick={() => reveal(i)}
+                aria-label={showMine ? "Mine" : open ? "Safe tile" : "Hidden tile"}
                 className={cn(
                   "grid aspect-square place-items-center rounded-xl text-lg ring-1 transition",
                   showMine
@@ -196,79 +226,152 @@ export function MinesView({
         </div>
       </div>
 
-      <div className="space-y-4">
-        <div className="panel rounded-2xl p-5 sm:p-6">
-          {playing ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Current</p>
-                  <p className="font-display text-2xl font-bold text-gold-300">{shownMult.toFixed(2)}x</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs uppercase tracking-wide text-slate-500">Next tile</p>
-                  <p className="font-display text-lg font-bold text-white">{nextMultiplier.toFixed(2)}x</p>
-                </div>
+      <div className="panel rounded-2xl p-5 sm:p-6">
+        <div className="flex items-baseline justify-between gap-3 border-b border-white/5 pb-3">
+          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Balance</span>
+          <span className="font-display text-base font-bold tabular-nums text-white">
+            {formatCrypto(shownBalance, decimals)} <span className="text-slate-400">{symbol}</span>
+          </span>
+        </div>
+
+        {playing ? (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Current</p>
+                <p className="font-display text-2xl font-bold text-gold-300">{shownMult.toFixed(2)}x</p>
               </div>
-              <Button size="lg" className="w-full" disabled={busy || revealed.length === 0} onClick={cashout}>
-                {busy ? <Loader2 className="animate-spin" size={18} /> : `Cash out ${formatCrypto(cashValue, decimals)} ${symbol}`}
-              </Button>
-              <p className="text-center text-xs text-slate-500">
-                {revealed.length} safe {revealed.length === 1 ? "tile" : "tiles"} open, {active?.mineCount} mines hidden
+              <div className="text-right">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Next tile</p>
+                <p className="font-display text-lg font-bold text-white">{nextMultiplier.toFixed(2)}x</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-lg bg-ink-900/60 px-3 py-2">
+                <p className="text-slate-400">Stake</p>
+                <p className="mt-0.5 font-mono tabular-nums text-slate-200">
+                  {formatCrypto(active?.stake ?? 0, decimals)} {symbol}
+                </p>
+              </div>
+              <div className="rounded-lg bg-ink-900/60 px-3 py-2">
+                <p className="text-slate-400">Open</p>
+                <p className="mt-0.5 font-mono tabular-nums text-slate-200">
+                  {revealed.length} of {MINES_TILES - (active?.mineCount ?? mineCount)}
+                </p>
+              </div>
+            </div>
+            <Button size="lg" className="w-full" disabled={busy || revealed.length === 0} onClick={cashout}>
+              {busy ? <Loader2 className="animate-spin" size={18} /> : `Cash out ${formatCrypto(cashValue, decimals)} ${symbol}`}
+            </Button>
+            <p className="text-center text-xs text-slate-400">
+              {revealed.length} safe {revealed.length === 1 ? "tile" : "tiles"} open, {active?.mineCount} mines hidden
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-4">
+            <div>
+              <label htmlFor="mines-stake" className="mb-1.5 block text-sm font-semibold text-slate-300">
+                Stake ({symbol})
+              </label>
+              <input
+                id="mines-stake"
+                type="number"
+                min={0}
+                step="any"
+                value={stake}
+                onChange={(e) => setStake(e.target.value)}
+                aria-invalid={badStake}
+                aria-describedby="mines-stake-help"
+                className="h-11 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 text-sm text-slate-100 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25"
+              />
+              <p
+                id="mines-stake-help"
+                className={cn("mt-1.5 text-xs", badStake ? "text-red-300" : "text-slate-400")}
+              >
+                {balance <= 0 ? (
+                  <>
+                    No balance to stake.{" "}
+                    <Link
+                      href="/#plans"
+                      className="font-semibold text-gold-300 underline underline-offset-2 hover:text-gold-200"
+                    >
+                      View plans
+                    </Link>
+                    .
+                  </>
+                ) : belowMin ? (
+                  `Minimum stake is ${formatCrypto(minBet, decimals)} ${symbol}.`
+                ) : aboveMax ? (
+                  `Maximum stake is ${formatCrypto(maxBet, decimals)} ${symbol}.`
+                ) : overBalance ? (
+                  "Stake is above your balance."
+                ) : minBet > 0 || maxBet > 0 ? (
+                  `Allowed ${minBet > 0 ? formatCrypto(minBet, decimals) : "0"} to ${
+                    maxBet > 0 ? formatCrypto(maxBet, decimals) : "no cap"
+                  } ${symbol}.`
+                ) : (
+                  `Balance ${formatCrypto(balance, decimals)} ${symbol}.`
+                )}
               </p>
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="mines-stake" className="mb-1.5 block text-sm font-semibold text-slate-300">
-                  Stake ({symbol})
-                </label>
-                <input
-                  id="mines-stake"
-                  type="number"
-                  min={0}
-                  step="any"
-                  value={stake}
-                  onChange={(e) => setStake(e.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 text-sm text-slate-100 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25"
-                />
-              </div>
-              <div>
-                <div className="mb-1.5 flex items-center justify-between text-sm">
-                  <span className="font-semibold text-slate-300">Mines</span>
-                  <span className="font-display font-bold text-white">{mineCount}</span>
-                </div>
-                <input
-                  type="range"
-                  min={1}
-                  max={MINES_MAX}
-                  value={mineCount}
-                  onChange={(e) => setMineCount(Number(e.target.value))}
-                  className="w-full accent-gold-500"
-                />
-              </div>
-              <Button size="lg" className="w-full" disabled={busy} onClick={start}>
-                {busy ? <Loader2 className="animate-spin" size={18} /> : done ? "Play again" : "Start round"}
-              </Button>
-              {done && (
-                <p className={cn("text-center text-sm font-semibold", done === "cashed" ? "text-emerald-300" : "text-red-300")}>
-                  {done === "cashed"
-                    ? `Cashed out ${formatCrypto(payout, decimals)} ${symbol}`
-                    : `Busted. ${formatCrypto(stakeNum, decimals)} ${symbol} lost.`}
-                </p>
-              )}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setStake(String(clampStake((Number(stake) || 0) / 2)))}
+                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+              >
+                1/2
+              </button>
+              <button
+                type="button"
+                onClick={() => setStake(String(clampStake((Number(stake) || 0) * 2)))}
+                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+              >
+                2x
+              </button>
+              <button
+                type="button"
+                onClick={() => setStake(String(clampStake(balance)))}
+                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+              >
+                Max
+              </button>
             </div>
-          )}
-        </div>
-        <div className="panel rounded-2xl p-5 text-sm text-slate-400">
-          <p className="font-display text-sm font-bold text-white">Balance</p>
-          <p className="mt-1 font-display text-xl font-bold tabular-nums text-white">
-            {formatCrypto(shownBalance, decimals)} <span className="text-slate-400">{symbol}</span>
-          </p>
-          <p className="mt-3 text-xs text-slate-500">
-            Every tile is drawn from the committed seed at the start. One percent house edge.
-          </p>
-        </div>
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-sm">
+                <span className="font-semibold text-slate-300">Mines</span>
+                <span className="font-display font-bold text-white">{mineCount}</span>
+              </div>
+              <input
+                type="range"
+                min={1}
+                max={MINES_MAX}
+                value={mineCount}
+                onChange={(e) => setMineCount(Number(e.target.value))}
+                aria-label="Number of mines"
+                className="w-full accent-gold-500"
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                {mineCount} {mineCount === 1 ? "mine" : "mines"} hidden in {MINES_TILES} tiles.
+              </p>
+            </div>
+            <Button size="lg" className="w-full" disabled={busy || !stakeOk} onClick={start}>
+              {busy ? <Loader2 className="animate-spin" size={18} /> : done ? "Play again" : "Start round"}
+            </Button>
+            {done && (
+              <p className={cn("text-center text-sm font-semibold", done === "cashed" ? "text-emerald-300" : "text-red-300")}>
+                {done === "cashed"
+                  ? `Cashed out ${formatCrypto(payout, decimals)} ${symbol}`
+                  : `Busted. ${formatCrypto(stakeNum, decimals)} ${symbol} lost.`}
+              </p>
+            )}
+          </div>
+        )}
+
+        <p className="mt-4 border-t border-white/5 pt-3 text-xs text-slate-400">
+          Every tile is drawn from the committed seed at the start. Base 1% house edge, and site payout
+          settings can adjust the return.
+        </p>
       </div>
     </div>
   );

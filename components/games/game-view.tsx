@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
@@ -44,6 +45,8 @@ export function GameView({
   symbol,
   decimals,
   balance: initialBalance,
+  minBet = 0,
+  maxBet = 0,
 }: {
   id: string;
   name: string;
@@ -51,11 +54,14 @@ export function GameView({
   symbol: string;
   decimals: number;
   balance: number;
+  minBet?: number;
+  maxBet?: number;
 }) {
   const { push } = useToast();
   const [balance, setBalance] = useState(initialBalance);
   const [seed, setSeed] = useState<SeedView | null>(null);
-  const [stake, setStake] = useState("1");
+  const [seedState, setSeedState] = useState<"loading" | "ready" | "error">("loading");
+  const [stake, setStake] = useState(() => String(minBet > 0 ? minBet : 1));
   const [params, setParams] = useState<Record<string, unknown>>(() => DEFAULTS[id] ?? {});
   const [result, setResult] = useState<PlayResponse | null>(null);
   const [runId, setRunId] = useState(0);
@@ -71,6 +77,26 @@ export function GameView({
 
   const set = useCallback((patch: Record<string, unknown>) => setParams((p) => ({ ...p, ...patch })), []);
 
+  const stakeNum = Number(stake);
+  const belowMin = minBet > 0 && Number.isFinite(stakeNum) && stakeNum < minBet;
+  const aboveMax = maxBet > 0 && Number.isFinite(stakeNum) && stakeNum > maxBet;
+  const overBalance = Number.isFinite(stakeNum) && stakeNum > balance;
+  const valid = Number.isFinite(stakeNum) && stakeNum > 0 && !belowMin && !aboveMax && !overBalance;
+  const fmt = useMemo(() => (v: number) => formatCrypto(v, decimals), [decimals]);
+  const shownBalance = useCountUp(balance, 650);
+  const rounds = useMemo(() => bets.filter((b) => b.game === id), [bets, id]);
+
+  const clampStake = useCallback(
+    (n: number) => {
+      let v = Number.isFinite(n) && n > 0 ? n : minBet > 0 ? minBet : 0;
+      if (minBet > 0 && v < minBet) v = minBet;
+      if (maxBet > 0 && v > maxBet) v = maxBet;
+      if (balance > 0 && v > balance) v = balance;
+      return Number(v.toFixed(decimals));
+    },
+    [balance, decimals, maxBet, minBet]
+  );
+
   const loadHistory = useCallback(async () => {
     try {
       const res = await fetch("/api/games/history");
@@ -81,22 +107,26 @@ export function GameView({
     }
   }, []);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const res = await fetch("/api/games/seed");
-        const j = (await res.json()) as { ok: boolean; seed?: SeedView };
-        if (alive && j.ok && j.seed) setSeed(j.seed);
-      } catch {
-        /* seed panel will show loading */
+  const loadSeed = useCallback(async () => {
+    setSeedState("loading");
+    try {
+      const res = await fetch("/api/games/seed");
+      const j = (await res.json()) as { ok: boolean; seed?: SeedView };
+      if (j.ok && j.seed) {
+        setSeed(j.seed);
+        setSeedState("ready");
+      } else {
+        setSeedState("error");
       }
-    })();
+    } catch {
+      setSeedState("error");
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSeed();
     void loadHistory();
-    return () => {
-      alive = false;
-    };
-  }, [loadHistory]);
+  }, [loadSeed, loadHistory]);
 
   // Announce a win once the reels finish, not while they are still spinning.
   useEffect(() => {
@@ -104,15 +134,26 @@ export function GameView({
     const r = resultRef.current;
     resultRef.current = null;
     if (r && r.won && r.multiplier > 1) {
-      push(`Win ${formatCrypto(r.payout, decimals)} ${symbol} at ${r.multiplier}x`, "success");
+      push(`Win ${formatCrypto(r.payout, decimals)} ${symbol} at ${r.multiplier.toFixed(2)}x`, "success");
     }
   }, [spin.phase, push, decimals, symbol]);
 
   async function bet() {
     if (spinning || bettingRef.current) return;
-    const stakeNum = Number(stake);
     if (!Number.isFinite(stakeNum) || stakeNum <= 0) {
       push("Enter a stake above zero", "error");
+      return;
+    }
+    if (belowMin) {
+      push(`Minimum stake is ${fmt(minBet)} ${symbol}`, "error");
+      return;
+    }
+    if (aboveMax) {
+      push(`Maximum stake is ${fmt(maxBet)} ${symbol}`, "error");
+      return;
+    }
+    if (overBalance) {
+      push("Stake is above your balance", "error");
       return;
     }
     bettingRef.current = true;
@@ -146,11 +187,6 @@ export function GameView({
     }
   }
 
-  const stakeNum = Number(stake);
-  const valid = Number.isFinite(stakeNum) && stakeNum > 0;
-  const shownBalance = useCountUp(balance, 650);
-  const fmt = useMemo(() => (v: number) => formatCrypto(v, decimals), [decimals]);
-
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="space-y-6">
@@ -171,14 +207,52 @@ export function GameView({
                 step="any"
                 value={stake}
                 onChange={(e) => setStake(e.target.value)}
+                aria-invalid={belowMin || aboveMax || overBalance}
+                aria-describedby="stake-help"
                 className="h-11 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 text-sm text-slate-100 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25"
               />
+              <p
+                id="stake-help"
+                className={cn(
+                  "mt-1.5 text-xs",
+                  belowMin || aboveMax || overBalance ? "text-red-300" : "text-slate-400"
+                )}
+              >
+                {balance <= 0 ? (
+                  <>
+                    No balance to stake.{" "}
+                    <Link
+                      href="/#plans"
+                      className="font-semibold text-gold-300 underline underline-offset-2 hover:text-gold-200"
+                    >
+                      View plans
+                    </Link>
+                    .
+                  </>
+                ) : belowMin ? (
+                  `Minimum stake is ${fmt(minBet)} ${symbol}.`
+                ) : aboveMax ? (
+                  `Maximum stake is ${fmt(maxBet)} ${symbol}.`
+                ) : overBalance ? (
+                  "Stake is above your balance."
+                ) : minBet > 0 || maxBet > 0 ? (
+                  `Allowed ${minBet > 0 ? fmt(minBet) : "0"} to ${maxBet > 0 ? fmt(maxBet) : "no cap"} ${symbol}.`
+                ) : (
+                  `Balance ${fmt(balance)} ${symbol}.`
+                )}
+              </p>
             </div>
-            <Button size="lg" disabled={spinning || !valid} onClick={bet} className="sm:w-40">
+            <Button
+              size="lg"
+              disabled={spinning || !valid}
+              onClick={bet}
+              className="sm:w-40"
+              aria-busy={spinning}
+            >
               {spinning ? <Loader2 className="animate-spin" size={18} /> : `Bet ${valid ? formatCrypto(stakeNum, decimals) : ""}`}
             </Button>
           </div>
-          <div className="mt-3 flex items-center justify-between text-sm">
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm">
             <span className="text-slate-400">
               Balance{" "}
               <span className="font-display font-bold tabular-nums text-white">
@@ -188,22 +262,22 @@ export function GameView({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setStake((s) => String(Math.max(0, Number(s) / 2 || 0)))}
-                className="tap rounded-lg bg-ink-900/80 px-3 py-1 text-xs font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white"
+                onClick={() => setStake(String(clampStake((Number(stake) || 0) / 2)))}
+                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
               >
                 1/2
               </button>
               <button
                 type="button"
-                onClick={() => setStake((s) => String(Number(s) * 2 || 0))}
-                className="tap rounded-lg bg-ink-900/80 px-3 py-1 text-xs font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white"
+                onClick={() => setStake(String(clampStake((Number(stake) || 0) * 2)))}
+                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
               >
                 2x
               </button>
               <button
                 type="button"
-                onClick={() => setStake(String(balance))}
-                className="tap rounded-lg bg-ink-900/80 px-3 py-1 text-xs font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white"
+                onClick={() => setStake(String(clampStake(balance)))}
+                className="tap inline-flex h-11 min-w-11 items-center justify-center rounded-lg bg-ink-900/80 px-3 text-xs font-semibold text-slate-300 ring-1 ring-white/10 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
               >
                 Max
               </button>
@@ -220,7 +294,7 @@ export function GameView({
               )}
             >
               {result.won
-                ? `Won ${fmt(result.payout)} ${symbol} at ${result.multiplier}x`
+                ? `Won ${fmt(result.payout)} ${symbol} at ${result.multiplier.toFixed(2)}x`
                 : `No win this round, ${fmt(result.stake)} ${symbol} staked.`}
             </div>
           )}
@@ -228,24 +302,36 @@ export function GameView({
       </div>
 
       <div className="space-y-4">
-        <SeedManager seed={seed} onSeed={setSeed} />
+        <SeedManager seed={seed} state={seedState} onSeed={setSeed} onRetry={loadSeed} />
         <div className="panel rounded-2xl p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-sm font-bold text-white">{name} history</h2>
-            <span className="text-xs text-slate-500">Last 25</span>
+            <span className="text-xs text-slate-400">Recent</span>
           </div>
-          <p className="mb-3 text-xs text-slate-500">{blurb}</p>
+          <p className="mb-3 text-xs text-slate-400">{blurb}</p>
           <ul className="space-y-1.5">
-            {bets.length === 0 && <li className="text-xs text-slate-500">No rounds yet.</li>}
-            {bets.map((b) => (
+            {rounds.length === 0 && (
+              <li className="rounded-lg border border-dashed border-slate-800 px-3 py-4 text-xs text-slate-400">
+                No rounds here yet. Your first bet lands in this list.
+              </li>
+            )}
+            {rounds.map((b) => (
               <li key={b.id} className="flex items-center justify-between gap-2 rounded-lg bg-ink-900/60 px-3 py-2 text-xs">
-                <span className="flex-1 truncate text-slate-400">
-                  {b.game} <span className="text-slate-600">#{b.nonce}</span>
+                <span className="flex-1 truncate text-slate-300">
+                  #{b.nonce}
                 </span>
                 <span className={cn("font-display font-bold", b.won ? "text-emerald-300" : "text-slate-400")}>
                   {b.multiplier.toFixed(2)}x
                 </span>
-                <span className="w-20 text-right tabular-nums text-slate-300">{formatCrypto(b.payout, decimals)}</span>
+                <span
+                  className={cn(
+                    "w-24 text-right font-mono tabular-nums",
+                    b.won ? "text-emerald-300" : "text-slate-400"
+                  )}
+                >
+                  {b.won ? "+" : "-"}
+                  {formatCrypto(b.won ? b.payout : b.stake, decimals)}
+                </span>
               </li>
             ))}
           </ul>

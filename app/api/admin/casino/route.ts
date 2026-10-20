@@ -6,7 +6,7 @@ import { getAdminSettings } from "@/lib/settings";
 import { recordAudit } from "@/lib/audit";
 import { GAME_CATALOG } from "@/lib/games/registry";
 import { MAX_EDGE } from "@/lib/games/econ";
-import { casinoStats } from "@/lib/games/stats";
+import { casinoStats, casinoStatsByGame } from "@/lib/games/stats";
 
 export const dynamic = "force-dynamic";
 
@@ -37,11 +37,20 @@ export async function GET() {
 
   const settings = await getAdminSettings();
   const now = Date.now();
-  const [day, week] = await Promise.all([
-    casinoStats(new Date(now - 864e5)),
-    casinoStats(new Date(now - 7 * 864e5)),
+  const daySince = new Date(now - 864e5);
+  const weekSince = new Date(now - 7 * 864e5);
+  const [day, week, dayByGame, weekByGame] = await Promise.all([
+    casinoStats(daySince),
+    casinoStats(weekSince),
+    casinoStatsByGame(daySince),
+    casinoStatsByGame(weekSince),
   ]);
-  return NextResponse.json({ ok: true, settings, stats: { day, week } });
+  return NextResponse.json({
+    ok: true,
+    settings,
+    stats: { day, week },
+    byGame: { day: dayByGame, week: weekByGame },
+  });
 }
 
 export async function POST(req: Request) {

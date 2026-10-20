@@ -11,6 +11,14 @@ type Override = { edge?: number; maxWin?: number; min?: number; max?: number };
 type Tier = { id: string; name: string; minWager: number; edge?: number; maxWin?: number };
 type Schedule = { enabled: boolean; startHour: number; endHour: number; edgeDelta: number };
 type Stat = { bets: number; wagers: number; payouts: number; hold: number; rtp: number };
+type ProfitRow = {
+  game: string;
+  bets: number;
+  wagers: number;
+  payouts: number;
+  profit: number;
+  hold: number;
+};
 
 type Initial = {
   enabled: boolean;
@@ -39,12 +47,18 @@ const field =
   "h-11 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 text-sm text-slate-100 placeholder:text-slate-400 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25";
 
 function money(n: number, code: string): string {
-  if (!Number.isFinite(n)) return "—";
+  if (!Number.isFinite(n)) return "-";
   return `${n.toLocaleString("en-US", { maximumFractionDigits: 8 })} ${code}`;
 }
 
+function signedMoney(n: number, code: string): string {
+  if (!Number.isFinite(n)) return "-";
+  const sign = n > 0 ? "+" : n < 0 ? "-" : "";
+  return `${sign}${money(Math.abs(n), code)}`;
+}
+
 function pct(n: number): string {
-  if (!Number.isFinite(n)) return "—";
+  if (!Number.isFinite(n)) return "-";
   return `${(n * 100).toFixed(1)}%`;
 }
 
@@ -86,7 +100,7 @@ function StatBlock({ title, stat, code }: { title: string; stat: Stat; code: str
         <div>
           <p className="text-[11px] text-slate-400">Hold</p>
           <p className={cn("font-display font-semibold", stat.hold >= 0 ? "text-emerald-300" : "text-red-300")}>
-            {stat.wagers > 0 ? pct(stat.hold) : "—"}
+            {stat.wagers > 0 ? pct(stat.hold) : "-"}
           </p>
         </div>
         <div>
@@ -107,13 +121,17 @@ export function CasinoControl({
   games,
   currencyCode,
   stats,
+  byGame,
 }: {
   initial: Initial;
   games: { id: string; name: string }[];
   currencyCode: string;
   stats: { day: Stat; week: Stat };
+  byGame: { day: ProfitRow[]; week: ProfitRow[] };
 }) {
   const { run, busy } = useAdminAction();
+
+  const [profitWindow, setProfitWindow] = useState<"day" | "week">("day");
 
   const [enabled, setEnabled] = useState(initial.enabled);
   const [minBet, setMinBet] = useState(initial.minBet);
@@ -202,6 +220,19 @@ export function CasinoControl({
     void run("/api/admin/casino", payload, { success: "Casino controls saved" });
   }
 
+  const profitSource = byGame[profitWindow] ?? [];
+  const profitById = new Map(profitSource.map((p) => [p.game, p]));
+  const profitRows = games
+    .map((g) => ({ id: g.id, name: g.name, row: profitById.get(g.id) }))
+    .sort((a, b) => (b.row?.profit ?? 0) - (a.row?.profit ?? 0));
+  const profitTotals = { bets: 0, wagers: 0, profit: 0 };
+  for (const p of profitSource) {
+    profitTotals.bets += p.bets;
+    profitTotals.wagers += p.wagers;
+    profitTotals.profit += p.profit;
+  }
+  const holdPct = profitTotals.wagers > 0 ? profitTotals.profit / profitTotals.wagers : 0;
+
   return (
     <div className="space-y-6">
       <div className="panel flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4">
@@ -226,6 +257,84 @@ export function CasinoControl({
         <StatBlock title="Last 24 hours" stat={stats.day} code={currencyCode} />
         <StatBlock title="Last 7 days" stat={stats.week} code={currencyCode} />
       </div>
+
+      <section className="panel rounded-2xl p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-display text-base font-semibold text-white">Owner profit by game</h2>
+            <p className="mt-1 text-xs text-slate-400">
+              Wagers minus payouts for rounds settled in the window. Games with no rounds show zero.
+            </p>
+          </div>
+          <div className="inline-flex rounded-xl border border-slate-700 p-1" role="group" aria-label="Profit window">
+            {(["day", "week"] as const).map((w) => (
+              <button
+                key={w}
+                type="button"
+                aria-pressed={profitWindow === w}
+                onClick={() => setProfitWindow(w)}
+                className={cn(
+                  "tap h-11 rounded-lg px-4 text-xs font-semibold transition-colors",
+                  profitWindow === w ? "bg-gold-500/15 text-gold-200" : "text-slate-400 hover:text-slate-200"
+                )}
+              >
+                {w === "day" ? "24 hours" : "7 days"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-baseline gap-x-6 gap-y-1 border-t border-white/10 pt-3">
+          <span
+            className={cn(
+              "font-display text-lg font-semibold",
+              profitTotals.profit >= 0 ? "text-emerald-300" : "text-red-300"
+            )}
+          >
+            {signedMoney(profitTotals.profit, currencyCode)}
+          </span>
+          <span className="font-mono text-xs text-slate-400">
+            {profitTotals.bets.toLocaleString("en-US")} rounds, {money(profitTotals.wagers, currencyCode)} wagered
+          </span>
+          <span className="font-mono text-xs text-slate-400">
+            {profitTotals.wagers > 0 ? `${pct(holdPct)} hold` : "no hold yet"}
+          </span>
+        </div>
+
+        {profitTotals.bets === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-slate-800 p-4 text-sm text-slate-400">
+            No rounds in this window. Profit appears here as players bet.
+          </p>
+        ) : (
+          <ul className="mt-2">
+            {profitRows.map(({ id, name, row }) => {
+              const bets = row?.bets ?? 0;
+              const profit = row?.profit ?? 0;
+              const hold = row?.hold ?? 0;
+              return (
+                <li key={id} className="border-t border-white/5 py-3 first:border-t-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className={cn("text-sm", bets > 0 ? "text-slate-200" : "text-slate-400")}>{name}</span>
+                    <span
+                      className={cn(
+                        "font-mono text-sm",
+                        profit > 0 ? "text-emerald-300" : profit < 0 ? "text-red-300" : "text-slate-400"
+                      )}
+                    >
+                      {bets > 0 ? signedMoney(profit, currencyCode) : "-"}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px] text-slate-400">
+                    <span>{bets.toLocaleString("en-US")} rounds</span>
+                    <span>{money(row?.wagers ?? 0, currencyCode)} wagered</span>
+                    <span>{bets > 0 ? `${pct(hold)} hold` : "no activity"}</span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
       <section className="panel rounded-2xl p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">

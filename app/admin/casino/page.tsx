@@ -1,6 +1,6 @@
 import { getAdminSettings } from "@/lib/settings";
 import { GAME_CATALOG } from "@/lib/games/registry";
-import { casinoStats } from "@/lib/games/stats";
+import { casinoStats, casinoStatsByGame } from "@/lib/games/stats";
 import { parseConfig, parseSchedule, parseTiers } from "@/lib/games/econ";
 import { CasinoControl } from "@/components/admin/casino-control";
 
@@ -10,9 +10,13 @@ export const metadata = { title: "Casino control" };
 export default async function AdminCasino() {
   const settings = await getAdminSettings();
   const now = Date.now();
-  const [day, week] = await Promise.all([
-    casinoStats(new Date(now - 864e5)),
-    casinoStats(new Date(now - 7 * 864e5)),
+  const daySince = new Date(now - 864e5);
+  const weekSince = new Date(now - 7 * 864e5);
+  const [day, week, dayByGame, weekByGame] = await Promise.all([
+    casinoStats(daySince),
+    casinoStats(weekSince),
+    casinoStatsByGame(daySince),
+    casinoStatsByGame(weekSince),
   ]);
 
   return (
@@ -34,6 +38,7 @@ export default async function AdminCasino() {
       games={GAME_CATALOG.map((g) => ({ id: g.id, name: g.name }))}
       currencyCode={settings.currency_code}
       stats={{ day, week }}
+      byGame={{ day: dayByGame, week: weekByGame }}
     />
   );
 }

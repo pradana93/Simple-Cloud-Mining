@@ -43,6 +43,11 @@ Lucide, chosen per meaning and noted inline where it is not obvious: `Pickaxe` f
 
 The mark is an agent-authored placeholder: a pick-and-rule monogram in a gold tile, plus an `app/icon.svg`. Replace it with the owner's real logo when available (antislop R-23).
 
+## Casino
+
+- The lobby groups games by pace (one press, choose and spin, round by round) because a player picks by session length, not by the category label.
+- Admin > Casino reports owner profit per game because the operator needs to know which table earns, not only the site total.
+
 ## What we said no to
 
 Decorative grid backgrounds, radial orb glows, glassmorphism on every surface, infinite marquee and pulse loops, large soft shadows on every card, and uppercase-tracked eyebrow pills above headlines.

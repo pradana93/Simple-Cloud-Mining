@@ -36,7 +36,7 @@ function Seg({
           type="button"
           onClick={() => onChange(o.value)}
           className={cn(
-            "tap rounded-lg px-3 py-1.5 text-sm font-semibold",
+            "tap inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400",
             value === o.value ? "bg-gold-500 text-ink-950" : "text-slate-300 hover:text-white"
           )}
         >
@@ -66,7 +66,7 @@ function Preview({ chance, mult }: { chance: number; mult: number }) {
       <span className="text-slate-400">
         Win chance <span className="font-display font-bold text-white">{chance.toFixed(2)}%</span>
       </span>
-      <span className="text-slate-600">/</span>
+      <span className="text-slate-400">/</span>
       <span className="text-slate-400">
         Payout <span className="font-display font-bold text-gold-300">{mult.toFixed(2)}x</span>
       </span>
@@ -114,7 +114,7 @@ function DiceBoard({ params, set, last, spin }: BoardProps) {
             >
               {active ? shown.toFixed(2) : "00.00"}
             </div>
-            <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+            <div className="mt-1 text-xs uppercase tracking-wide text-slate-400">
               {mode === "under" ? "roll under" : "roll over"} {target.toFixed(2)}
             </div>
           </div>
@@ -171,7 +171,7 @@ function TargetBoard({ id, params, set, last, spin }: BoardProps) {
               key={m}
               type="button"
               onClick={() => set({ target: m })}
-              className="tap rounded-lg bg-ink-900/80 px-3 py-1.5 text-sm font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white"
+              className="tap inline-flex min-h-11 items-center rounded-lg bg-ink-900/80 px-3 text-sm font-semibold text-slate-300 ring-1 ring-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
             >
               {m}x
             </button>
@@ -194,7 +194,7 @@ function TargetBoard({ id, params, set, last, spin }: BoardProps) {
               style={{ width: `${pct}%` }}
             />
           </div>
-          <div className="mt-2 flex justify-between text-xs text-slate-500">
+          <div className="mt-2 flex justify-between text-xs text-slate-400">
             <span>1.00x</span>
             <span>{ceiling.toFixed(2)}x</span>
           </div>
@@ -420,7 +420,7 @@ function KenoBoard({ params, set, last, spin }: BoardProps) {
         )}
       </p>
       <Stage className="place-items-stretch">
-        <div className="grid grid-cols-8 gap-1.5 self-center sm:grid-cols-10">
+        <div className="grid grid-cols-5 gap-1.5 self-center sm:grid-cols-10">
           {Array.from({ length: 40 }, (_, i) => i + 1).map((n) => {
             const picked = picks.includes(n);
             const hit = shown.includes(n);
@@ -430,13 +430,13 @@ function KenoBoard({ params, set, last, spin }: BoardProps) {
                 type="button"
                 onClick={() => toggle(n)}
                 className={cn(
-                  "tap aspect-square rounded-lg text-xs font-bold ring-1",
+                  "tap aspect-square min-h-11 rounded-lg text-xs font-bold ring-1",
                   hit
                     ? "animate-pop bg-emerald-500 text-ink-950 ring-emerald-400"
                     : picked
                       ? "bg-gold-500 text-ink-950 ring-gold-500"
                       : spin.phase === "spin"
-                        ? "bg-ink-900/70 text-slate-500 ring-white/10"
+                        ? "bg-ink-900/70 text-slate-400 ring-white/10"
                         : "bg-ink-900/70 text-slate-300 ring-white/10 hover:text-white"
                 )}
               >
@@ -541,7 +541,7 @@ function RouletteBoard({ params, set, last, spin }: BoardProps) {
           <p className="mb-2 text-sm text-slate-400">
             Straight number <span className="font-display font-bold text-white">{number}</span>
           </p>
-          <div className="grid grid-cols-9 gap-1.5">
+          <div className="grid grid-cols-6 gap-1.5 sm:grid-cols-9">
             {Array.from({ length: 37 }, (_, n) => {
               const color = pocketColor(n);
               return (
@@ -550,7 +550,7 @@ function RouletteBoard({ params, set, last, spin }: BoardProps) {
                   type="button"
                   onClick={() => set({ number: n })}
                   className={cn(
-                    "tap aspect-square rounded-lg text-xs font-bold ring-1",
+                    "tap aspect-square min-h-11 rounded-lg text-xs font-bold ring-1",
                     color === "red" && "bg-red-600/80 text-white ring-red-500/50",
                     color === "black" && "bg-ink-950 text-white ring-white/20",
                     color === "green" && "bg-emerald-600/80 text-white ring-emerald-500/50",

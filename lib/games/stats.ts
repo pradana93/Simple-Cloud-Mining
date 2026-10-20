@@ -11,6 +11,43 @@ export type CasinoStat = {
   rtp: number;
 };
 
+export type GameProfit = {
+  game: string;
+  bets: number;
+  wagers: number;
+  payouts: number;
+  profit: number;
+  hold: number;
+};
+
+export async function casinoStatsByGame(since: Date): Promise<GameProfit[]> {
+  try {
+    const { data } = await createAdminSupabase().rpc("game_stats_by_game", {
+      p_since: since.toISOString(),
+    });
+    const rows = Array.isArray(data) ? data : [];
+    const out: GameProfit[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i] as Record<string, unknown>;
+      const wagers = Number(r.total_wager ?? 0) || 0;
+      const payouts = Number(r.total_payout ?? 0) || 0;
+      const profit = wagers - payouts;
+      out.push({
+        game: String(r.game ?? ""),
+        bets: Number(r.bet_count ?? 0) || 0,
+        wagers,
+        payouts,
+        profit,
+        hold: wagers > 0 ? profit / wagers : 0,
+      });
+    }
+    out.sort((a, b) => b.profit - a.profit);
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export async function casinoStats(since: Date): Promise<CasinoStat> {
   try {
     const { data } = await createAdminSupabase().rpc("game_stats", { p_since: since.toISOString() });

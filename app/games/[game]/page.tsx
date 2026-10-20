@@ -19,7 +19,8 @@ export function generateMetadata({ params }: { params: { game: string } }) {
 export default async function GamePage({ params }: { params: { game: string } }) {
   const meta = gameMeta(params.game);
   const s = await getCachedSettings();
-  if (!meta || !s.games_enabled || isGameDisabled(casinoEcon(s), params.game)) notFound();
+  const econ = casinoEcon(s);
+  if (!meta || !s.games_enabled || isGameDisabled(econ, params.game)) notFound();
 
   const supabase = createServerSupabase();
   const {
@@ -37,19 +38,28 @@ export default async function GamePage({ params }: { params: { game: string } })
   return (
     <div className="space-y-6 py-8 sm:py-10">
       <div>
-        <Link href="/games" className="inline-flex items-center gap-1 text-sm text-slate-400 hover:text-white">
+        <Link
+          href="/games"
+          className="inline-flex min-h-11 items-center gap-1 rounded-lg pr-2 text-sm text-slate-400 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+        >
           <ChevronLeft size={16} /> All games
         </Link>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <h1 className="font-display text-3xl font-bold text-white">{meta.name}</h1>
           <Badge variant="gold">{meta.category}</Badge>
-          <span className="text-xs font-semibold text-emerald-300">{meta.edge}</span>
+          <span className="text-xs font-semibold text-slate-400">{meta.edge}</span>
         </div>
         <p className="mt-2 max-w-2xl text-slate-400">{meta.blurb}</p>
       </div>
 
       {meta.interactive ? (
-        <MinesView symbol={s.currency_symbol} decimals={s.currency_decimals} balance={balance} />
+        <MinesView
+          symbol={s.currency_symbol}
+          decimals={s.currency_decimals}
+          balance={balance}
+          minBet={econ.minBet}
+          maxBet={econ.maxBet}
+        />
       ) : (
         <GameView
           id={meta.id}
@@ -58,6 +68,8 @@ export default async function GamePage({ params }: { params: { game: string } })
           symbol={s.currency_symbol}
           decimals={s.currency_decimals}
           balance={balance}
+          minBet={econ.minBet}
+          maxBet={econ.maxBet}
         />
       )}
     </div>
