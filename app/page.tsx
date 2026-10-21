@@ -74,7 +74,7 @@ export default async function HomePage() {
             <Metric label="Hashrate plans">
               <CountUp value={plans.length} />
             </Metric>
-            <Metric label={`Completed payouts (${cfg.mode === "fiat" ? cfg.fiatCurrency : cfg.code})`}>
+            <Metric label="Paid out">
               <CountUp value={stats.totalPaid} decimals={s.currency_decimals} cfg={cfg} />
             </Metric>
             <Metric label="Members">

@@ -24,7 +24,7 @@ function statusLabel(row: Row): string {
 
 function statusVariant(row: Row): "green" | "gold" | "red" | "slate" {
   const status = String(row.status ?? "").toUpperCase();
-  if (row.kind === "in") return status === "SUCCESS" ? "green" : "gold";
+  if (row.kind === "in") return status === "SUCCESS" ? "green" : status === "CANCELED" ? "red" : "gold";
   if (status === "SUCCESS") return "green";
   if (status === "CANCELED") return "red";
   if (status === "PROCESSING") return "gold";

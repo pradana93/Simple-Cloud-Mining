@@ -21,10 +21,17 @@ export default async function PayoutsPage() {
           <h1 className="font-display text-3xl font-bold text-white sm:text-5xl">Payout history</h1>
           <p className="mt-3 text-slate-400">
             Deposits and withdrawal requests, with their current status.{" "}
-            <span className="font-semibold text-gold-300">
-              <CountUp value={stats.totalPaid} decimals={s.currency_decimals} cfg={cfg} /> {moneyUnit(cfg)}
-            </span>{" "}
-            completed payouts so far.
+            {stats.totalPaid > 0 ? (
+              <>
+                <span className="font-semibold text-gold-300">
+                  <CountUp value={stats.totalPaid} decimals={s.currency_decimals} cfg={cfg} />{" "}
+                  {moneyUnit(cfg)}
+                </span>{" "}
+                completed payouts so far.
+              </>
+            ) : (
+              "No completed payouts yet."
+            )}
           </p>
           <p className="mt-3 text-sm leading-relaxed text-slate-400">
             Withdrawals are reviewed and paid by hand. Canceled requests stay visible for
@@ -33,13 +40,20 @@ export default async function PayoutsPage() {
         </div>
       </Reveal>
       <Reveal delay={80}>
-        <PayoutFeed
-          deposits={deposits}
-          withdrawals={withdrawals}
-          currencyCode={s.currency_code}
-          decimals={s.currency_decimals}
-          cfg={cfg}
-        />
+        <div className="space-y-3">
+          <PayoutFeed
+            deposits={deposits}
+            withdrawals={withdrawals}
+            currencyCode={s.currency_code}
+            decimals={s.currency_decimals}
+            cfg={cfg}
+          />
+          <p className="text-xs leading-relaxed text-slate-400">
+            Paid means the withdrawal was completed. Pending review means it is waiting for manual
+            approval. Canceled means the amount was returned to the member and is not counted as a
+            payout.
+          </p>
+        </div>
       </Reveal>
     </div>
   );
