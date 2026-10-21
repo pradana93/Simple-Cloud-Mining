@@ -63,8 +63,7 @@ job alerts when stored balances drift from the append-only ledger.
   balances, withdrawals and invoices can only change through the service-role
   API routes.
 - `022_security_payout_atomicity.sql` adds atomic withdrawal settlement and
-  payout claiming, and locks the legacy CMS tables. Apply every migration in
-  order.
+  locks the legacy CMS tables. Apply every migration in order.
 - Admin API routes require TOTP enrollment plus a fresh authenticator code.
   Enroll before relying on admin tools.
 - Set the Supabase Auth site URL and redirect allow-list to the production
