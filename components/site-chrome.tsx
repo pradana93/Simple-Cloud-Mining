@@ -24,6 +24,7 @@ export async function SiteHeader() {
 
 export async function SiteFooter() {
   const s = await getCachedSettings();
+  const slogan = s.siteslogan.trim().replace(/[.\s]+$/, "");
   return (
     <footer className="mt-20 border-t border-white/10">
       <div className="mx-auto grid w-full max-w-6xl gap-10 px-4 py-12 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr]">
@@ -33,7 +34,7 @@ export async function SiteFooter() {
             <span className="font-display text-lg font-bold text-white">{s.sitename}</span>
           </div>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-slate-400">
-            {s.siteslogan}. Buy {s.currency_name} ({s.currency_code}) hashrate, watch it accrue, and
+            {slogan}. Buy {s.currency_name} ({s.currency_code}) hashrate, watch it accrue, and
             withdraw on-chain.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-400">
