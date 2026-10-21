@@ -69,7 +69,8 @@ job alerts when stored balances drift from the append-only ledger.
 - Set the Supabase Auth site URL and redirect allow-list to the production
   domain, including `/reset-password`, so email reset links work.
 - Set at least one CryptAPI receiving address in Admin > Settings > Payments or
-  via `CRYPTAPI_*_ADDRESS`. The checkout hides coins without an address, and the
-  webhook verifies CryptAPI's RSA signature.
+  via `CRYPTAPI_*_ADDRESS`. The checkout hides coins without an address. USDT
+  TRC20 needs its own address, separate from the TRX address. The webhook
+  verifies CryptAPI's RSA signature.
 - Backups are encrypted locally. Set `BACKUP_UPLOAD_URL` (and optional
   `BACKUP_UPLOAD_TOKEN`) to copy each backup offsite.
