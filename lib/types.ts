@@ -117,6 +117,12 @@ export type SiteSettings = {
   price_currency: string;
   coin_cur1: string;
   coin_cur2: string;
+  cryptapi_btc_address: string | null;
+  cryptapi_ltc_address: string | null;
+  cryptapi_doge_address: string | null;
+  cryptapi_eth_address: string | null;
+  cryptapi_trx_address: string | null;
+  cryptapi_usdt_trc20_address: string | null;
   smtp_host: string | null;
   smtp_user: string | null;
   smtp_pass: string | null;

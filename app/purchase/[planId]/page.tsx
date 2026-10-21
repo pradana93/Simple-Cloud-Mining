@@ -13,7 +13,7 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
   const { planId } = await params;
   const s = await getCachedSettings();
   const cfg = await getMoneyCfg();
-  const coins = availableCoins(s.pay_coins);
+  const coins = availableCoins(s.pay_coins, s);
   type PurchasePlan = { id: number; plan_name: string; price: number; version: string | null; point_per_day: number | null; duration: number };
   let plan: PurchasePlan | null = null;
   try {

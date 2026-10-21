@@ -1,6 +1,12 @@
 import crypto from "crypto";
 import { describe, expect, it } from "vitest";
-import { amountCovers, isConfirmed, parseCryptapiWebhook, verifyCryptapiSignature } from "@/lib/cryptapi";
+import {
+  amountCovers,
+  isConfirmed,
+  parseCryptapiWebhook,
+  paymentAddress,
+  verifyCryptapiSignature,
+} from "@/lib/cryptapi";
 import { cryptoTicker } from "@/lib/checkout";
 
 describe("cryptoTicker", () => {
@@ -13,6 +19,18 @@ describe("cryptoTicker", () => {
   it("rejects unsupported coins", () => {
     expect(cryptoTicker("FOO")).toBeNull();
     expect(cryptoTicker(null)).toBeNull();
+  });
+});
+
+describe("paymentAddress", () => {
+  it("falls back to the settings row", () => {
+    expect(paymentAddress("DOGE", { cryptapi_doge_address: "DBXBMFbdMD7ViGExxeHNbSqdpbNEpWT1Mq" })).toBe(
+      "DBXBMFbdMD7ViGExxeHNbSqdpbNEpWT1Mq"
+    );
+  });
+
+  it("returns null when neither source is configured", () => {
+    expect(paymentAddress("DOGE", { cryptapi_doge_address: null })).toBeNull();
   });
 });
 

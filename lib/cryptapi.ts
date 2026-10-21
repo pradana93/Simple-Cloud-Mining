@@ -18,6 +18,24 @@ const ADDRESS_ENV: Record<string, string[]> = {
   USDT: ["CRYPTAPI_USDT_TRC20_ADDRESS", "CRYPTAPI_USDT_ADDRESS"],
 };
 
+const ADDRESS_DB: Record<string, keyof PaymentAddresses> = {
+  BTC: "cryptapi_btc_address",
+  DOGE: "cryptapi_doge_address",
+  LTC: "cryptapi_ltc_address",
+  ETH: "cryptapi_eth_address",
+  TRX: "cryptapi_trx_address",
+  USDT: "cryptapi_usdt_trc20_address",
+};
+
+export type PaymentAddresses = {
+  cryptapi_btc_address: string | null;
+  cryptapi_ltc_address: string | null;
+  cryptapi_doge_address: string | null;
+  cryptapi_eth_address: string | null;
+  cryptapi_trx_address: string | null;
+  cryptapi_usdt_trc20_address: string | null;
+};
+
 export type CryptapiPayment = {
   addressIn: string;
   minimum: number;
@@ -33,20 +51,29 @@ export type CryptapiWebhook = {
   pending: number;
 };
 
-export function paymentAddress(coin: string): string | null {
-  for (const name of ADDRESS_ENV[coin.toUpperCase()] ?? []) {
+export function paymentAddress(
+  coin: string,
+  settings?: Partial<PaymentAddresses> | null
+): string | null {
+  const code = coin.toUpperCase();
+  for (const name of ADDRESS_ENV[code] ?? []) {
     const value = process.env[name]?.trim();
     if (value) return value;
   }
-  return null;
+  const key = ADDRESS_DB[code];
+  const value = key ? settings?.[key]?.trim() : "";
+  return value || null;
 }
 
-export function availableCoins(csv: string | null | undefined): PayCoin[] {
-  return coinOptions(csv).filter((coin) => Boolean(paymentAddress(coin.code)));
+export function availableCoins(
+  csv: string | null | undefined,
+  settings?: Partial<PaymentAddresses> | null
+): PayCoin[] {
+  return coinOptions(csv).filter((coin) => Boolean(paymentAddress(coin.code, settings)));
 }
 
-function requiredAddress(coin: string): string {
-  const address = paymentAddress(coin);
+function requiredAddress(coin: string, settings?: Partial<PaymentAddresses> | null): string {
+  const address = paymentAddress(coin, settings);
   if (!address) throw new Error(`CryptAPI receiving address is not configured for ${coin}.`);
   return address;
 }
@@ -83,10 +110,11 @@ export async function createPayment(opts: {
   coin: string;
   callbackUrl: string;
   confirmations: number;
+  settings?: Partial<PaymentAddresses> | null;
 }): Promise<CryptapiPayment> {
   const ticker = requiredTicker(opts.coin);
   const url = `${API_BASE}/${ticker}/create/?${new URLSearchParams({
-    address: requiredAddress(opts.coin),
+    address: requiredAddress(opts.coin, opts.settings),
     callback: opts.callbackUrl,
     pending: "1",
     confirmations: String(Math.max(1, Math.min(12, Math.trunc(opts.confirmations)))),

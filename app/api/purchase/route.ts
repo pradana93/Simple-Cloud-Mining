@@ -48,7 +48,7 @@ export async function POST(req: Request) {
   }
   const payCoin = (coin as string).trim().toUpperCase();
   const ticker = cryptoTicker(payCoin);
-  if (!ticker || !paymentAddress(payCoin)) {
+  if (!ticker || !paymentAddress(payCoin, settings)) {
     return NextResponse.json({ ok: false, error: `${payCoin} checkout is not configured.` }, { status: 503 });
   }
 
@@ -95,6 +95,7 @@ export async function POST(req: Request) {
       coin: payCoin,
       callbackUrl: `${baseUrl}/api/webhooks/cryptapi?invoice=${hash}`,
       confirmations: Number(settings.blockchain) || 1,
+      settings,
     });
   } catch (e) {
     const message = e instanceof Error ? e.message : "CryptAPI checkout failed.";

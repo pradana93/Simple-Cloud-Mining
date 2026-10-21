@@ -68,7 +68,8 @@ job alerts when stored balances drift from the append-only ledger.
   Enroll before relying on admin tools.
 - Set the Supabase Auth site URL and redirect allow-list to the production
   domain, including `/reset-password`, so email reset links work.
-- Set at least one `CRYPTAPI_*_ADDRESS` in production. The checkout hides coins
-  without a receiving address, and the webhook verifies CryptAPI's RSA signature.
+- Set at least one CryptAPI receiving address in Admin > Settings > Payments or
+  via `CRYPTAPI_*_ADDRESS`. The checkout hides coins without an address, and the
+  webhook verifies CryptAPI's RSA signature.
 - Backups are encrypted locally. Set `BACKUP_UPLOAD_URL` (and optional
   `BACKUP_UPLOAD_TOKEN`) to copy each backup offsite.

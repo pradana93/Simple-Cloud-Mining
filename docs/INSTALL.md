@@ -212,7 +212,7 @@ scheduler, sending `Authorization: Bearer YOUR_CRON_SECRET`:
 ## 10. CryptAPI setup
 
 CryptAPI needs no account, API key, or KYC. Add at least one public receiving
-address to the host environment:
+address in **Admin > Settings > Payments** (or use these environment overrides):
 
 ```
 CRYPTAPI_BTC_ADDRESS=...
@@ -224,9 +224,10 @@ CRYPTAPI_USDT_TRC20_ADDRESS=...
 ```
 
 The app creates a unique deposit address per invoice and passes
-`https://YOUR-DOMAIN/api/webhooks/cryptapi` as the callback. Do not put a wallet
-private key anywhere in the app. Withdrawals are manual: send from your wallet,
-then record the txid in Admin > Withdrawals.
+`https://YOUR-DOMAIN/api/webhooks/cryptapi` as the callback. USDT TRC20 needs a
+different receiving address from TRX. Do not put a wallet private key anywhere
+in the app. Withdrawals are manual: send from your wallet, then record the txid
+in Admin > Withdrawals.
 
 ## 11. Go-live checklist
 

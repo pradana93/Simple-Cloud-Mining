@@ -112,6 +112,12 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
     fields: [
       { key: "pay_coins", label: "Buyer coin options", type: "text", maxLength: 191, help: "Comma separated coins the buyer can pick at checkout: BTC,DOGE,LTC,ETH,USDT,TRX. USDT uses TRC20." },
       { key: "blockchain", label: "Confirmations", type: "slider", min: 1, max: 12, step: 1, integer: true, help: "Network confirmations before a deposit is credited." },
+      { key: "cryptapi_btc_address", label: "Bitcoin receiving address", type: "text", maxLength: 128, nullable: true },
+      { key: "cryptapi_ltc_address", label: "Litecoin receiving address", type: "text", maxLength: 128, nullable: true },
+      { key: "cryptapi_doge_address", label: "Dogecoin receiving address", type: "text", maxLength: 128, nullable: true },
+      { key: "cryptapi_eth_address", label: "Ethereum receiving address", type: "text", maxLength: 128, nullable: true },
+      { key: "cryptapi_trx_address", label: "TRON receiving address", type: "text", maxLength: 128, nullable: true },
+      { key: "cryptapi_usdt_trc20_address", label: "USDT TRC20 receiving address", type: "text", maxLength: 128, nullable: true },
     ],
   },
   {
