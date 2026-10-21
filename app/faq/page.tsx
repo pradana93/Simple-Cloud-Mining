@@ -7,7 +7,7 @@ export const revalidate = 300;
 const FALLBACK_FAQS = [
   { id: -1, question: "How do I start mining?", answer: "<p>Create an account and the free miner starts hashing instantly.</p>" },
   { id: -2, question: "When do I get paid?", answer: "<p>Earnings accrue every minute. Withdraw anytime within the limits.</p>" },
-  { id: -3, question: "How do upgrades work?", answer: "<p>Deploy a paid plan via CoinPayments. It activates automatically on confirmation.</p>" },
+  { id: -3, question: "How do upgrades work?", answer: "<p>Deploy a paid plan with crypto. It activates automatically on confirmation.</p>" },
 ];
 
 export default async function FaqPage() {

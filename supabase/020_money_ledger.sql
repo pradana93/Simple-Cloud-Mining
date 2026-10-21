@@ -393,7 +393,7 @@ revoke all on function public.post_affiliate_commission(uuid, numeric, text, tex
 revoke all on function public.post_affiliate_commission(uuid, numeric, text, text, text, jsonb) from anon, authenticated;
 grant execute on function public.post_affiliate_commission(uuid, numeric, text, text, text, jsonb) to service_role;
 
--- Turn a verified CoinPayments invoice into a deposit, an active rig, and the
+-- Turn a verified crypto invoice into a deposit, an active rig, and the
 -- upline commission in one transaction. The invoice status guard keeps a
 -- duplicate IPN from activating the plan twice.
 create or replace function public.activate_paid_invoice(

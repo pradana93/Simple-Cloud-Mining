@@ -14,8 +14,8 @@ describe("coinOptions", () => {
     expect(coinOptions("DOGE")[0]).toEqual({ code: "DOGE", label: "Dogecoin", symbol: "Ð" });
   });
 
-  it("falls back to the code for unknown coins", () => {
-    expect(coinOptions("FOO")[0]).toEqual({ code: "FOO", label: "FOO", symbol: "FOO" });
+  it("drops coins the payment provider cannot accept", () => {
+    expect(coinOptions("BTC,FOO,USDT").map((c) => c.code)).toEqual(["BTC", "USDT"]);
   });
 
   it("returns nothing for empty input", () => {

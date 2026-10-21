@@ -15,7 +15,7 @@ export async function POST(req: Request) {
     const skipped = summary.skipped ? ` ${summary.skipped}` : "";
     return NextResponse.json({
       ok: true,
-      message: `Submitted ${summary.autoSent}, failed ${summary.autoFailed}, reset ${summary.staleReset}, held ${summary.heldProcessing}, aged ${summary.agedPending}.${skipped}`,
+      message: `Reset ${summary.staleReset}, held ${summary.heldProcessing}, aged ${summary.agedPending}.${skipped}`,
     });
   } catch (e) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "Payout pass failed" }, { status: 500 });

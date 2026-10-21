@@ -3,10 +3,10 @@
 Migrated from [`pradana93/Simple-Cloud-Mining`](https://github.com/pradana93/Simple-Cloud-Mining)
 (CodeIgniter 3 / PHP — SCM v3.15.0) to a premium TypeScript stack:
 
-- **Next.js 14** App Router + TypeScript + Tailwind CSS
+- **Next.js 15** App Router + TypeScript + Tailwind CSS
 - **Supabase** — Postgres, Auth, RLS (replaces Ion Auth + MySQL)
 - **Vercel Cron** — mining accrual every 5 min (replaces per-request balance updates)
-- **CoinPayments** — Gateway + API modes with HMAC-verified IPN route
+- **CryptAPI** — non-custodial deposit addresses with RSA-signed webhooks
 
 ## Deepscan summary (legacy → modern)
 
@@ -15,7 +15,7 @@ Migrated from [`pradana93/Simple-Cloud-Mining`](https://github.com/pradana93/Sim
 | `Welcome` (home, referral, affiliate, faq, payouts, contact) | `app/page.tsx`, `app/affiliate`, `app/faq`, `app/payouts`, `app/contact`, `app/referral/[uniqueId]` |
 | `Account` (dashboard, history, withdrawal, purchase, invoice) | `app/dashboard`, `app/account`, `app/withdrawal`, `app/purchase/[planId]` (`app/api/purchase`), `app/invoice/[hash]` |
 | `Ajaxauth` (login/register) | Supabase Auth — `app/login`, `app/register` |
-| `GatewayIpn::coinpayments` | `app/api/ipn/coinpayments/route.ts` (HMAC-SHA512 verify, status machine pending→waiting→paid/canceled, deposit + plan activation + upline commission) |
+| `GatewayIpn` (legacy) | `app/api/webhooks/cryptapi/route.ts` (RSA-SHA256 verify, status machine pending→waiting→paid, deposit + plan activation + upline commission) |
 | `Users_model::updateUserBalance/updateUserMiningSpeed` | `lib/mining.ts` (`accrueForPlan`) + `app/api/cron/accrue/route.ts` |
 | Admin controllers (Admins, Plans, Users, Transactions, Withdrawals, Settings, Faqs, Contact, Ipnlogs, Urlchains, Contents) | `app/admin/*` |
 | 20 CodeIgniter migrations | `supabase/schema.sql` + `supabase/seed.sql` |
@@ -29,8 +29,8 @@ See [docs/INSTALL.md](docs/INSTALL.md) for the full guide. The short version:
    `supabase/`, in order, through the Supabase API
 3. `npm run dev` — sign up at `/register`, then run
    `npm run make-admin -- you@example.com`
-4. Deploy to Vercel (or Docker) with the same env vars, then set the
-   CoinPayments IPN URL to `https://YOUR-DOMAIN/api/ipn/coinpayments`
+4. Deploy to Vercel (or Docker) with the same env vars. CryptAPI callbacks go
+   to `https://YOUR-DOMAIN/api/webhooks/cryptapi` automatically.
 
 `vercel.json` schedules five daily jobs: `/api/cron/accrue`, `/api/cron/risk`,
 `/api/cron/security`, `/api/cron/payouts` and `/api/cron/ledger`. Per-request
@@ -69,7 +69,7 @@ job alerts when stored balances drift from the append-only ledger.
   Enroll before relying on admin tools.
 - Set the Supabase Auth site URL and redirect allow-list to the production
   domain, including `/reset-password`, so email reset links work.
-- Set `COINPAYMENTS_IPN_SECRET` and `COINPAYMENTS_MERCHANT_ID` in production;
-  the IPN route rejects requests when either is missing.
+- Set at least one `CRYPTAPI_*_ADDRESS` in production. The checkout hides coins
+  without a receiving address, and the webhook verifies CryptAPI's RSA signature.
 - Backups are encrypted locally. Set `BACKUP_UPLOAD_URL` (and optional
   `BACKUP_UPLOAD_TOKEN`) to copy each backup offsite.

@@ -38,12 +38,7 @@ export default async function AdminWithdrawals() {
 
   return (
     <div className="space-y-4">
-      <PayoutOps
-        autoEnabled={settings.auto_payout_enabled}
-        ceiling={Number(settings.auto_payout_max)}
-        code={settings.currency_code}
-        events={events}
-      />
+      <PayoutOps code={settings.currency_code} events={events} />
       <WithdrawalsManager
         rows={rows}
         symbol={settings.currency_symbol}

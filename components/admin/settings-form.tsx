@@ -442,7 +442,7 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
           {!q && (
             <div className="flex items-center gap-2 text-xs text-slate-400">
               <Check size={13} className="text-emerald-400" />
-              Secrets such as CoinPayments keys stay in Vercel environment variables, never in the database.
+              Secrets such as SMTP credentials stay in Vercel environment variables, never in the database.
             </div>
           )}
         </div>

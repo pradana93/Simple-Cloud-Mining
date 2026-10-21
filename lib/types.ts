@@ -117,8 +117,6 @@ export type SiteSettings = {
   price_currency: string;
   coin_cur1: string;
   coin_cur2: string;
-  coin_mode: "api" | "gateway";
-  coin_email: "user" | "admin";
   smtp_host: string | null;
   smtp_user: string | null;
   smtp_pass: string | null;
@@ -145,8 +143,6 @@ export type SiteSettings = {
   checkin_amount: number;
   pay_coins: string;
   default_theme: string;
-  auto_payout_enabled: boolean;
-  auto_payout_max: number;
   games_enabled: boolean;
   games_min_bet: number;
   games_max_bet: number;

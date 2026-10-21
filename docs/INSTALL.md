@@ -1,7 +1,7 @@
 # Installation guide
 
-Simple Cloud Mining is a Next.js 14 web app. It uses Supabase for the database
-and login, and CoinPayments to take deposits. This guide takes you from the
+Simple Cloud Mining is a Next.js 15 web app. It uses Supabase for the database
+and login, and CryptAPI to take deposits. This guide takes you from the
 downloaded folder to a running site, then to a live deploy.
 
 Read time is about 15 minutes. The database and deploy steps are the only parts
@@ -13,7 +13,7 @@ that need careful attention.
 |---|---|
 | Node.js 20.19 or newer | https://nodejs.org. The installer checks this. |
 | A Supabase account | Free tier is enough to start. https://supabase.com |
-| A CoinPayments account | Needed for real deposits. https://www.coinpayments.net |
+| Crypto wallet addresses | Needed for real deposits. No CryptAPI account or KYC. |
 | A host (optional at first) | Vercel has a free tier. Any Node host works. |
 | A domain (optional) | Needed before you take live payments. |
 
@@ -43,8 +43,8 @@ The wizard walks through four steps:
    optional: you can skip it and run the SQL by hand (section 5).
 3. **Site and automation.** Your site URL and the cron secret. Say yes to
    generate a strong secret.
-4. **CoinPayments.** Your merchant ID and IPN secret. The API keys are optional
-   and only needed for automated payouts.
+4. **CryptAPI.** Public receiving addresses for the coins you accept. There is
+   no account, API key, or KYC. Leave a coin blank to hide it at checkout.
 
 The wizard writes `.env.local`. If that file already existed, the old copy is
 kept next to it with a `.bak` suffix.
@@ -105,19 +105,21 @@ deploys. `.env.example` lists them with comments.
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Project Settings > API | Database and auth endpoint |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Same screen | Public key, safe in the browser |
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Same screen | Server key that bypasses row level security |
-| `NEXT_PUBLIC_SITE_URL` | Yes | You choose it | Absolute URL for referrals and payment redirects |
+| `NEXT_PUBLIC_SITE_URL` | Yes | You choose it | Absolute URL for referrals and the payment callback |
 | `CRON_SECRET` | Yes | You generate it | Guards the `/api/cron/*` routes |
-| `COINPAYMENTS_MERCHANT_ID` | Yes | CoinPayments Account > API Keys | Identifies your store at checkout |
-| `COINPAYMENTS_IPN_SECRET` | Yes | Same screen | Verifies incoming payment callbacks |
-| `COINPAYMENTS_PRIVATE_KEY` | No | Same screen | API mode checkout and automated payouts |
-| `COINPAYMENTS_PUBLIC_KEY` | No | Same screen | Same as above |
+| `CRYPTAPI_BTC_ADDRESS` | At least one | Your wallet | Bitcoin deposits |
+| `CRYPTAPI_LTC_ADDRESS` | At least one | Your wallet | Litecoin deposits |
+| `CRYPTAPI_DOGE_ADDRESS` | At least one | Your wallet | Dogecoin deposits |
+| `CRYPTAPI_ETH_ADDRESS` | At least one | Your wallet | Ethereum deposits |
+| `CRYPTAPI_TRX_ADDRESS` | At least one | Your wallet | TRON deposits |
+| `CRYPTAPI_USDT_TRC20_ADDRESS` | At least one | Your wallet | USDT TRC20 deposits |
 | `RISK_SALT` | No | You generate it | Salt for hashing IPs in anti-fraud data |
 | `NEXT_PUBLIC_SENTRY_DSN` | No | Sentry project settings | Error reporting in the browser |
 | `SENTRY_DSN` | No | Sentry project settings | Error reporting on the server and edge |
 | `ALERT_WEBHOOK_URL` | No | Slack or Discord webhook | Money and ledger drift alerts |
 | `BACKUP_ENCRYPTION_KEY` | Recommended | You generate 32+ random characters | Encrypts logical backups |
 | `SUPABASE_ACCESS_TOKEN` | For backup checks | Supabase account settings | Reads native backup posture |
-| `SMTP_SENDER` | No | Your mail provider | From address on gateway emails |
+| `SMTP_SENDER` | No | Your mail provider | From address on outbound email |
 | `OPENAI_API_KEY` | No | OpenAI | Powers the admin plan assistant |
 | `ANTHROPIC_API_KEY` | No | Anthropic | Alternative provider for the plan assistant |
 | `PLAN_AI_MODEL` | No | Provider docs | Overrides the assistant model name |
@@ -149,13 +151,13 @@ Everything below lives in the admin area.
 | Plans | Price and daily yield for each plan. The free plan stays at 0. |
 | Content | Affiliate, payouts and contact page copy |
 | FAQ | Replace the sample questions with your own |
-| Withdrawals | Review requests, run the payout pass, see the audit trail |
+| Withdrawals | Review requests, reconcile the queue, record payout txids, see the audit trail |
 | Analytics | Revenue, signups and conversion |
 | Audit log | Who changed what, and when |
 
 Two features are off until you enable them in Settings: the announcement banner
-and the daily check-in bonus. Automated payouts also stay off until you enable
-them there and add the CoinPayments API keys. The casino is off by default too:
+and the daily check-in bonus. Withdrawals are paid manually from your wallet.
+The casino is off by default too:
 turn on **Casino** in Settings and set a minimum and maximum bet before members
 can play. The same section holds the basic operator controls: an extra house
 edge, a per-round win cap, and a comma separated list of game ids to switch off.
@@ -203,31 +205,39 @@ scheduler, sending `Authorization: Bearer YOUR_CRON_SECRET`:
 /api/cron/accrue    mining accrual
 /api/cron/risk      anti-fraud rescan
 /api/cron/security  access watchdog
-/api/cron/payouts   automated payout pass
+/api/cron/payouts   manual payout queue reconciliation
 /api/cron/ledger    balance reconciliation and drift alert
 ```
 
-## 10. CoinPayments setup
+## 10. CryptAPI setup
 
-In the CoinPayments dashboard, set the IPN URL to:
+CryptAPI needs no account, API key, or KYC. Add at least one public receiving
+address to the host environment:
 
 ```
-https://YOUR-DOMAIN/api/ipn/coinpayments
+CRYPTAPI_BTC_ADDRESS=...
+CRYPTAPI_LTC_ADDRESS=...
+CRYPTAPI_DOGE_ADDRESS=...
+CRYPTAPI_ETH_ADDRESS=...
+CRYPTAPI_TRX_ADDRESS=...
+CRYPTAPI_USDT_TRC20_ADDRESS=...
 ```
 
-Without this, deposits are recorded as waiting and plans never activate. The
-app verifies each callback against `COINPAYMENTS_IPN_SECRET`.
+The app creates a unique deposit address per invoice and passes
+`https://YOUR-DOMAIN/api/webhooks/cryptapi` as the callback. Do not put a wallet
+private key anywhere in the app. Withdrawals are manual: send from your wallet,
+then record the txid in Admin > Withdrawals.
 
 ## 11. Go-live checklist
 
 - [ ] `NEXT_PUBLIC_SITE_URL` points at the live domain, not localhost.
-- [ ] `SUPABASE_SERVICE_ROLE_KEY` and all API keys are set on the host and never committed.
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` and all secrets are set on the host and never committed.
 - [ ] `CRON_SECRET` is a long random value.
-- [ ] The IPN URL in CoinPayments matches your domain.
+- [ ] At least one `CRYPTAPI_*_ADDRESS` is set and a test deposit credits a plan.
 - [ ] Plans, prices and daily yield match what you intend to pay out.
 - [ ] The admin account exists and two-factor auth is enabled on it.
 - [ ] At least one withdrawal allowlist address is set for admin payouts.
-- [ ] You have decided whether automated payouts are on, and set the ceiling.
+- [ ] You have a funded external wallet for manual withdrawals.
 - [ ] Sentry DSN and `ALERT_WEBHOOK_URL` are set and a test alert arrives.
 - [ ] `BACKUP_ENCRYPTION_KEY` is stored in a secret manager and `npm run backup` succeeds.
 - [ ] Native Supabase backups or PITR are enabled, or the backup limitation is accepted.

@@ -47,7 +47,7 @@ c. You may not remove or alter this license file or the copyright notices.
 5. Your responsibilities
 
 a. The Software connects to third-party services such as Supabase and
-   CoinPayments. You are responsible for those accounts, their fees, their terms
+   CryptAPI. You are responsible for those accounts, their fees, their terms
    and their security.
 b. You are responsible for keeping your keys, passwords and secrets private.
 c. You are responsible for complying with the laws that apply to your business,

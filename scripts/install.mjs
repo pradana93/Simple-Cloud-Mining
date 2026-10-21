@@ -188,30 +188,29 @@ async function collectApp(existing) {
 }
 
 async function collectPayments(existing) {
-  step(4, 4, "CoinPayments");
-  info("Create an account at https://www.coinpayments.net and open Account > API Keys.");
-  info("Leave the API keys blank if you only plan to use the hosted Gateway checkout.");
+  step(4, 4, "CryptAPI");
+  info("CryptAPI needs public receiving addresses only. There is no account, API key, or KYC.");
+  info("Leave a coin blank to hide it from checkout. USDT is TRC20.");
 
-  const merchant = await prompt.required(
-    "Merchant ID",
-    null,
-    { def: existing.COINPAYMENTS_MERCHANT_ID || "" }
-  );
-  const ipn = await prompt.required(
-    "IPN secret",
-    null,
-    { hidden: true, def: existing.COINPAYMENTS_IPN_SECRET || "" }
-  );
-
-  let priv = existing.COINPAYMENTS_PRIVATE_KEY || "";
-  let pub = existing.COINPAYMENTS_PUBLIC_KEY || "";
-  if (await prompt.confirm("Add API keys (needed for auto payouts)?", false)) {
-    priv = await prompt.required("API private key", null, { hidden: true, def: priv });
-    pub = await prompt.required("API public key", null, { hidden: true, def: pub });
+  const addressKeys = [
+    ["BTC", "CRYPTAPI_BTC_ADDRESS", "Bitcoin address"],
+    ["LTC", "CRYPTAPI_LTC_ADDRESS", "Litecoin address"],
+    ["DOGE", "CRYPTAPI_DOGE_ADDRESS", "Dogecoin address"],
+    ["ETH", "CRYPTAPI_ETH_ADDRESS", "Ethereum address"],
+    ["TRX", "CRYPTAPI_TRX_ADDRESS", "TRON address"],
+    ["USDT", "CRYPTAPI_USDT_TRC20_ADDRESS", "USDT TRC20 address"],
+  ];
+  const addresses = {};
+  for (const [coin, key, label] of addressKeys) {
+    const value = (await prompt.text(`${label} (${coin})`, { def: existing[key] || "" })).trim();
+    if (value) addresses[key] = value;
+  }
+  if (Object.keys(addresses).length === 0) {
+    warn("No receiving addresses set. Checkout will stay unavailable until you add at least one.");
   }
 
   let smtp = existing.SMTP_SENDER || "";
-  if (await prompt.confirm("Set a from address for gateway emails (optional)?", false)) {
+  if (await prompt.confirm("Set a from address for outbound mail (optional)?", false)) {
     smtp = await prompt.text("From email", { def: smtp });
   }
 
@@ -223,7 +222,7 @@ async function collectPayments(existing) {
     else anthropic = await prompt.required("Anthropic API key", null, { hidden: true, def: anthropic });
   }
 
-  return { merchant, ipn, priv, pub, smtp, openai, anthropic };
+  return { addresses, smtp, openai, anthropic };
 }
 
 function printGuide(pairs) {
@@ -251,13 +250,12 @@ ${c.bold("Next steps")}
        FAQ       ->  replace the sample questions
 
   4. Deploy for real users (see docs/INSTALL.md "Deploy"):
-       Push the repo to GitHub, import it in Vercel, add the same env vars,
-       and set the CoinPayments IPN URL to https://YOUR-DOMAIN/api/ipn/coinpayments
+       Push the repo to GitHub, import it in Vercel, and add the same env vars.
+       CryptAPI callbacks are sent to https://YOUR-DOMAIN/api/webhooks/cryptapi automatically.
 
 ${c.bold("Before you take real money")}
   - Set NEXT_PUBLIC_SITE_URL to your live domain in the host's env vars.
-  - CoinPayments merchant: ${has.get("COINPAYMENTS_MERCHANT_ID") ? "set" : c.red("missing")}
-  - IPN secret: ${has.get("COINPAYMENTS_IPN_SECRET") ? "set" : c.red("missing")}
+  - CryptAPI receiving addresses: ${has.get("CRYPTAPI_BTC_ADDRESS") || has.get("CRYPTAPI_LTC_ADDRESS") || has.get("CRYPTAPI_DOGE_ADDRESS") || has.get("CRYPTAPI_ETH_ADDRESS") || has.get("CRYPTAPI_TRX_ADDRESS") || has.get("CRYPTAPI_USDT_TRC20_ADDRESS") ? "set" : c.red("missing")}
   - Cron secret: ${has.get("CRON_SECRET") ? "set" : c.red("missing")}
   - Enable two-factor auth and a withdrawal allowlist for admin actions.
   - Keep .env.local and RESET-CREDENTIALS.local.txt out of version control.
@@ -283,8 +281,6 @@ async function main() {
       "NEXT_PUBLIC_SUPABASE_ANON_KEY",
       "SUPABASE_SERVICE_ROLE_KEY",
       "CRON_SECRET",
-      "COINPAYMENTS_MERCHANT_ID",
-      "COINPAYMENTS_IPN_SECRET",
     ];
     let bad = 0;
     for (const key of have) {
@@ -293,6 +289,19 @@ async function main() {
         fail(`${key} is missing`);
         bad++;
       }
+    }
+    const paymentKeys = [
+      "CRYPTAPI_BTC_ADDRESS",
+      "CRYPTAPI_LTC_ADDRESS",
+      "CRYPTAPI_DOGE_ADDRESS",
+      "CRYPTAPI_ETH_ADDRESS",
+      "CRYPTAPI_TRX_ADDRESS",
+      "CRYPTAPI_USDT_TRC20_ADDRESS",
+    ];
+    if (paymentKeys.some((key) => existing[key])) ok("CryptAPI receiving address");
+    else {
+      fail("At least one CRYPTAPI_*_ADDRESS is missing");
+      bad++;
     }
     if (existing.NEXT_PUBLIC_SUPABASE_URL && existing.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       try {
@@ -324,11 +333,8 @@ async function main() {
     ["SUPABASE_SERVICE_ROLE_KEY", supa.service],
     ["NEXT_PUBLIC_SITE_URL", app.site],
     ["CRON_SECRET", app.cron],
-    ["COINPAYMENTS_MERCHANT_ID", pay.merchant],
-    ["COINPAYMENTS_IPN_SECRET", pay.ipn],
   ];
-  if (pay.priv) pairs.push(["COINPAYMENTS_PRIVATE_KEY", pay.priv]);
-  if (pay.pub) pairs.push(["COINPAYMENTS_PUBLIC_KEY", pay.pub]);
+  for (const [key, value] of Object.entries(pay.addresses)) pairs.push([key, value]);
   if (pay.smtp) pairs.push(["SMTP_SENDER", pay.smtp]);
   pairs.push(["RISK_SALT", existing.RISK_SALT || randomHex(24)]);
   if (pay.openai) pairs.push(["OPENAI_API_KEY", pay.openai]);

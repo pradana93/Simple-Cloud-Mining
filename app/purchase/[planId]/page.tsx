@@ -4,7 +4,7 @@ import { getCachedSettings } from "@/lib/catalog";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getMoneyCfg } from "@/lib/currency";
 import { formatMoney, formatPrice } from "@/lib/money";
-import { coinOptions } from "@/lib/checkout";
+import { availableCoins } from "@/lib/cryptapi";
 import { PurchaseButton } from "@/components/purchase-button";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +13,7 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
   const { planId } = await params;
   const s = await getCachedSettings();
   const cfg = await getMoneyCfg();
+  const coins = availableCoins(s.pay_coins);
   type PurchasePlan = { id: number; plan_name: string; price: number; version: string | null; point_per_day: number | null; duration: number };
   let plan: PurchasePlan | null = null;
   try {
@@ -51,15 +52,21 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
           ))}
         </div>
         <div className="mt-6 space-y-2.5 rounded-2xl bg-white/[0.03] p-5 text-sm ring-1 ring-white/10">
-          <p className="flex items-center gap-2 text-slate-300"><Coins size={15} className="text-gold-300" /> {s.coin_mode === "api" ? "Pick the coin you hold, credited" : "Pay with any coin CoinPayments accepts, credited"} in {s.currency_code}</p>
-          <p className="flex items-center gap-2 text-slate-300"><BadgeCheck size={15} className="text-emerald-400" /> Miner activates automatically after CoinPayments confirms</p>
-          <p className="flex items-center gap-2 text-slate-300"><Timer size={15} className="text-gold-400" /> Mode: {s.coin_mode === "api" ? "instant invoice" : "hosted gateway"}</p>
+          <p className="flex items-center gap-2 text-slate-300"><Coins size={15} className="text-gold-300" /> Pick the coin you hold, credited in {s.currency_code}</p>
+          <p className="flex items-center gap-2 text-slate-300"><BadgeCheck size={15} className="text-emerald-400" /> Miner activates automatically after the network confirms</p>
+          <p className="flex items-center gap-2 text-slate-300"><Timer size={15} className="text-gold-400" /> Direct deposit, no hosted checkout</p>
           <p className="border-t border-white/10 pt-2.5 text-xs text-slate-400">
-            The plan is priced in {s.price_currency} and billed at checkout. CoinPayments converts it, so you can settle in the coin you hold.
+            The plan is priced in {s.price_currency}. Your invoice shows the exact amount in the coin you pick.
           </p>
         </div>
         <div className="mt-6">
-          <PurchaseButton planId={Number(planId)} coins={s.coin_mode === "api" ? coinOptions(s.pay_coins) : []} />
+          {coins.length > 0 ? (
+            <PurchaseButton planId={Number(planId)} coins={coins} />
+          ) : (
+            <p className="rounded-2xl bg-white/[0.03] p-4 text-sm text-slate-400 ring-1 ring-white/10">
+              Checkout is temporarily unavailable. Contact support.
+            </p>
+          )}
         </div>
       </div>
     </div>

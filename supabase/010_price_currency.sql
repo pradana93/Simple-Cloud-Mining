@@ -1,7 +1,7 @@
 -- 010_price_currency.sql
 -- Plans are priced in a stable fiat currency so the storefront reads sensibly
 -- to a global audience. Checkout bills the invoice in this currency through
--- CoinPayments, which converts and lets the buyer pay with any coin.
+-- CryptAPI, which converts and lets the buyer pay with any supported coin.
 -- Earnings and balances stay in the site's crypto currency.
 
 alter table public.settings

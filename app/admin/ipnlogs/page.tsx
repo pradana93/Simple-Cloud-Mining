@@ -17,7 +17,7 @@ export default async function AdminIpnLogs() {
     <div className="space-y-4">
       <AdminPageHeader title="IPN logs" />
       <Card>
-        <CardHeader><CardTitle>CoinPayments callback errors ({rows.length})</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Payment callback errors ({rows.length})</CardTitle></CardHeader>
         <CardContent className="text-sm">
           {rows.length === 0 ? (
             <p className="text-slate-400">No callback errors recorded. A clean log means every IPN was accepted.</p>

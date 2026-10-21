@@ -33,8 +33,7 @@ export function PurchaseButton({ planId, coins = [] }: { planId: number; coins?:
       }
       keyRef.current = null;
       push("Invoice created", "success");
-      if (j.redirectUrl) window.location.href = j.redirectUrl as string;
-      else if (j.hash) router.push(`/invoice/${j.hash}`);
+      if (j.hash) router.push(`/invoice/${j.hash}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Purchase failed";
       setErr(msg);

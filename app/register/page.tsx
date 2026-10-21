@@ -58,7 +58,7 @@ export default function RegisterPage() {
           {[
             ["01", "Create account", "Username and password. Sign in with your username."],
             ["02", "Free miner activates", "It starts earning on the spot."],
-            ["03", "Upgrade anytime", "Deploy paid rigs via CoinPayments."],
+            ["03", "Upgrade anytime", "Deploy paid rigs with crypto."],
           ].map(([n, t, d]) => (
             <li key={n} className="flex gap-4">
               <span className="font-display text-lg font-bold text-gold-400">{n}</span>

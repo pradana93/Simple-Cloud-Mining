@@ -3,23 +3,22 @@ import crypto from "crypto";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
-import { buildGatewayUrl, createApiTransaction } from "@/lib/coinpayments";
+import { createPayment, convertToCoin, paymentAddress } from "@/lib/cryptapi";
+import { cryptoTicker, isPayableCoin } from "@/lib/checkout";
 import { getFxTable } from "@/lib/fx";
-import { isPayableCoin } from "@/lib/checkout";
 import { requestIdempotencyKey } from "@/lib/ledger";
 import { sendAlert } from "@/lib/alerts";
 
 type StoredInvoice = {
   hash: string;
   status?: string | null;
-  params?: { gateway_url?: string; payCoin?: string } | null;
+  params?: { payCoin?: string } | null;
 };
 
 function invoiceResponse(row: StoredInvoice) {
   return NextResponse.json({
     ok: true,
     hash: row.hash,
-    redirectUrl: row.params?.gateway_url,
     status: row.status ?? "pending",
     duplicate: true,
   });
@@ -44,10 +43,14 @@ export async function POST(req: Request) {
 
   const settings = await getSettings();
 
-  if (coin && !isPayableCoin(coin, settings.pay_coins)) {
-    return NextResponse.json({ ok: false, error: "That coin is not available for checkout." }, { status: 400 });
+  if (!isPayableCoin(coin, settings.pay_coins)) {
+    return NextResponse.json({ ok: false, error: "Choose a coin to pay with." }, { status: 400 });
   }
-  const payCoin = isPayableCoin(coin, settings.pay_coins) ? (coin as string).trim().toUpperCase() : null;
+  const payCoin = (coin as string).trim().toUpperCase();
+  const ticker = cryptoTicker(payCoin);
+  if (!ticker || !paymentAddress(payCoin)) {
+    return NextResponse.json({ ok: false, error: `${payCoin} checkout is not configured.` }, { status: 503 });
+  }
 
   const { data: plan } = await admin.from("plans").select("*").eq("id", planId).maybeSingle();
   if (!plan) return NextResponse.json({ ok: false, error: "Plan not found" }, { status: 404 });
@@ -65,96 +68,68 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Transaction limit reached. Wait for pending invoices to expire." }, { status: 400 });
   }
 
-  const hash = crypto.createHash("md5").update(`${process.env.COINPAYMENTS_IPN_SECRET ?? "hash"}${Date.now()}`).digest("hex");
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  const hash = crypto.randomBytes(16).toString("hex");
+  const baseUrl = new URL(req.url).origin;
 
-  // The plan is priced in the site price currency and billed that way so the
-  // buyer can settle in any coin CoinPayments accepts. The ledger stays in the
-  // site crypto, so convert the price once here and store both amounts.
+  // The plan is priced in the site price currency. The ledger stays in the
+  // site currency, while the invoice shows an exact amount in the buyer's coin.
   const price = Number((plan as { price: number }).price);
   const priceCurrency = settings.price_currency.toUpperCase();
-  let cryptoAmount = price;
+  let siteAmount = price;
   if (priceCurrency !== settings.currency_code.toUpperCase()) {
     const table = await getFxTable(settings.currency_code);
     const perCoin = table?.rates[priceCurrency] ?? 0;
     if (!(perCoin > 0)) {
       return NextResponse.json({ ok: false, error: "Live rates are unavailable right now. Try again in a minute." }, { status: 503 });
     }
-    cryptoAmount = price / perCoin;
+    siteAmount = price / perCoin;
   }
 
-  if (settings.coin_mode === "gateway") {
-    const url = buildGatewayUrl({
-      merchantId: process.env.COINPAYMENTS_MERCHANT_ID ?? "",
-      planId: (plan as { id: number }).id,
-      planName: (plan as { version: string }).version ?? String((plan as { id: number }).id),
-      siteName: settings.sitename,
-      amount: price,
-      currency: settings.price_currency,
-      invoice: hash,
-      baseUrl,
+  let payAmount: number;
+  let payment: Awaited<ReturnType<typeof createPayment>>;
+  try {
+    payAmount = payCoin === settings.currency_code.toUpperCase()
+      ? siteAmount
+      : await convertToCoin(ticker, price, priceCurrency);
+    payment = await createPayment({
+      coin: payCoin,
+      callbackUrl: `${baseUrl}/api/webhooks/cryptapi?invoice=${hash}`,
+      confirmations: Number(settings.blockchain) || 1,
     });
-    const { error: insertError } = await admin.from("transactions_history").insert({
-      user_id: user.id,
-      plan_id: planId,
-      amount: cryptoAmount,
-      price_amount: price,
-      price_currency: settings.price_currency,
-      hash,
-      idempotency_key: key,
-      params: { gateway_url: url },
+  } catch (e) {
+    const message = e instanceof Error ? e.message : "CryptAPI checkout failed.";
+    await sendAlert({
+      title: "CryptAPI invoice could not be created",
+      message,
+      tags: { flow: "purchase", provider: "cryptapi" },
+      extra: { userId: user.id, planId, coin: payCoin },
     });
-    if (insertError) {
-      if (insertError.code === "23505") {
-        const { data: raced } = await admin
-          .from("transactions_history")
-          .select("hash,status,params")
-          .eq("idempotency_key", key)
-          .maybeSingle();
-        if (raced) return invoiceResponse(raced as StoredInvoice);
-      }
-      await sendAlert({
-        title: "Purchase invoice was not recorded",
-        message: insertError.message,
-        tags: { flow: "purchase", mode: "gateway" },
-        extra: { userId: user.id, planId, hash },
-      });
-      return NextResponse.json({ ok: false, error: "Invoice created but could not be recorded. Contact support." }, { status: 500 });
-    }
-    return NextResponse.json({ ok: true, redirectUrl: url, hash });
+    return NextResponse.json({ ok: false, error: "Checkout is temporarily unavailable. Try again in a minute." }, { status: 503 });
   }
 
-  // API mode
-  const { data: profile } = await admin.from("profiles").select("email").eq("id", user.id).maybeSingle();
-  const buyerEmail = settings.coin_email === "user"
-    ? ((profile as { email: string } | null)?.email ?? "")
-    : (process.env.SMTP_SENDER ?? "");
-  if (!buyerEmail) return NextResponse.json({ ok: false, error: "Update your contact email before purchasing." }, { status: 400 });
-
-  const result = await createApiTransaction({
-    privateKey: process.env.COINPAYMENTS_PRIVATE_KEY ?? "",
-    publicKey: process.env.COINPAYMENTS_PUBLIC_KEY ?? "",
-    amount: price,
-    currency1: settings.price_currency,
-    currency2: payCoin ?? settings.coin_cur2,
-    buyerEmail,
-    itemName: `Purchase of Mining Plan ${(plan as { version: string }).version} on ${settings.sitename}`,
-    itemNumber: (plan as { id: number }).id,
-    invoice: hash,
-    ipnUrl: `${baseUrl}/api/ipn/coinpayments`,
-  });
-  if ((result as { error?: string }).error !== "ok") {
-    return NextResponse.json({ ok: false, error: "CoinPayments error. Contact admin." }, { status: 502 });
+  if (payment.minimum > payAmount) {
+    return NextResponse.json({
+      ok: false,
+      error: `${payCoin} has a minimum payment of ${payment.minimum}. Choose another coin.`,
+    }, { status: 400 });
   }
+
   const { error: insertError } = await admin.from("transactions_history").insert({
     user_id: user.id,
     plan_id: planId,
-    amount: cryptoAmount,
+    amount: siteAmount,
     price_amount: price,
     price_currency: settings.price_currency,
     hash,
     idempotency_key: key,
-    params: { ...(result.result as Record<string, unknown>), payCoin: payCoin ?? settings.coin_cur2 } as never,
+    params: {
+      provider: "cryptapi",
+      address: payment.addressIn,
+      amount: String(payAmount),
+      timeout: 20 * 60,
+      payCoin,
+      ticker,
+    },
   });
   if (insertError) {
     if (insertError.code === "23505") {
@@ -168,7 +143,7 @@ export async function POST(req: Request) {
     await sendAlert({
       title: "Purchase invoice was not recorded",
       message: insertError.message,
-      tags: { flow: "purchase", mode: "api" },
+      tags: { flow: "purchase", provider: "cryptapi" },
       extra: { userId: user.id, planId, hash },
     });
     return NextResponse.json({ ok: false, error: "Invoice created but could not be recorded. Contact support." }, { status: 500 });

@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, PlayCircle, Zap } from "lucide-react";
+import { Loader2, PlayCircle, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
@@ -29,17 +29,7 @@ function detailText(detail: Record<string, unknown> | null): string {
     .join(" · ");
 }
 
-export function PayoutOps({
-  autoEnabled,
-  ceiling,
-  code,
-  events,
-}: {
-  autoEnabled: boolean;
-  ceiling: number;
-  code: string;
-  events: PayoutEvent[];
-}) {
+export function PayoutOps({ code, events }: { code: string; events: PayoutEvent[] }) {
   const { push } = useToast();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -63,15 +53,11 @@ export function PayoutOps({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           <span className="grid h-11 w-11 place-items-center rounded-2xl bg-gold-500/15 text-gold-300">
-            <Zap size={20} />
+            <Wallet size={20} />
           </span>
           <div>
-            <h2 className="font-display text-lg font-bold text-white">Auto-payout</h2>
-            <p className="text-xs text-slate-400">
-              {autoEnabled
-                ? `On, sending ${code} requests up to ${ceiling > 0 ? ceiling : "no ceiling"}.`
-                : "Off. Requests wait for a manual decision below."}
-            </p>
+            <h2 className="font-display text-lg font-bold text-white">Payout queue</h2>
+            <p className="text-xs text-slate-400">Manual {code} payouts. Send from your wallet, then record the txid below.</p>
           </div>
         </div>
         <Button variant="secondary" onClick={run} disabled={busy}>
@@ -81,15 +67,14 @@ export function PayoutOps({
             </>
           ) : (
             <>
-              <PlayCircle size={15} /> Run payout pass
+              <PlayCircle size={15} /> Reconcile queue
             </>
           )}
         </Button>
       </div>
 
       <p className="mt-3 text-xs text-slate-400">
-        One pass resets stalled requests back to pending, flags ones left a week, then sends eligible requests
-        {autoEnabled ? "" : " (auto-payout is off, so it only reconciles)"}.
+        One pass resets stalled requests back to pending and flags requests left untouched for a week.
       </p>
 
       {events.length > 0 && (

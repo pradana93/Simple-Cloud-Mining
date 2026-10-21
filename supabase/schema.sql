@@ -85,7 +85,7 @@ create table if not exists public.user_withdrawal (
   date_paid timestamptz
 );
 
--- TRANSACTIONS (CoinPayments invoices)
+-- TRANSACTIONS (crypto invoices)
 create table if not exists public.transactions_history (
   id bigint generated always as identity primary key,
   user_id uuid not null references public.profiles(id) on delete cascade,

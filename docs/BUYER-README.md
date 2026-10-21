@@ -6,7 +6,7 @@ start, and how to get a site running. The full walkthrough is in
 
 ## What this is
 
-A Next.js 14 application for running a cloud mining site. Members sign up, get a
+A Next.js 15 application for running a cloud mining site. Members sign up, get a
 mining plan, watch a balance grow, and withdraw. You run the store from an admin
 area.
 
@@ -14,7 +14,7 @@ Included features:
 
 - Email and password accounts through Supabase Auth, with row level security.
 - Plans with a daily yield, a free default plan, and paid upgrades.
-- CoinPayments checkout, with a hosted Gateway mode and an API mode.
+- Non-custodial CryptAPI checkout with signed deposit callbacks.
 - A member dashboard with balance, plan status, history and a withdraw form.
 - Affiliate referrals with a configurable commission.
 - Admin area: settings, plans, users, transactions, withdrawals, FAQ, content,
@@ -27,7 +27,7 @@ Included features:
     tiers, a promo window, live hold reporting, owner profit by game, and
     per-game switches. Off by default, switched on in Settings.
 - Installable as a phone app (PWA) with a light and dark theme.
-- Optional automated payouts with a reconciliation pass and a payout log.
+- Manual payouts with a reconciliation pass and a payout log.
 
 ## What is in the package
 
@@ -52,7 +52,7 @@ Have these ready:
 
 - Node.js 20.19 or newer.
 - A Supabase project (free tier is fine).
-- A CoinPayments account, for real deposits.
+- Crypto wallet receiving addresses, for real deposits.
 - A host and a domain, when you are ready to go live.
 
 ## Quick start
