@@ -77,7 +77,7 @@ export default function RegisterPage() {
           <form action={submit} className="mt-6 space-y-4">
             <div><Label htmlFor="username">Username</Label><Input id="username" name="username" minLength={3} placeholder="satoshi_01" required /></div>
             <div><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" placeholder="you@wallet.com" required /></div>
-            <div><Label htmlFor="password">Password</Label><Input id="password" name="password" type="password" minLength={4} placeholder="Min. 4 characters" required /></div>
+            <div><Label htmlFor="password">Password</Label><Input id="password" name="password" type="password" minLength={10} placeholder="Min. 10 characters" required /></div>
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Spinning up miner…" : "Claim free miner"}
             </Button>

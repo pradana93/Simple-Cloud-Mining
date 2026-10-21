@@ -44,6 +44,6 @@ export function mfaCookieOptions() {
   };
 }
 
-export function hasFreshMfa(userId: string): boolean {
-  return readMfaToken(cookies().get(MFA_COOKIE)?.value) === userId;
+export async function hasFreshMfa(userId: string): Promise<boolean> {
+  return readMfaToken((await cookies()).get(MFA_COOKIE)?.value) === userId;
 }

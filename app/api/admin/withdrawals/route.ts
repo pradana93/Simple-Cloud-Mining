@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/api-admin";
 import { recordAudit } from "@/lib/audit";
+import { firstRow } from "@/lib/ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -19,42 +20,58 @@ export async function POST(req: Request) {
   const action = String(body.action ?? "");
   const id = Number(body.id);
   if (!Number.isFinite(id)) return NextResponse.json({ ok: false, error: "Withdrawal id is required" }, { status: 400 });
-
-  const admin = createAdminSupabase();
-  try {
-    const { data: row } = await admin.from("user_withdrawal").select("id,user_id,amount,status").eq("id", id).maybeSingle();
-    if (!row) return NextResponse.json({ ok: false, error: "Withdrawal not found" }, { status: 404 });
-    const w = row as { user_id: string; amount: number; status: string };
-    const current = String(w.status ?? "").toUpperCase();
-    if (current === "SUCCESS" || current === "CANCELED") {
-      return NextResponse.json({ ok: false, error: `Already ${current.toLowerCase()}` }, { status: 409 });
-    }
-
-    if (action === "approve") {
-      const tx = String(body.tx ?? "").trim().slice(0, 191) || null;
-      const { error } = await admin
-        .from("user_withdrawal")
-        .update({ status: "SUCCESS", tx, date_paid: new Date().toISOString() })
-        .eq("id", id);
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-      revalidateTag("payouts");
-      await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "withdrawal.approve", target: String(id), detail: { user: w.user_id, amount: Number(w.amount), tx }, req });
-      return NextResponse.json({ ok: true, message: "Withdrawal marked paid" });
-    }
-
-    if (action === "reject") {
-      const { error } = await admin
-        .from("user_withdrawal")
-        .update({ status: "CANCELED", date_paid: new Date().toISOString() })
-        .eq("id", id);
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-      await admin.rpc("credit_balance", { p_user_id: w.user_id, p_amount: Number(w.amount) });
-      revalidateTag("payouts");
-      await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "withdrawal.reject", target: String(id), detail: { user: w.user_id, amount: Number(w.amount) }, req });
-      return NextResponse.json({ ok: true, message: `Rejected and refunded ${Number(w.amount).toFixed(8)}` });
-    }
-
+  if (action !== "approve" && action !== "reject") {
     return NextResponse.json({ ok: false, error: "Unknown action" }, { status: 400 });
+  }
+
+  const tx = String(body.tx ?? "").trim().slice(0, 191) || null;
+
+  try {
+    const { data, error } = await createAdminSupabase().rpc("settle_withdrawal", {
+      p_id: id,
+      p_action: action,
+      p_tx: action === "approve" ? tx : null,
+    });
+    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+
+    const row = firstRow<{ status?: string; withdrawal_status?: string; balance?: unknown }>(data);
+    const status = String(row?.status ?? "");
+
+    if (status === "missing") {
+      return NextResponse.json({ ok: false, error: "Withdrawal not found" }, { status: 404 });
+    }
+    if (status === "already_settled") {
+      return NextResponse.json(
+        { ok: false, error: `Already ${String(row?.withdrawal_status ?? "").toLowerCase()}` },
+        { status: 409 }
+      );
+    }
+    if (status === "invalid_state") {
+      return NextResponse.json(
+        { ok: false, error: "This payout is already processing at the wallet. Check it before refunding." },
+        { status: 409 }
+      );
+    }
+    if (status !== "applied") {
+      return NextResponse.json({ ok: false, error: "Could not settle the withdrawal" }, { status: 500 });
+    }
+
+    revalidateTag("payouts");
+    await recordAudit({
+      actor: { id: gate.userId, name: gate.name },
+      action: action === "approve" ? "withdrawal.approve" : "withdrawal.reject",
+      target: String(id),
+      detail: { tx, balance: row?.balance },
+      req,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      message:
+        action === "approve"
+          ? "Withdrawal marked paid"
+          : "Rejected and refunded the withdrawal amount",
+    });
   } catch {
     return NextResponse.json({ ok: false, error: "Action failed" }, { status: 500 });
   }

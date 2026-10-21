@@ -10,11 +10,11 @@ import { FX_COOKIE, CUR_COOKIE, type MoneyCfg } from "./money";
 
 export async function getMoneyCfg(): Promise<MoneyCfg> {
   const s = await getCachedSettings();
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const priceCurrency = (s.price_currency || "USD").toUpperCase();
 
   const picked = cookieStore.get(CUR_COOKIE)?.value?.toUpperCase();
-  const headerStore = headers();
+  const headerStore = await headers();
   const geo = detectCurrency(headerStore.get("x-vercel-ip-country"), headerStore.get("accept-language"));
   const displayCurrency =
     (isSupportedFiat(picked) ? (picked as string) : null) ??

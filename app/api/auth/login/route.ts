@@ -5,6 +5,14 @@ import { createClient } from "@supabase/supabase-js";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { recordEvent } from "@/lib/risk-telemetry";
 import { isTwoFactorEnabled } from "@/lib/two-factor";
+import {
+  LOGIN_IP_LIMIT,
+  LOGIN_NAME_LIMIT,
+  LOGIN_WINDOW_MS,
+  clientIp,
+  limitReached,
+  normalizeLogin,
+} from "@/lib/login-throttle";
 import type { Database } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +28,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });
   }
   const raw = String(body.username ?? "").trim();
+  const loginKey = normalizeLogin(raw);
   const password = String(body.password ?? "");
   if (!raw || !password) {
     return NextResponse.json({ ok: false, error: "Username and password are required" }, { status: 400 });
@@ -27,14 +36,23 @@ export async function POST(req: Request) {
 
   try {
     const admin = createAdminSupabase();
-    const ip = (req.headers.get("x-forwarded-for")?.split(",")[0] ?? "").trim().slice(0, 45);
-    const since = Date.now() - 10 * 60 * 1000;
-    const { count } = await admin
-      .from("login_attempts")
-      .select("id", { count: "exact", head: true })
-      .eq("login", raw)
-      .gte("time", since);
-    if ((count ?? 0) >= 10) {
+    const ip = clientIp(req);
+    const since = Date.now() - LOGIN_WINDOW_MS;
+    const [{ count: nameCount }, { count: ipCount }] = await Promise.all([
+      admin
+        .from("login_attempts")
+        .select("id", { count: "exact", head: true })
+        .eq("login", loginKey)
+        .gte("time", since),
+      ip
+        ? admin
+            .from("login_attempts")
+            .select("id", { count: "exact", head: true })
+            .eq("ip_address", ip)
+            .gte("time", since)
+        : Promise.resolve({ count: 0 }),
+    ]);
+    if (limitReached(nameCount, LOGIN_NAME_LIMIT) || limitReached(ipCount, LOGIN_IP_LIMIT)) {
       return NextResponse.json({ ok: false, error: "Too many attempts. Try again later." }, { status: 429 });
     }
     type Lite = { email: string | null; is_admin: boolean };
@@ -59,7 +77,7 @@ export async function POST(req: Request) {
     }
 
     if (!row?.email) {
-      await admin.from("login_attempts").insert({ ip_address: ip, login: raw, time: Date.now() });
+      await admin.from("login_attempts").insert({ ip_address: ip, login: loginKey, time: Date.now() });
       return NextResponse.json({ ok: false, error: "Invalid username or password" }, { status: 401 });
     }
 
@@ -70,10 +88,10 @@ export async function POST(req: Request) {
     const plain = createClient<Database>(url, anon, { auth: { persistSession: false } });
     const { data: signIn, error } = await plain.auth.signInWithPassword({ email: row.email, password });
     if (error || !signIn.session || !signIn.user) {
-      await admin.from("login_attempts").insert({ ip_address: ip, login: raw, time: Date.now() });
+      await admin.from("login_attempts").insert({ ip_address: ip, login: loginKey, time: Date.now() });
       return NextResponse.json({ ok: false, error: "Invalid username or password" }, { status: 401 });
     }
-    await admin.from("login_attempts").delete().eq("login", raw);
+    await admin.from("login_attempts").delete().eq("login", loginKey);
     await recordEvent({ userId: signIn.user.id, kind: "login", req });
 
     // Members with 2FA on are not signed in until they clear the code gate.
@@ -95,9 +113,9 @@ export async function POST(req: Request) {
     const res = NextResponse.json({ ok: true, isAdmin: Boolean(row.is_admin) });
     const supabase = createServerClient<Database>(url, anon, {
       cookies: {
-        getAll() {
-          return cookies().getAll();
-        },
+      async getAll() {
+        return (await cookies()).getAll();
+      },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
         },

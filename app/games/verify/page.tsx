@@ -16,8 +16,9 @@ function one(value: string | string[] | undefined): string | undefined {
 export default async function VerifyPage({
   searchParams,
 }: {
-  searchParams: { bet?: string | string[]; game?: string | string[] };
+  searchParams: Promise<{ bet?: string | string[]; game?: string | string[] }>;
 }) {
+  const query = await searchParams;
   const s = await getCachedSettings();
   const supabase = createServerSupabase();
   const {
@@ -48,8 +49,8 @@ export default async function VerifyPage({
         symbol={s.currency_symbol}
         decimals={s.currency_decimals}
         gamesOpen={gamesOpen}
-        initialBetKey={one(searchParams.bet)}
-        initialGame={one(searchParams.game)}
+        initialBetKey={one(query.bet)}
+        initialGame={one(query.game)}
       />
     </div>
   );

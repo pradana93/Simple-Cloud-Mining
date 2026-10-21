@@ -5,8 +5,9 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 // to signup where the attribution is applied on the first console load. The
 // lookup runs with the service role because profiles RLS only exposes a
 // caller's own row, so an anonymous read would never find the referrer.
-export async function GET(req: NextRequest, { params }: { params: { uniqueId: string } }) {
-  const id = (params.uniqueId ?? "").trim();
+export async function GET(req: NextRequest, { params }: { params: Promise<{ uniqueId: string }> }) {
+  const { uniqueId } = await params;
+  const id = (uniqueId ?? "").trim();
   const dest = req.nextUrl.clone();
   dest.pathname = "/register";
   dest.search = "";

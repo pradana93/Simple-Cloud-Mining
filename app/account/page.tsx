@@ -7,6 +7,7 @@ import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { isTwoFactorEnabled } from "@/lib/two-factor";
 import { Badge } from "@/components/ui/badge";
 import { TwoFactorPanel } from "@/components/2fa/two-factor-panel";
+import { PasswordPanel } from "@/components/account/password-panel";
 
 export const dynamic = "force-dynamic";
 
@@ -119,7 +120,10 @@ export default async function AccountPage() {
         </Link>
       </div>
 
-      <TwoFactorPanel enabled={twoFactorOn} />
+      <div className="grid gap-4 md:grid-cols-2">
+        <PasswordPanel />
+        <TwoFactorPanel enabled={twoFactorOn} />
+      </div>
 
       <div className="panel flex flex-wrap items-center justify-between gap-4 rounded-2xl p-5">
         <div>

@@ -116,6 +116,34 @@ function probes(): Probe[] {
       },
     },
     {
+      key: "legacy_tables_locked",
+      label: "Anon cannot read legacy CMS tables",
+      run: async () => {
+        const tables = ["addon_demo", "addons", "addons_menu", "groups", "profile_groups"];
+        for (const table of tables) {
+          const { error } = await pub.from(table).select("*").limit(1);
+          if (errCode(error) !== DENIED) {
+            return { passed: false, detail: `${table} is reachable by anon${error ? `: ${errCode(error)}` : ""}.` };
+          }
+        }
+        return { passed: true, detail: `${tables.length} legacy tables blocked (42501).` };
+      },
+    },
+    {
+      key: "secret_tables_locked",
+      label: "Anon cannot read 2FA/seeds/attempt logs",
+      run: async () => {
+        const tables = ["user_2fa", "login_pending_2fa", "game_seeds", "login_attempts", "ipn_errors"];
+        for (const table of tables) {
+          const { error } = await pub.from(table).select("*").limit(1);
+          if (errCode(error) !== DENIED) {
+            return { passed: false, detail: `${table} is reachable by anon${error ? `: ${errCode(error)}` : ""}.` };
+          }
+        }
+        return { passed: true, detail: `${tables.length} sensitive tables blocked (42501).` };
+      },
+    },
+    {
       key: "profiles_hidden",
       label: "Anon sees no profile rows",
       run: async () => {

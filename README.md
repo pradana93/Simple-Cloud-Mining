@@ -62,3 +62,14 @@ job alerts when stored balances drift from the append-only ledger.
 - `006_security_lockdown.sql` revokes client write access to money tables, so
   balances, withdrawals and invoices can only change through the service-role
   API routes.
+- `022_security_payout_atomicity.sql` adds atomic withdrawal settlement and
+  payout claiming, and locks the legacy CMS tables. Apply every migration in
+  order.
+- Admin API routes require TOTP enrollment plus a fresh authenticator code.
+  Enroll before relying on admin tools.
+- Set the Supabase Auth site URL and redirect allow-list to the production
+  domain, including `/reset-password`, so email reset links work.
+- Set `COINPAYMENTS_IPN_SECRET` and `COINPAYMENTS_MERCHANT_ID` in production;
+  the IPN route rejects requests when either is missing.
+- Backups are encrypted locally. Set `BACKUP_UPLOAD_URL` (and optional
+  `BACKUP_UPLOAD_TOKEN`) to copy each backup offsite.

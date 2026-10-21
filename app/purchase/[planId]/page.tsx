@@ -9,14 +9,15 @@ import { PurchaseButton } from "@/components/purchase-button";
 
 export const dynamic = "force-dynamic";
 
-export default async function PurchasePage({ params }: { params: { planId: string } }) {
+export default async function PurchasePage({ params }: { params: Promise<{ planId: string }> }) {
+  const { planId } = await params;
   const s = await getCachedSettings();
   const cfg = await getMoneyCfg();
   type PurchasePlan = { id: number; plan_name: string; price: number; version: string | null; point_per_day: number | null; duration: number };
   let plan: PurchasePlan | null = null;
   try {
     const supabase = createServerSupabase();
-    const { data } = await supabase.from("plans").select("*").eq("id", Number(params.planId)).maybeSingle();
+    const { data } = await supabase.from("plans").select("*").eq("id", Number(planId)).maybeSingle();
     plan = (data as PurchasePlan | null) ?? null;
   } catch {
     plan = null;
@@ -58,7 +59,7 @@ export default async function PurchasePage({ params }: { params: { planId: strin
           </p>
         </div>
         <div className="mt-6">
-          <PurchaseButton planId={Number(params.planId)} coins={s.coin_mode === "api" ? coinOptions(s.pay_coins) : []} />
+          <PurchaseButton planId={Number(planId)} coins={s.coin_mode === "api" ? coinOptions(s.pay_coins) : []} />
         </div>
       </div>
     </div>

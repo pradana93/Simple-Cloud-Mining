@@ -5,12 +5,14 @@ import { isStale, selectAutoPayoutBatch, type WithdrawalLike } from "./payouts";
 
 // One pass of the payout queue, shared by the nightly cron and the admin
 // "run now" action:
-//   1. Reconciliation: an in-flight row that never settled is put back in the
-//      queue so it can be retried or handled by hand.
+//   1. Reconciliation: a PROCESSING row that was never sent is put back in the
+//      queue. Rows with a recorded send attempt are left alone; retrying them
+//      could pay the member twice.
 //   2. Aged pending: requests left untouched for a week are flagged (no state
 //      change) so an operator notices them.
-//   3. Auto-payout: when enabled and the wallet API is configured, eligible
-//      requests are sent, oldest first, up to a per-run cap.
+//   3. Auto-payout: eligible requests are claimed atomically, then sent once.
+//      A successful API call leaves the row PROCESSING until the CoinPayments
+//      IPN confirms it, so a crash cannot turn an unconfirmed send into SUCCESS.
 const STALE_MS = 60 * 60 * 1000;
 const AGED_MS = 7 * 24 * 60 * 60 * 1000;
 const MAX_PER_RUN = 25;
@@ -21,6 +23,7 @@ export type PayoutSummary = {
   autoFailed: number;
   agedPending: number;
   staleReset: number;
+  heldProcessing: number;
   skipped?: string;
 };
 
@@ -29,24 +32,48 @@ type Row = WithdrawalLike & { address: string | null };
 export async function runPayoutPass(now = new Date()): Promise<PayoutSummary> {
   const admin = createAdminSupabase();
   const settings = await getSettings();
-  const summary: PayoutSummary = { autoSent: 0, autoFailed: 0, agedPending: 0, staleReset: 0 };
+  const summary: PayoutSummary = {
+    autoSent: 0,
+    autoFailed: 0,
+    agedPending: 0,
+    staleReset: 0,
+    heldProcessing: 0,
+  };
 
   async function log(withdrawalId: number, event: string, detail: Record<string, unknown>) {
-    await admin.from("payout_events").insert({ withdrawal_id: withdrawalId, event, detail });
+    const { error } = await admin.from("payout_events").insert({ withdrawal_id: withdrawalId, event, detail });
+    return !error;
   }
 
-  // 1. Reset in-flight rows that went quiet.
+  // 1. Reset in-flight rows that were claimed but never handed to the wallet.
   const { data: inFlight } = await admin
     .from("user_withdrawal")
     .select("id,status,created_at")
     .not("status", "in", `(${SETTLED.map((s) => `"${s}"`).join(",")})`);
   for (const row of (inFlight ?? []) as Array<{ id: number; status: string; created_at: string }>) {
-    if (isStale(row.created_at, now, STALE_MS)) {
-      const { error } = await admin.from("user_withdrawal").update({ status: "PENDING" }).eq("id", row.id);
-      if (!error) {
-        await log(row.id, "stale_reset", { from: row.status });
-        summary.staleReset++;
-      }
+    if (!isStale(row.created_at, now, STALE_MS)) continue;
+
+    const { data: attempts } = await admin
+      .from("payout_events")
+      .select("id")
+      .eq("withdrawal_id", row.id)
+      .in("event", ["auto_attempt", "auto_sent"])
+      .limit(1);
+    if ((attempts ?? []).length > 0) {
+      summary.heldProcessing++;
+      continue;
+    }
+
+    const { data: updated } = await admin
+      .from("user_withdrawal")
+      .update({ status: "PENDING" })
+      .eq("id", row.id)
+      .eq("status", row.status)
+      .select("id")
+      .maybeSingle();
+    if (updated) {
+      await log(row.id, "stale_reset", { from: row.status });
+      summary.staleReset++;
     }
   }
 
@@ -86,7 +113,21 @@ export async function runPayoutPass(now = new Date()): Promise<PayoutSummary> {
       summary.autoFailed++;
       continue;
     }
-    await admin.from("user_withdrawal").update({ status: "PROCESSING" }).eq("id", row.id);
+
+    const { data: claimData, error: claimError } = await admin.rpc("claim_withdrawal_payout", { p_id: row.id });
+    const claim = Array.isArray(claimData) ? claimData[0] : claimData;
+    if (claimError || claim?.status !== "claimed") continue;
+
+    // Record the attempt before the network call. If the process dies after
+    // this point the row stays PROCESSING and an operator must reconcile it;
+    // it is never automatically resent.
+    if (!(await log(row.id, "auto_attempt", { amount: Number(row.amount) }))) {
+      await admin.from("user_withdrawal").update({ status: "PENDING" }).eq("id", row.id).eq("status", "PROCESSING");
+      await log(row.id, "auto_error", { error: "Could not record payout attempt" });
+      summary.autoFailed++;
+      continue;
+    }
+
     try {
       const result = await createWithdrawal({
         privateKey,
@@ -96,22 +137,29 @@ export async function runPayoutPass(now = new Date()): Promise<PayoutSummary> {
         address: row.address,
         ipnUrl: `${baseUrl}/api/ipn/coinpayments`,
       });
+
       if ((result as { error?: string }).error === "ok") {
         const tx = String((result.result as { id?: unknown } | undefined)?.id ?? "");
         await admin
           .from("user_withdrawal")
-          .update({ status: "SUCCESS", tx: tx || null, date_paid: now.toISOString() })
-          .eq("id", row.id);
+          .update({ tx: tx || null })
+          .eq("id", row.id)
+          .eq("status", "PROCESSING");
         await log(row.id, "auto_sent", { tx });
         summary.autoSent++;
       } else {
-        await admin.from("user_withdrawal").update({ status: "PENDING" }).eq("id", row.id);
+        await admin
+          .from("user_withdrawal")
+          .update({ status: "PENDING" })
+          .eq("id", row.id)
+          .eq("status", "PROCESSING");
         await log(row.id, "auto_error", { error: (result as { error?: string }).error ?? "unknown" });
         summary.autoFailed++;
       }
     } catch (e) {
-      await admin.from("user_withdrawal").update({ status: "PENDING" }).eq("id", row.id);
-      await log(row.id, "auto_error", { error: e instanceof Error ? e.message : "unknown" });
+      // The request may have reached CoinPayments. Leave it PROCESSING and
+      // surface it for manual review rather than risking a duplicate send.
+      await log(row.id, "auto_uncertain", { error: e instanceof Error ? e.message : "unknown" });
       summary.autoFailed++;
     }
   }

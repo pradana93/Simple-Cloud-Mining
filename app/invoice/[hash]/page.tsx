@@ -14,11 +14,12 @@ type Invoice = {
   date: string;
 };
 
-export default async function InvoicePage({ params }: { params: { hash: string } }) {
+export default async function InvoicePage({ params }: { params: Promise<{ hash: string }> }) {
+  const { hash } = await params;
   let inv: Invoice | null = null;
   try {
     const supabase = createServerSupabase();
-    const { data } = await supabase.from("transactions_history").select("*").eq("hash", params.hash).maybeSingle();
+    const { data } = await supabase.from("transactions_history").select("*").eq("hash", hash).maybeSingle();
     inv = data as Invoice | null;
   } catch {
     inv = null;
@@ -49,7 +50,7 @@ export default async function InvoicePage({ params }: { params: { hash: string }
           )}
         </div>
         <h1 className="font-display mt-4 text-2xl font-bold text-white sm:text-3xl">Complete your payment</h1>
-        <p className="mt-1 break-all font-mono text-xs text-slate-400">Invoice {params.hash}</p>
+        <p className="mt-1 break-all font-mono text-xs text-slate-400">Invoice {hash}</p>
 
         {p.address ? (
           <div className="mt-6 space-y-4">

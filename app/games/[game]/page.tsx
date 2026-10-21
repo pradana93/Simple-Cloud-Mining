@@ -12,16 +12,18 @@ import { CrashView } from "@/components/games/crash-view";
 
 export const dynamic = "force-dynamic";
 
-export function generateMetadata({ params }: { params: { game: string } }) {
-  const meta = gameMeta(params.game);
+export async function generateMetadata({ params }: { params: Promise<{ game: string }> }) {
+  const { game } = await params;
+  const meta = gameMeta(game);
   return { title: meta ? meta.name : "Game" };
 }
 
-export default async function GamePage({ params }: { params: { game: string } }) {
-  const meta = gameMeta(params.game);
+export default async function GamePage({ params }: { params: Promise<{ game: string }> }) {
+  const { game } = await params;
+  const meta = gameMeta(game);
   const s = await getCachedSettings();
   const econ = casinoEcon(s);
-  if (!meta || !s.games_enabled || isGameDisabled(econ, params.game)) notFound();
+  if (!meta || !s.games_enabled || isGameDisabled(econ, game)) notFound();
 
   const supabase = createServerSupabase();
   const {

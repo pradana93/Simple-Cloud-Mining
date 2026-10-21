@@ -22,13 +22,68 @@ export async function POST(req: Request) {
   const sentHmac = req.headers.get("hmac") ?? req.headers.get("HMAC");
   const ipnType = g("ipn_type");
 
-  if (ipnType === "withdrawal" && form.get("converted_to")) {
-    return new Response("IPN OK");
-  }
-
   const log = async (message: string, transaction_id: number | null, status: string | null, content: string | null) => {
     await admin.from("ipn_errors").insert({ transaction_id, message, status, content });
   };
+
+  const secret = process.env.COINPAYMENTS_IPN_SECRET ?? "";
+  const merchantId = process.env.COINPAYMENTS_MERCHANT_ID ?? "";
+  if (!secret || !merchantId) {
+    await log("IPN is not configured (missing secret or merchant id)", null, null, ipnType);
+    return new Response("IPN Error: not configured", { status: 500 });
+  }
+
+  if (!ipnMode || ipnMode !== "hmac") {
+    await log("IPN Mode is not HMAC!", null, null, ipnMode);
+    return new Response("IPN Error: mode", { status: 400 });
+  }
+  if (!verifyIpnHmac(raw, sentHmac, secret)) {
+    await log("HMAC signature does not match", null, null, sentHmac);
+    return new Response("IPN Error: HMAC", { status: 400 });
+  }
+  if (!merchant || merchant !== merchantId) {
+    await log("No or incorrect Merchant ID passed", null, null, merchant);
+    return new Response("IPN Error: merchant", { status: 400 });
+  }
+
+  // Withdrawal status updates have no invoice. Reconcile them after the HMAC
+  // check so a forged request cannot mark a payout paid or refund it.
+  if (ipnType === "withdrawal") {
+    if (form.get("converted_to")) return new Response("IPN OK");
+
+    const withdrawalId = g("id") ?? g("txn_id");
+    const status = Number(g("status"));
+    if (!withdrawalId) return new Response("IPN OK");
+
+    let { data: w } = await admin
+      .from("user_withdrawal")
+      .select("id,status,tx")
+      .eq("tx", withdrawalId)
+      .maybeSingle();
+    const txnId = g("txn_id");
+    if (!w && txnId && txnId !== withdrawalId) {
+      const alt = await admin.from("user_withdrawal").select("id,status,tx").eq("tx", txnId).maybeSingle();
+      w = alt.data;
+    }
+    if (!w) {
+      await log("Withdrawal not found", null, String(status), withdrawalId);
+      return new Response("IPN OK");
+    }
+
+    if (status >= 100 || status === 2 || status < 0) {
+      const action = status < 0 ? "cancel_refund" : "approve";
+      const { error } = await admin.rpc("settle_withdrawal", {
+        p_id: (w as { id: number }).id,
+        p_action: action,
+        p_tx: withdrawalId,
+      });
+      if (error) {
+        await log("Withdrawal settlement failed", null, String(status), error.message);
+        return new Response("IPN Error: settlement failed", { status: 500 });
+      }
+    }
+    return new Response("IPN OK");
+  }
 
   const { data: tx } = await admin.from("transactions_history").select("*").eq("hash", invoice ?? "").maybeSingle();
   if (!tx) {
@@ -47,19 +102,6 @@ export async function POST(req: Request) {
   if (t.status === "paid") {
     await log("Transaction already paid!", t.id, null, invoice);
     return new Response("IPN Error: already paid");
-  }
-  if (!ipnMode || ipnMode !== "hmac") {
-    await log("IPN Mode is not HMAC!", t.id, null, ipnMode);
-    return new Response("IPN Error: mode", { status: 400 });
-  }
-  const secret = process.env.COINPAYMENTS_IPN_SECRET ?? "";
-  if (!verifyIpnHmac(raw, sentHmac, secret)) {
-    await log("HMAC signature does not match", t.id, null, sentHmac);
-    return new Response("IPN Error: HMAC", { status: 400 });
-  }
-  if (!merchant || merchant !== (process.env.COINPAYMENTS_MERCHANT_ID ?? "")) {
-    await log("No or incorrect Merchant ID passed", t.id, null, merchant);
-    return new Response("IPN Error: merchant", { status: 400 });
   }
 
   const currency1 = g("currency1");

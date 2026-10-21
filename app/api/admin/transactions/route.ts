@@ -26,8 +26,16 @@ export async function POST(req: Request) {
     if (status === "paid") return NextResponse.json({ ok: false, error: "Paid invoices cannot be canceled" }, { status: 409 });
     if (status === "canceled") return NextResponse.json({ ok: false, error: "Already canceled" }, { status: 409 });
 
-    const { error } = await admin.from("transactions_history").update({ status: "canceled" }).eq("id", id);
+    const { data: updated, error } = await admin
+      .from("transactions_history")
+      .update({ status: "canceled" })
+      .eq("id", id)
+      .neq("status", "paid")
+      .neq("status", "canceled")
+      .select("id")
+      .maybeSingle();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+    if (!updated) return NextResponse.json({ ok: false, error: "Invoice is already settled" }, { status: 409 });
     await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "invoice.cancel", target: String(id), req });
     return NextResponse.json({ ok: true, message: "Invoice canceled" });
   } catch {

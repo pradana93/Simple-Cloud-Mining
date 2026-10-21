@@ -103,7 +103,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const refCookie = cookies().get("ref")?.value ?? null;
+  const refCookie = (await cookies()).get("ref")?.value ?? null;
   const s = await getCachedSettings();
   const cfg = await getMoneyCfg();
   const now = Date.now();
@@ -284,8 +284,8 @@ export default async function DashboardPage() {
     }
   }
 
+  const h = await headers();
   const referralLink = (() => {
-    const h = headers();
     const host = h.get("host");
     const proto = h.get("x-forwarded-proto") ?? (host && host.includes("localhost") ? "http" : "https");
     const base = host ? `${proto}://${host}` : process.env.NEXT_PUBLIC_SITE_URL || "";

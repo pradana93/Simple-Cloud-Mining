@@ -76,9 +76,9 @@ export default async function AffiliatePage() {
     }
   }
 
+  const h = await headers();
   const referralLink = (() => {
     if (!uniqueId) return "";
-    const h = headers();
     const host = h.get("host");
     const proto = h.get("x-forwarded-proto") ?? (host && host.includes("localhost") ? "http" : "https");
     const base = host ? `${proto}://${host}` : process.env.NEXT_PUBLIC_SITE_URL || "";

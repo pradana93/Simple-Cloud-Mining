@@ -5,7 +5,7 @@ import path from "node:path";
 // No DOM, no network, no database: fast and deterministic.
 export default defineConfig({
   resolve: {
-    alias: { "@": path.resolve(__dirname, ".") },
+    alias: { "@": path.resolve(import.meta.dirname, ".") },
   },
   test: {
     environment: "node",

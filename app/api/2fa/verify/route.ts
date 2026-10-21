@@ -5,6 +5,13 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { verifyUserCode } from "@/lib/two-factor";
 import { MFA_COOKIE, issueMfaToken, mfaCookieOptions } from "@/lib/mfa-cookie";
+import {
+  TFA_LIMIT,
+  TFA_WINDOW_MS,
+  clientIp,
+  limitReached,
+  twoFactorAttemptKey,
+} from "@/lib/login-throttle";
 import type { Database } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -55,10 +62,29 @@ export async function POST(req: Request) {
     userId = user.id;
   }
 
+  const attemptKey = twoFactorAttemptKey(userId);
+  const { count } = await admin
+    .from("login_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("login", attemptKey)
+    .gte("time", Date.now() - TFA_WINDOW_MS);
+  if (limitReached(count, TFA_LIMIT)) {
+    return NextResponse.json(
+      { ok: false, error: "Too many codes. Try again in 15 minutes." },
+      { status: 429 }
+    );
+  }
+
   const result = await verifyUserCode(userId, code);
   if (!result.ok) {
+    await admin.from("login_attempts").insert({
+      ip_address: clientIp(req),
+      login: attemptKey,
+      time: Date.now(),
+    });
     return NextResponse.json({ ok: false, error: "That code is not valid." }, { status: 400 });
   }
+  await admin.from("login_attempts").delete().eq("login", attemptKey);
 
   let isAdmin = false;
   if (pending) {
@@ -74,9 +100,9 @@ export async function POST(req: Request) {
     const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
     const ssr = createServerClient<Database>(url, anon, {
       cookies: {
-        getAll() {
-          return cookies().getAll();
-        },
+      async getAll() {
+        return (await cookies()).getAll();
+      },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
         },

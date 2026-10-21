@@ -28,7 +28,14 @@ const TABLES = [
   "game_bets",
   "game_rounds",
   "crash_rounds",
+  "game_seeds",
   "game_seed_reveals",
+  "payout_events",
+  "ipn_errors",
+  "user_2fa",
+  "login_attempts",
+  "security_checks",
+  "account_risk",
   "admin_audit",
   "risk_events",
   "chat_messages",
@@ -121,6 +128,24 @@ async function main() {
   fs.writeFileSync(file, JSON.stringify(envelope), { mode: 0o600 });
   const size = fs.statSync(file).size;
   info(`Wrote ${file} (${Math.round(size / 1024)} KiB).`);
+
+  if (env.BACKUP_UPLOAD_URL) {
+    const headers = { "content-type": "application/octet-stream" };
+    if (env.BACKUP_UPLOAD_TOKEN) headers.authorization = `Bearer ${env.BACKUP_UPLOAD_TOKEN}`;
+    const res = await fetch(env.BACKUP_UPLOAD_URL, {
+      method: "PUT",
+      headers,
+      body: fs.readFileSync(file),
+    });
+    if (!res.ok) {
+      warn(`Offsite upload failed: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
+    } else {
+      ok("Encrypted backup uploaded offsite");
+    }
+  } else {
+    info("Set BACKUP_UPLOAD_URL (and optional BACKUP_UPLOAD_TOKEN) to copy backups offsite.");
+  }
+
   info("Store this file off the server and keep BACKUP_ENCRYPTION_KEY in a separate secret manager.");
 }
 
