@@ -4,6 +4,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
 import { recordEvent } from "@/lib/risk-telemetry";
 import { requireFreshMfa } from "@/lib/mfa-guard";
+import { firstRow, requestIdempotencyKey } from "@/lib/ledger";
 
 const ADDRESS_MIN = 8;
 const ADDRESS_MAX = 200;
@@ -13,9 +14,9 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
 
-  let body: { amount?: unknown; address?: unknown };
+  let body: { amount?: unknown; address?: unknown; idempotencyKey?: unknown };
   try {
-    body = (await req.json()) as { amount?: unknown; address?: unknown };
+    body = (await req.json()) as { amount?: unknown; address?: unknown; idempotencyKey?: unknown };
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });
   }
@@ -54,28 +55,28 @@ export async function POST(req: Request) {
     );
   }
 
-  // Atomic reserve: one guarded UPDATE so concurrent requests can't overspend.
-  const { data: debited, error: debitError } = await admin.rpc("debit_balance", {
-    p_user_id: user.id,
+  // The database reserves the balance and creates the request in one
+  // transaction, so a retry or a crash can never debit without a row.
+  const idempotency = requestIdempotencyKey(req, user.id, "withdraw", body.idempotencyKey);
+  const { data, error } = await admin.rpc("request_withdrawal", {
+    p_user: user.id,
     p_amount: amount,
+    p_address: address,
+    p_idempotency_key: idempotency,
   });
-  if (debitError) return NextResponse.json({ ok: false, error: debitError.message }, { status: 500 });
-  if (debited == null) {
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+  const row = firstRow<{ status?: string; withdrawal_id?: unknown; balance?: unknown }>(data);
+  const id = row?.withdrawal_id == null ? null : Number(row.withdrawal_id);
+  if (row?.status === "insufficient") {
     return NextResponse.json({ ok: false, error: "Insufficient earnings balance" }, { status: 400 });
   }
-
-  const { data: created, error: insertError } = await admin
-    .from("user_withdrawal")
-    .insert({ user_id: user.id, amount, address })
-    .select("id")
-    .maybeSingle();
-  if (insertError) {
-    // Refund the reserved amount so a member never loses balance to a failed row.
-    await admin.rpc("credit_balance", { p_user_id: user.id, p_amount: amount });
-    return NextResponse.json({ ok: false, error: insertError.message }, { status: 500 });
+  if (row?.status !== "applied" && row?.status !== "duplicate") {
+    return NextResponse.json({ ok: false, error: "Could not create the withdrawal" }, { status: 500 });
   }
-  const id = (created as { id: number } | null)?.id ?? null;
-  await recordEvent({ userId: user.id, kind: "withdraw", req, detail: { amount } });
+  if (row.status === "applied") {
+    await recordEvent({ userId: user.id, kind: "withdraw", req, detail: { amount } });
+  }
 
   return NextResponse.json({ ok: true, id });
 }

@@ -32,9 +32,10 @@ See [docs/INSTALL.md](docs/INSTALL.md) for the full guide. The short version:
 4. Deploy to Vercel (or Docker) with the same env vars, then set the
    CoinPayments IPN URL to `https://YOUR-DOMAIN/api/ipn/coinpayments`
 
-`vercel.json` schedules four daily jobs: `/api/cron/accrue`, `/api/cron/risk`,
-`/api/cron/security` and `/api/cron/payouts`. Per-request accrual in
-`lib/accrue-user.ts` keeps balances fresh between runs.
+`vercel.json` schedules five daily jobs: `/api/cron/accrue`, `/api/cron/risk`,
+`/api/cron/security`, `/api/cron/payouts` and `/api/cron/ledger`. Per-request
+accrual in `lib/accrue-user.ts` keeps balances fresh between runs. The ledger
+job alerts when stored balances drift from the append-only ledger.
 
 ## Docs and tooling
 
@@ -45,6 +46,9 @@ See [docs/INSTALL.md](docs/INSTALL.md) for the full guide. The short version:
 | [LICENSE.txt](LICENSE.txt) | License template to adapt before selling |
 | `scripts/install.mjs` | Setup wizard (`npm run setup`) |
 | `scripts/make-admin.mjs` | Promote an account (`npm run make-admin`) |
+| `scripts/logical-backup.mjs` | Encrypted application backup (`npm run backup`) |
+| [docs/RESTORE.md](docs/RESTORE.md) | Backup posture and restore drill |
+| `playwright.config.ts`, `tests/e2e` | Public and signed-in browser baseline (`npm run test:e2e`) |
 | `scripts/package.mjs` | Build the buyer zip (`npm run bundle`) |
 | `Dockerfile`, `docker-compose.yml` | Self-host option |
 

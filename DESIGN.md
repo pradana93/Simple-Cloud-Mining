@@ -47,6 +47,10 @@ The mark is an agent-authored placeholder: a pick-and-rule monogram in a gold ti
 
 - The lobby groups games by pace (one press, choose and spin, round by round) because a player picks by session length, not by the category label.
 - Admin > Casino reports owner profit per game because the operator needs to know which table earns, not only the site total.
+- The verifier is a separate page because a member may need it when the casino is closed, and checking a bet should not require opening a table.
+- Verification runs in the browser from the committed hash, client seed, nonce and a revealed server seed. The archive keeps each reveal by hash; the page fills the seed when known and accepts a pasted seed when it is not.
+- The verifier shows the seed-derived outcome separately from the recorded paid multiplier because site edge and win caps can change payout without changing the outcome.
+- Mines only lists settled rounds. An active round hides its layout until it settles.
 
 ## Casino motion reasons
 

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Bomb, Gem, Loader2 } from "lucide-react";
+import { ArrowUpRight, Bomb, Gem, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCrypto } from "@/lib/utils";
@@ -111,7 +111,7 @@ export function MinesView({
       const res = await fetch(`/api/games/mines/${path}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ ...body, idempotencyKey: crypto.randomUUID() }),
       });
       const j = (await res.json()) as Play;
       if (!j.ok) {
@@ -173,12 +173,14 @@ export function MinesView({
   const revealed = active?.revealed ?? [];
   const multiplier = active?.multiplier ?? (done === "cashed" ? payout : 0);
   const nextMultiplier = active?.nextMultiplier ?? 0;
-  const stakeNum = active ? active.stake : Number(stake);
+  const playing = Boolean(active) && !done;
+  const lastStake = active?.stake ?? Number(stake);
+  const stakeNum = playing ? lastStake : Number(stake);
   const belowMin = minBet > 0 && Number.isFinite(stakeNum) && stakeNum < minBet;
   const aboveMax = maxBet > 0 && Number.isFinite(stakeNum) && stakeNum > maxBet;
-  const overBalance = !active && Number.isFinite(stakeNum) && stakeNum > balance;
+  const overBalance = !playing && Number.isFinite(stakeNum) && stakeNum > balance;
   const badStake = belowMin || aboveMax || overBalance;
-  const stakeOk = !active && Number.isFinite(stakeNum) && stakeNum > 0 && !badStake;
+  const stakeOk = !playing && Number.isFinite(stakeNum) && stakeNum > 0 && !badStake;
   const clampStake = (n: number) => {
     let v = Number.isFinite(n) && n > 0 ? n : minBet > 0 ? minBet : 0;
     if (minBet > 0 && v < minBet) v = minBet;
@@ -186,8 +188,7 @@ export function MinesView({
     if (balance > 0 && v > balance) v = balance;
     return Number(v.toFixed(decimals));
   };
-  const cashValue = active ? active.stake * active.multiplier : 0;
-  const playing = Boolean(active) && !done;
+  const cashValue = playing && active ? active.stake * active.multiplier : 0;
   const shownBalance = useCountUp(balance, 650);
   const shownMult = useCountUp(multiplier, 450);
 
@@ -361,7 +362,7 @@ export function MinesView({
               <p className={cn("text-center text-sm font-semibold", done === "cashed" ? "text-emerald-300" : "text-red-300")}>
                 {done === "cashed"
                   ? `Cashed out ${formatCrypto(payout, decimals)} ${symbol}`
-                  : `Busted. ${formatCrypto(stakeNum, decimals)} ${symbol} lost.`}
+                  : `Busted. ${formatCrypto(lastStake, decimals)} ${symbol} lost.`}
               </p>
             )}
           </div>
@@ -371,6 +372,16 @@ export function MinesView({
           Every tile is drawn from the committed seed at the start. Base 1% house edge, and site payout
           settings can adjust the return.
         </p>
+        <Link
+          href={
+            done && active
+              ? `/games/verify?bet=mines:${active.roundId}&game=mines`
+              : "/games/verify?game=mines"
+          }
+          className="tap mt-3 inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-gold-300 underline underline-offset-2 hover:text-gold-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+        >
+          {done && active ? "Verify this round" : "Verify a settled round"} <ArrowUpRight size={14} />
+        </Link>
       </div>
     </div>
   );

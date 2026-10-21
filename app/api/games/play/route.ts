@@ -6,9 +6,9 @@ export async function POST(req: Request) {
   const gate = await requirePlayer();
   if ("error" in gate) return gate.error;
 
-  let body: { game?: unknown; stake?: unknown; params?: unknown };
+  let body: { game?: unknown; stake?: unknown; params?: unknown; idempotencyKey?: unknown };
   try {
-    body = (await req.json()) as { game?: unknown; stake?: unknown; params?: unknown };
+    body = (await req.json()) as { game?: unknown; stake?: unknown; params?: unknown; idempotencyKey?: unknown };
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });
   }
@@ -27,6 +27,10 @@ export async function POST(req: Request) {
     params: body.params,
     req,
     econ,
+    idempotencyKey:
+      typeof body.idempotencyKey === "string"
+        ? body.idempotencyKey
+        : req.headers.get("idempotency-key") ?? undefined,
   });
 
   if (!outcome.ok) {

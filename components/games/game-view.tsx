@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, Loader2, Repeat2 } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Loader2, Repeat2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCrypto } from "@/lib/utils";
@@ -78,6 +78,7 @@ export function GameView({
   const [result, setResult] = useState<PlayResponse | null>(null);
   const [runId, setRunId] = useState(0);
   const [bets, setBets] = useState<BetRow[]>([]);
+  const [historyState, setHistoryState] = useState<"loading" | "ready" | "error">("loading");
   const [autoOpen, setAutoOpen] = useState(false);
   const [autoCfg, setAutoCfg] = useState<AutoConfig>(AUTO_DEFAULTS);
   const [autoRunning, setAutoRunning] = useState(false);
@@ -91,6 +92,7 @@ export function GameView({
   const autoSessionRef = useRef(0);
   const autoCancelRef = useRef(false);
   const suppressWinToastRef = useRef(false);
+  const betKeyRef = useRef<string | null>(null);
 
   const landMs = LAND[id] ?? 240;
   const spin = useSpin(runId, 0, landMs, readyRef);
@@ -138,12 +140,18 @@ export function GameView({
   );
 
   const loadHistory = useCallback(async () => {
+    setHistoryState((state) => (state === "ready" ? state : "loading"));
     try {
       const res = await fetch("/api/games/history");
       const j = (await res.json()) as { ok: boolean; bets?: BetRow[] };
-      if (j.ok && j.bets) setBets(j.bets);
+      if (j.ok && j.bets) {
+        setBets(j.bets);
+        setHistoryState("ready");
+      } else {
+        setHistoryState("error");
+      }
     } catch {
-      /* history is best-effort */
+      setHistoryState("error");
     }
   }, []);
 
@@ -204,18 +212,27 @@ export function GameView({
       readyRef.current = false;
       setResult(null);
       setRunId((n) => n + 1);
+      const key = betKeyRef.current ?? crypto.randomUUID();
+      betKeyRef.current = key;
       try {
         const res = await fetch("/api/games/play", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ game: id, stake: betStake, params: betParams }),
+          body: JSON.stringify({
+            game: id,
+            stake: betStake,
+            params: betParams,
+            idempotencyKey: key,
+          }),
         });
         const j = (await res.json()) as PlayResponse | { ok: false; error: string };
         if (!j.ok) {
+          betKeyRef.current = null;
           push((j as { error: string }).error || "Bet failed", "error");
           readyRef.current = true;
           return null;
         }
+        betKeyRef.current = null;
         const r = j as PlayResponse;
         balanceRef.current = r.balance;
         setBalance(r.balance);
@@ -726,32 +743,72 @@ export function GameView({
         <div className="panel rounded-2xl p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-sm font-bold text-white">{name} history</h2>
-            <span className="text-xs text-slate-400">Recent</span>
+            <Link
+              href="/games/verify"
+              className="inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-gold-300 underline underline-offset-2 hover:text-gold-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+            >
+              Verify <ArrowUpRight size={12} />
+            </Link>
           </div>
           <p className="mb-3 text-xs text-slate-400">{blurb}</p>
-          <ul className="space-y-1.5">
-            {rounds.length === 0 && (
+          {historyState === "error" && rounds.length > 0 && (
+            <p className="mb-2 text-xs text-red-300">Could not refresh history.</p>
+          )}
+          <ul className="space-y-1.5" aria-busy={historyState === "loading"}>
+            {historyState === "loading" && rounds.length === 0 && (
+              <li className="space-y-1.5" aria-hidden>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-9 animate-pulse rounded-lg bg-ink-900/60" />
+                ))}
+              </li>
+            )}
+            {historyState === "error" && rounds.length === 0 && (
+              <li className="rounded-lg bg-red-500/10 px-3 py-3 ring-1 ring-red-500/30">
+                <p className="text-xs text-red-200">Could not load history.</p>
+                <button
+                  type="button"
+                  onClick={() => void loadHistory()}
+                  className="tap mt-2 inline-flex h-11 items-center rounded-lg border border-red-500/30 px-4 text-xs font-semibold text-red-100 transition-colors hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+                >
+                  Retry
+                </button>
+              </li>
+            )}
+            {historyState === "ready" && rounds.length === 0 && (
               <li className="rounded-lg border border-dashed border-slate-800 px-3 py-4 text-xs text-slate-400">
                 No rounds here yet. Your first bet lands in this list.
               </li>
             )}
             {rounds.map((b) => (
-              <li key={b.id} className="flex items-center justify-between gap-2 rounded-lg bg-ink-900/60 px-3 py-2 text-xs">
-                <span className="flex-1 truncate text-slate-300">
-                  #{b.nonce}
-                </span>
-                <span className={cn("font-display font-bold", b.won ? "text-emerald-300" : "text-slate-400")}>
-                  {b.multiplier.toFixed(2)}x
-                </span>
-                <span
-                  className={cn(
-                    "w-24 text-right font-mono tabular-nums",
-                    b.won ? "text-emerald-300" : "text-slate-400"
-                  )}
+              <li key={b.id}>
+                <Link
+                  href={`/games/verify?bet=bet:${b.id}&game=${id}`}
+                  title={`Verify round ${b.nonce}`}
+                  aria-label={`Verify round ${b.nonce}, ${b.won ? "won" : "lost"} ${formatCrypto(
+                    b.won ? b.payout : b.stake,
+                    decimals
+                  )} ${symbol}`}
+                  className="tap group flex min-h-11 items-center justify-between gap-2 rounded-lg bg-ink-900/60 px-3 py-2 text-xs ring-1 ring-transparent transition-colors hover:bg-ink-800 hover:ring-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
                 >
-                  {b.won ? "+" : "-"}
-                  {formatCrypto(b.won ? b.payout : b.stake, decimals)}
-                </span>
+                  <span className="flex-1 truncate text-slate-300 group-hover:text-white">#{b.nonce}</span>
+                  <span className={cn("font-display font-bold", b.won ? "text-emerald-300" : "text-slate-400")}>
+                    {b.multiplier.toFixed(2)}x
+                  </span>
+                  <span
+                    className={cn(
+                      "w-20 text-right font-mono tabular-nums",
+                      b.won ? "text-emerald-300" : "text-slate-400"
+                    )}
+                  >
+                    {b.won ? "+" : "-"}
+                    {formatCrypto(b.won ? b.payout : b.stake, decimals)}
+                  </span>
+                  <ArrowUpRight
+                    size={12}
+                    className="shrink-0 text-slate-500 group-hover:text-gold-300"
+                    aria-hidden
+                  />
+                </Link>
               </li>
             ))}
           </ul>

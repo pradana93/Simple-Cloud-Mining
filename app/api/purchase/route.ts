@@ -6,15 +6,43 @@ import { getSettings } from "@/lib/settings";
 import { buildGatewayUrl, createApiTransaction } from "@/lib/coinpayments";
 import { getFxTable } from "@/lib/fx";
 import { isPayableCoin } from "@/lib/checkout";
+import { requestIdempotencyKey } from "@/lib/ledger";
+import { sendAlert } from "@/lib/alerts";
+
+type StoredInvoice = {
+  hash: string;
+  status?: string | null;
+  params?: { gateway_url?: string; payCoin?: string } | null;
+};
+
+function invoiceResponse(row: StoredInvoice) {
+  return NextResponse.json({
+    ok: true,
+    hash: row.hash,
+    redirectUrl: row.params?.gateway_url,
+    status: row.status ?? "pending",
+    duplicate: true,
+  });
+}
 
 export async function POST(req: Request) {
   const supabase = createServerSupabase();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
 
-  const { planId, coin } = (await req.json()) as { planId: number; coin?: string };
-  const settings = await getSettings();
+  const body = (await req.json()) as { planId: number; coin?: string; idempotencyKey?: string };
+  const { planId, coin } = body;
+  const key = requestIdempotencyKey(req, user.id, "purchase", body.idempotencyKey);
   const admin = createAdminSupabase();
+
+  const { data: existing } = await admin
+    .from("transactions_history")
+    .select("hash,status,params")
+    .eq("idempotency_key", key)
+    .maybeSingle();
+  if (existing) return invoiceResponse(existing as StoredInvoice);
+
+  const settings = await getSettings();
 
   if (coin && !isPayableCoin(coin, settings.pay_coins)) {
     return NextResponse.json({ ok: false, error: "That coin is not available for checkout." }, { status: 400 });
@@ -66,15 +94,33 @@ export async function POST(req: Request) {
       invoice: hash,
       baseUrl,
     });
-    await admin.from("transactions_history").insert({
+    const { error: insertError } = await admin.from("transactions_history").insert({
       user_id: user.id,
       plan_id: planId,
       amount: cryptoAmount,
       price_amount: price,
       price_currency: settings.price_currency,
       hash,
+      idempotency_key: key,
       params: { gateway_url: url },
     });
+    if (insertError) {
+      if (insertError.code === "23505") {
+        const { data: raced } = await admin
+          .from("transactions_history")
+          .select("hash,status,params")
+          .eq("idempotency_key", key)
+          .maybeSingle();
+        if (raced) return invoiceResponse(raced as StoredInvoice);
+      }
+      await sendAlert({
+        title: "Purchase invoice was not recorded",
+        message: insertError.message,
+        tags: { flow: "purchase", mode: "gateway" },
+        extra: { userId: user.id, planId, hash },
+      });
+      return NextResponse.json({ ok: false, error: "Invoice created but could not be recorded. Contact support." }, { status: 500 });
+    }
     return NextResponse.json({ ok: true, redirectUrl: url, hash });
   }
 
@@ -100,14 +146,32 @@ export async function POST(req: Request) {
   if ((result as { error?: string }).error !== "ok") {
     return NextResponse.json({ ok: false, error: "CoinPayments error. Contact admin." }, { status: 502 });
   }
-  await admin.from("transactions_history").insert({
+  const { error: insertError } = await admin.from("transactions_history").insert({
     user_id: user.id,
     plan_id: planId,
     amount: cryptoAmount,
     price_amount: price,
     price_currency: settings.price_currency,
     hash,
+    idempotency_key: key,
     params: { ...(result.result as Record<string, unknown>), payCoin: payCoin ?? settings.coin_cur2 } as never,
   });
+  if (insertError) {
+    if (insertError.code === "23505") {
+      const { data: raced } = await admin
+        .from("transactions_history")
+        .select("hash,status,params")
+        .eq("idempotency_key", key)
+        .maybeSingle();
+      if (raced) return invoiceResponse(raced as StoredInvoice);
+    }
+    await sendAlert({
+      title: "Purchase invoice was not recorded",
+      message: insertError.message,
+      tags: { flow: "purchase", mode: "api" },
+      extra: { userId: user.id, planId, hash },
+    });
+    return NextResponse.json({ ok: false, error: "Invoice created but could not be recorded. Contact support." }, { status: 500 });
+  }
   return NextResponse.json({ ok: true, hash });
 }

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -170,6 +170,7 @@ export function WithdrawConsole({
   const [filter, setFilter] = useState<Filter>("All");
   const [openId, setOpenId] = useState<number | null>(null);
   const [mfaOpen, setMfaOpen] = useState(false);
+  const idempotencyRef = useRef<string | null>(null);
 
   // Re-anchor the optimistic debit once the server hands back a fresh balance.
   useEffect(() => setSpent(0), [balance]);
@@ -199,14 +200,17 @@ export function WithdrawConsole({
 
   async function submit() {
     setLoading(true);
+    const key = idempotencyRef.current ?? crypto.randomUUID();
+    idempotencyRef.current = key;
     try {
       const res = await fetch("/api/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: parsed, address: address.trim() }),
+        body: JSON.stringify({ amount: parsed, address: address.trim(), idempotencyKey: key }),
       });
       const j = (await res.json()) as { ok: boolean; error?: string; id?: number; mfaRequired?: boolean };
       if (j.ok) {
+        idempotencyRef.current = null;
         push("Withdrawal requested", "success");
         setSpent((s) => s + parsed);
         setConfirming(false);
@@ -216,6 +220,7 @@ export function WithdrawConsole({
         setConfirming(false);
         setMfaOpen(true);
       } else {
+        idempotencyRef.current = null;
         push(j.error ?? "Withdrawal failed", "error");
       }
     } catch (e) {

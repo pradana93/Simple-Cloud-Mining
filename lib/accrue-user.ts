@@ -1,5 +1,6 @@
 import { createAdminSupabase } from "./supabase/admin";
 import { accrueForPlan } from "./mining";
+import { asNumber, firstRow } from "./ledger";
 
 export type AccrualRow = {
   id: number;
@@ -42,7 +43,6 @@ export async function accrueOwnPlans(
     const dueIds: number[] = [];
     const expiredIds: number[] = [];
     let pending = 0;
-    let credited = 0;
 
     for (const row of rows) {
       const planObj = Array.isArray(row.plan) ? row.plan[0] : row.plan;
@@ -64,23 +64,27 @@ export async function accrueOwnPlans(
       const last = row.last_sum ? new Date(row.last_sum).getTime() : new Date(row.created_at).getTime();
       if (now.getTime() - last < minInterval) continue;
       dueIds.push(row.id);
-      credited += res.earnings;
     }
 
     if (dueIds.length === 0 && expiredIds.length === 0) return { pending, credited: 0 };
 
-    const writes: Array<PromiseLike<unknown>> = [];
-    if (dueIds.length > 0) {
-      writes.push(admin.from("user_plan_history").update({ last_sum: now.toISOString() }).in("id", dueIds));
+    const settleIds = Array.from(new Set([...expiredIds, ...dueIds]));
+    const results = await Promise.all(
+      settleIds.map((id) =>
+        admin.rpc("accrue_plan", {
+          p_plan_id: id,
+          p_now: now.toISOString(),
+        })
+      )
+    );
+
+    let persisted = 0;
+    for (const result of results) {
+      if (result.error) continue;
+      const row = firstRow<{ status?: string; credited?: unknown }>(result.data);
+      if (row?.status === "credited") persisted += asNumber(row.credited);
     }
-    if (expiredIds.length > 0) {
-      writes.push(admin.from("user_plan_history").update({ status: "inactive" }).in("id", expiredIds));
-    }
-    if (credited > 0) {
-      writes.push(admin.rpc("credit_balance", { p_user_id: userId, p_amount: credited }));
-    }
-    await Promise.all(writes);
-    return { pending, credited };
+    return { pending, credited: Number(persisted.toFixed(8)) };
   } catch {
     return { pending: 0, credited: 0 };
   }

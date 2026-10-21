@@ -11,7 +11,7 @@ that need careful attention.
 
 | Item | Notes |
 |---|---|
-| Node.js 18.17 or newer | https://nodejs.org. The installer checks this. |
+| Node.js 20.19 or newer | https://nodejs.org. The installer checks this. |
 | A Supabase account | Free tier is enough to start. https://supabase.com |
 | A CoinPayments account | Needed for real deposits. https://www.coinpayments.net |
 | A host (optional at first) | Vercel has a free tier. Any Node host works. |
@@ -112,6 +112,11 @@ deploys. `.env.example` lists them with comments.
 | `COINPAYMENTS_PRIVATE_KEY` | No | Same screen | API mode checkout and automated payouts |
 | `COINPAYMENTS_PUBLIC_KEY` | No | Same screen | Same as above |
 | `RISK_SALT` | No | You generate it | Salt for hashing IPs in anti-fraud data |
+| `NEXT_PUBLIC_SENTRY_DSN` | No | Sentry project settings | Error reporting in the browser |
+| `SENTRY_DSN` | No | Sentry project settings | Error reporting on the server and edge |
+| `ALERT_WEBHOOK_URL` | No | Slack or Discord webhook | Money and ledger drift alerts |
+| `BACKUP_ENCRYPTION_KEY` | Recommended | You generate 32+ random characters | Encrypts logical backups |
+| `SUPABASE_ACCESS_TOKEN` | For backup checks | Supabase account settings | Reads native backup posture |
 | `SMTP_SENDER` | No | Your mail provider | From address on gateway emails |
 | `OPENAI_API_KEY` | No | OpenAI | Powers the admin plan assistant |
 | `ANTHROPIC_API_KEY` | No | Anthropic | Alternative provider for the plan assistant |
@@ -172,7 +177,7 @@ stored, so members can keep verifying results.
    Variables. Use your live domain for `NEXT_PUBLIC_SITE_URL`.
 4. Deploy.
 
-`vercel.json` already declares the four scheduled jobs. Vercel calls them with
+`vercel.json` already declares the five scheduled jobs. Vercel calls them with
 the `CRON_SECRET` you set.
 
 ### Any Node host or Docker
@@ -191,7 +196,7 @@ docker compose up --build
 ```
 
 Set the same environment variables on the host. Scheduled jobs do not run by
-themselves outside Vercel, so call these four URLs once a day with your own
+themselves outside Vercel, so call these five URLs once a day with your own
 scheduler, sending `Authorization: Bearer YOUR_CRON_SECRET`:
 
 ```
@@ -199,6 +204,7 @@ scheduler, sending `Authorization: Bearer YOUR_CRON_SECRET`:
 /api/cron/risk      anti-fraud rescan
 /api/cron/security  access watchdog
 /api/cron/payouts   automated payout pass
+/api/cron/ledger    balance reconciliation and drift alert
 ```
 
 ## 10. CoinPayments setup
@@ -222,6 +228,9 @@ app verifies each callback against `COINPAYMENTS_IPN_SECRET`.
 - [ ] The admin account exists and two-factor auth is enabled on it.
 - [ ] At least one withdrawal allowlist address is set for admin payouts.
 - [ ] You have decided whether automated payouts are on, and set the ceiling.
+- [ ] Sentry DSN and `ALERT_WEBHOOK_URL` are set and a test alert arrives.
+- [ ] `BACKUP_ENCRYPTION_KEY` is stored in a secret manager and `npm run backup` succeeds.
+- [ ] Native Supabase backups or PITR are enabled, or the backup limitation is accepted.
 - [ ] Sample FAQ and content are replaced with your own.
 - [ ] You have a plain text Terms and Privacy page for your jurisdiction.
 
@@ -249,7 +258,7 @@ Your account is not an admin, or the session is stale. Run
 are different values on the same settings screen.
 
 **Build fails with a type error about `for..of`.**
-Your Node version is too old. Use 18.17 or newer.
+Your Node version is too old. Use 20.19 or newer.
 
 ## 13. Updating
 

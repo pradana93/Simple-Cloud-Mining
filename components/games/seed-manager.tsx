@@ -1,26 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { RefreshCw, ShieldCheck } from "lucide-react";
+import Link from "next/link";
+import { ArrowUpRight, RefreshCw, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import type { SeedView } from "./types";
 
 // The fairness panel. The server commits to a hidden seed by publishing its
-// hash; the member picks the client seed. Rotating the server seed reveals the
-// old one so any past round can be re-checked.
+// hash; the member picks the client seed. Rotating reveals the seed that signed
+// the rounds since the last rotation.
 
 export function SeedManager({
   seed,
   state,
   onSeed,
   onRetry,
+  showVerify = true,
 }: {
   seed: SeedView | null;
   state?: "loading" | "ready" | "error";
   onSeed: (s: SeedView) => void;
   onRetry?: () => void;
+  showVerify?: boolean;
 }) {
   const { push } = useToast();
   const [client, setClient] = useState("client");
@@ -64,6 +67,8 @@ export function SeedManager({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-controls="seed-panel"
         className="flex w-full items-center justify-between gap-2 px-5 py-4 text-left"
       >
         <span className="inline-flex items-center gap-2 font-display text-sm font-bold text-white">
@@ -72,7 +77,7 @@ export function SeedManager({
         <span className="text-xs text-slate-400">{open ? "Hide" : "Show seeds"}</span>
       </button>
       {open && (
-        <div className="space-y-4 border-t border-white/5 px-5 py-4">
+        <div id="seed-panel" className="space-y-4 border-t border-white/5 px-5 py-4">
           <div>
             <Label>Server seed hash</Label>
             {seed?.serverSeedHash ? (
@@ -99,6 +104,7 @@ export function SeedManager({
             )}
             <p className="mt-1 text-xs text-slate-400">
               Every result is produced from the hidden server seed, your client seed and the bet nonce.
+              Rotating publishes the seed that signed this session so its rounds can be re-checked.
             </p>
           </div>
           <div>
@@ -127,6 +133,14 @@ export function SeedManager({
               <p className="text-xs font-semibold text-slate-300">Revealed previous server seed</p>
               <p className="mt-1 break-all font-mono text-xs text-slate-400">{seed.previous.serverSeed}</p>
             </div>
+          )}
+          {showVerify && (
+            <Link
+              href="/games/verify"
+              className="tap inline-flex h-11 items-center gap-1 text-xs font-semibold text-gold-300 underline underline-offset-2 hover:text-gold-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+            >
+              Verify a settled round <ArrowUpRight size={14} />
+            </Link>
           )}
         </div>
       )}

@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Coins, KeyRound, Pickaxe, Search, ShieldCheck, ShieldMinus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +45,7 @@ export function UsersManager({
   const [grantDays, setGrantDays] = useState("");
   const [amount, setAmount] = useState("");
   const [mode, setMode] = useState<"add" | "set">("add");
+  const balanceKeyRef = useRef<string | null>(null);
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -64,6 +65,7 @@ export function UsersManager({
     setBalanceFor(m);
     setAmount("");
     setMode("add");
+    balanceKeyRef.current = null;
   }
   function onPlanChange(id: string) {
     setGrantPlan(id);
@@ -82,12 +84,16 @@ export function UsersManager({
   }
   async function adjustBalance() {
     if (!balanceFor) return;
+    if (!balanceKeyRef.current) balanceKeyRef.current = crypto.randomUUID();
     const res = await run(
       "/api/admin/users",
-      { action: "balance", userId: balanceFor.id, amount: Number(amount), mode },
+      { action: "balance", userId: balanceFor.id, amount: Number(amount), mode, idempotencyKey: balanceKeyRef.current },
       { success: "Balance updated" }
     );
-    if (res.ok) setBalanceFor(null);
+    if (res.ok) {
+      balanceKeyRef.current = null;
+      setBalanceFor(null);
+    }
   }
   const toggleRole = (m: AdminMember) =>
     run("/api/admin/users", { action: "role", userId: m.id, isAdmin: !m.is_admin }, { success: "Role updated" });
@@ -212,7 +218,10 @@ export function UsersManager({
 
       <Modal
         open={Boolean(balanceFor)}
-        onClose={() => setBalanceFor(null)}
+        onClose={() => {
+          balanceKeyRef.current = null;
+          setBalanceFor(null);
+        }}
         title="Adjust balance"
         description={balanceFor ? `${balanceFor.username ?? "Member"} currently holds ${symbol}${formatCrypto(Number(balanceFor.balance ?? 0), decimals)} ${code}.` : undefined}
         footer={

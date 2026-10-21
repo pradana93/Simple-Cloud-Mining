@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, Receipt } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Receipt } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getMoneyCfg } from "@/lib/currency";
 import { formatMoney } from "@/lib/money";
@@ -120,6 +120,21 @@ export default async function AccountPage() {
       </div>
 
       <TwoFactorPanel enabled={twoFactorOn} />
+
+      <div className="panel flex flex-wrap items-center justify-between gap-4 rounded-2xl p-5">
+        <div>
+          <h2 className="font-display text-base font-bold text-white">Casino fairness</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Check any settled casino round against the seed that signed it.
+          </p>
+        </div>
+        <Link
+          href="/games/verify"
+          className="inline-flex min-h-11 items-center gap-1 rounded-xl border border-slate-700 px-4 text-sm font-semibold text-slate-200 transition-colors hover:border-gold-500/50 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+        >
+          Verify a bet <ArrowUpRight size={14} />
+        </Link>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         {sections.map((sec) => (

@@ -50,7 +50,7 @@ Not included, by design: `node_modules`, build output, and any secret file.
 
 Have these ready:
 
-- Node.js 18.17 or newer.
+- Node.js 20.19 or newer.
 - A Supabase project (free tier is fine).
 - A CoinPayments account, for real deposits.
 - A host and a domain, when you are ready to go live.

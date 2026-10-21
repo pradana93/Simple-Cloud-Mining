@@ -4,6 +4,7 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
 import { checkinBonus, computeStreak, utcDay } from "@/lib/checkin";
 import { recordEvent } from "@/lib/risk-telemetry";
+import { firstRow } from "@/lib/ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -35,16 +36,23 @@ export async function POST(req: Request) {
   const streak = computeStreak(last, today);
   const amount = checkinBonus(base, streak);
 
-  const { error } = await admin.from("checkins").insert({ user_id: user.id, day: today, amount, streak });
-  if (error) {
-    if (error.code === "23505") {
-      return NextResponse.json({ ok: false, error: "You already claimed today. Come back tomorrow." }, { status: 409 });
-    }
-    return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  const { data, error } = await admin.rpc("claim_checkin", {
+    p_user: user.id,
+    p_day: today,
+    p_amount: amount,
+    p_streak: streak,
+  });
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+  const row = firstRow<{ status?: string; amount?: unknown; balance?: unknown }>(data);
+  if (row?.status === "already_claimed") {
+    return NextResponse.json({ ok: false, error: "You already claimed today. Come back tomorrow." }, { status: 409 });
+  }
+  if (row?.status !== "claimed") {
+    return NextResponse.json({ ok: false, error: "Could not claim the bonus" }, { status: 500 });
   }
 
-  await admin.rpc("credit_balance", { p_user_id: user.id, p_amount: amount });
   await recordEvent({ userId: user.id, kind: "checkin", req, detail: { amount, streak } });
 
-  return NextResponse.json({ ok: true, amount, streak });
+  return NextResponse.json({ ok: true, amount: Number(row.amount ?? amount), streak, balance: row.balance });
 }

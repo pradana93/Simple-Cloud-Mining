@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
 import { Button } from "./ui/button";
@@ -13,15 +13,17 @@ export function PurchaseButton({ planId, coins = [] }: { planId: number; coins?:
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [coin, setCoin] = useState<string>(coins[0]?.code ?? "");
+  const keyRef = useRef<string | null>(null);
 
   async function buy() {
+    if (!keyRef.current) keyRef.current = crypto.randomUUID();
     setLoading(true);
     setErr(null);
     try {
       const res = await fetch("/api/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, coin: coin || undefined }),
+        body: JSON.stringify({ planId, coin: coin || undefined, idempotencyKey: keyRef.current }),
       });
       const j = await res.json();
       if (!j.ok) {
@@ -29,6 +31,7 @@ export function PurchaseButton({ planId, coins = [] }: { planId: number; coins?:
         push(j.error ?? "Purchase failed", "error");
         return;
       }
+      keyRef.current = null;
       push("Invoice created", "success");
       if (j.redirectUrl) window.location.href = j.redirectUrl as string;
       else if (j.hash) router.push(`/invoice/${j.hash}`);
@@ -55,7 +58,10 @@ export function PurchaseButton({ planId, coins = [] }: { planId: number; coins?:
                   type="button"
                   role="radio"
                   aria-checked={active}
-                  onClick={() => setCoin(c.code)}
+                  onClick={() => {
+                    keyRef.current = null;
+                    setCoin(c.code);
+                  }}
                   className={cn(
                     "tap inline-flex h-11 items-center gap-2 rounded-xl border px-3.5 text-sm font-semibold transition-colors",
                     active

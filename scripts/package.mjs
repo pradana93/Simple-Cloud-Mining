@@ -161,7 +161,7 @@ Read this first:
   docs/BUYER-README.md what is included, accounts you need, and requirements
 
 Fastest path:
-  1. Install Node.js 18.17 or newer.
+  1. Install Node.js 20.19 or newer.
   2. Open a terminal in this folder and run:  npm install
   3. Run the setup wizard:                     npm run setup
   4. Start the app:                            npm run dev

@@ -59,8 +59,8 @@ function isJwt(v) {
 }
 
 function nodeOk() {
-  const major = Number(process.versions.node.split(".")[0]);
-  return major >= 18;
+  const [major, minor] = process.versions.node.split(".").map(Number);
+  return major > 20 || (major === 20 && minor >= 19);
 }
 
 async function collectSupabase(existing) {
@@ -268,7 +268,7 @@ The full guide lives in ${c.bold("docs/INSTALL.md")}.`);
 async function main() {
   banner("Simple Cloud Mining - setup");
   if (!nodeOk()) {
-    fail(`Node 18.17 or newer is required. You have ${process.versions.node}.`);
+    fail(`Node 20.19 or newer is required. You have ${process.versions.node}.`);
     process.exit(1);
   }
 

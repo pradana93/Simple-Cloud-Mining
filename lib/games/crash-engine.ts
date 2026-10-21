@@ -5,6 +5,8 @@ import { ensureSeedRow, type SeedView } from "./engine";
 import { applyPayout, type CasinoEcon } from "./econ";
 import { CRASH_MAX_SECONDS, crashMultiplierAt, crashPoint } from "./crash";
 import { toLedger } from "./util";
+import { firstRow, idempotencyKey } from "../ledger";
+import { sendAlert } from "../alerts";
 
 // Server-only crash rounds. The line is a function of the recorded start time,
 // so the client can draw it but cannot decide when it stops. A cashout is
@@ -44,12 +46,6 @@ const MAX_MS = CRASH_MAX_SECONDS * 1000;
 function n(v: unknown, fallback = 0): number {
   const x = Number(v);
   return Number.isFinite(x) ? x : fallback;
-}
-
-function firstRow(data: unknown): { settled?: boolean; balance?: unknown } | null {
-  if (Array.isArray(data)) return (data[0] as { settled?: boolean; balance?: unknown }) ?? null;
-  if (data && typeof data === "object") return data as { settled?: boolean; balance?: unknown };
-  return null;
 }
 
 function elapsedOf(row: CrashRoundRow, now = Date.now()): number {
@@ -128,7 +124,7 @@ async function recordSettled(row: CrashRoundRow, status: "cashed" | "crashed", c
   const admin = createAdminSupabase();
   const stake = n(row.stake);
   const multiplier = paid > 0 && stake > 0 ? paid / stake : 0;
-  await admin.from("game_bets").insert({
+  const { error } = await admin.from("game_bets").insert({
     user_id: row.user_id,
     game: "crash",
     stake,
@@ -140,7 +136,16 @@ async function recordSettled(row: CrashRoundRow, status: "cashed" | "crashed", c
     server_seed_hash: row.server_seed_hash,
     client_seed: row.client_seed,
     nonce: n(row.nonce),
+    idempotency_key: idempotencyKey(row.user_id, "crash:bet", String(row.id)),
   });
+  if (error && error.code !== "23505") {
+    await sendAlert({
+      title: "Crash verifier record was not written",
+      message: error.message,
+      tags: { flow: "crash", round: String(row.id) },
+      extra: { userId: row.user_id, status, paid },
+    });
+  }
   void recordEvent({
     userId: row.user_id,
     kind: "bet",
@@ -186,11 +191,42 @@ export type StartOutcome =
 export async function startCrash(opts: {
   userId: string;
   stake: number;
+  idempotencyKey?: string;
 }): Promise<StartOutcome> {
   const admin = createAdminSupabase();
-  const seed = await ensureSeedRow(opts.userId);
   const stake = toLedger(opts.stake);
   if (!(stake > 0)) return { ok: false, error: "Enter a stake above zero", status: 400 };
+  const key = idempotencyKey(opts.userId, "crash:start", opts.idempotencyKey);
+
+  const { data: existing } = await admin
+    .from("crash_rounds")
+    .select("*")
+    .eq("idempotency_key", key)
+    .eq("user_id", opts.userId)
+    .maybeSingle();
+  if (existing) {
+    const row = existing as CrashRoundRow;
+    if (row.status !== "active") {
+      return {
+        ok: false,
+        error: "That round is already over",
+        status: 409,
+        round: crashView(row),
+        balance: await balanceOf(opts.userId),
+      };
+    }
+    return {
+      ok: true,
+      round: crashView(row),
+      balance: await balanceOf(opts.userId),
+      seed: {
+        serverSeedHash: row.server_seed_hash,
+        clientSeed: row.client_seed,
+        nonce: n(row.nonce),
+        previous: null,
+      },
+    };
+  }
 
   const active = await loadActive(opts.userId);
   if (active) {
@@ -208,70 +244,71 @@ export async function startCrash(opts: {
     }
   }
 
-  const { data: debited, error: debitError } = await admin.rpc("debit_balance", {
+  const seed = await ensureSeedRow(opts.userId);
+  const { data: nonceData, error: nonceError } = await admin.rpc("next_game_nonce", {
     p_user_id: opts.userId,
-    p_amount: stake,
   });
-  if (debitError) return { ok: false, error: debitError.message, status: 500 };
-  if (debited == null) return { ok: false, error: "Insufficient balance", status: 400 };
+  if (nonceError) return { ok: false, error: nonceError.message, status: 500 };
+  const nonce = n(nonceData);
 
-  try {
-    const { data: nonceData, error: nonceError } = await admin.rpc("next_game_nonce", {
-      p_user_id: opts.userId,
-    });
-    if (nonceError) throw new Error(nonceError.message);
-    const nonce = n(nonceData);
+  const floats = floatStream(seed.server_seed, seed.client_seed, nonce, 1);
+  const crashAt = crashPoint(floats[0] ?? 0);
 
-    const floats = floatStream(seed.server_seed, seed.client_seed, nonce, 1);
-    const crashAt = crashPoint(floats[0] ?? 0);
-    const startedAt = new Date().toISOString();
+  const { data, error } = await admin.rpc("start_crash_round", {
+    p_user: opts.userId,
+    p_stake: stake,
+    p_crash_at: crashAt,
+    p_seed_hash: seed.server_seed_hash,
+    p_client_seed: seed.client_seed,
+    p_nonce: nonce,
+    p_idempotency_key: key,
+  });
+  if (error) return { ok: false, error: error.message, status: 500 };
 
-    const { data: inserted, error: insertError } = await admin
-      .from("crash_rounds")
-      .insert({
-        user_id: opts.userId,
-        stake,
-        crash_at: crashAt,
-        status: "active",
-        server_seed_hash: seed.server_seed_hash,
-        client_seed: seed.client_seed,
-        nonce,
-        started_at: startedAt,
-      })
-      .select("*")
-      .single();
-
-    if (insertError || !inserted) {
-      await admin.rpc("credit_balance", { p_user_id: opts.userId, p_amount: stake });
-      if (insertError?.code === "23505") {
-        const live = await loadActive(opts.userId);
-        return {
-          ok: false,
-          error: "A round is already live",
-          status: 409,
-          round: live ? crashView(live) : undefined,
-          balance: await balanceOf(opts.userId),
-        };
-      }
-      return { ok: false, error: "Could not start the round", status: 500 };
-    }
-
-    const row = inserted as CrashRoundRow;
-    return {
-      ok: true,
-      round: { ...crashView(row), live: 1, crashAt: null },
-      balance: await balanceOf(opts.userId),
-      seed: {
-        serverSeedHash: seed.server_seed_hash,
-        clientSeed: seed.client_seed,
-        nonce,
-        previous: null,
-      },
-    };
-  } catch (err) {
-    await admin.rpc("credit_balance", { p_user_id: opts.userId, p_amount: stake });
-    return { ok: false, error: err instanceof Error ? err.message : "Could not start the round", status: 500 };
+  const res = firstRow<{ status?: string; round_id?: unknown; balance?: unknown }>(data);
+  if (res?.status === "insufficient") {
+    return { ok: false, error: "Insufficient balance", status: 400 };
   }
+  if (res?.status === "missing_user") {
+    return { ok: false, error: "Member not found", status: 404 };
+  }
+  if (res?.status === "active_exists") {
+    const live = res.round_id == null ? await loadActive(opts.userId) : await loadRound(opts.userId, n(res.round_id));
+    return {
+      ok: false,
+      error: "A round is already live",
+      status: 409,
+      round: live ? crashView(live) : undefined,
+      balance: await balanceOf(opts.userId),
+    };
+  }
+  if (res?.status !== "applied" && res?.status !== "duplicate") {
+    return { ok: false, error: "Could not start the round", status: 500 };
+  }
+
+  const row = res.round_id == null ? null : await loadRound(opts.userId, n(res.round_id));
+  if (!row) return { ok: false, error: "Could not start the round", status: 500 };
+  if (row.status !== "active") {
+    return {
+      ok: false,
+      error: "That round is already over",
+      status: 409,
+      round: crashView(row),
+      balance: n(res.balance),
+    };
+  }
+
+  return {
+    ok: true,
+    round: { ...crashView(row), live: 1, crashAt: null },
+    balance: n(res.balance),
+    seed: {
+      serverSeedHash: row.server_seed_hash,
+      clientSeed: row.client_seed,
+      nonce: n(row.nonce),
+      previous: null,
+    },
+  };
 }
 
 export type CashOutOutcome =
@@ -299,12 +336,22 @@ export async function cashOutCrash(opts: {
   const now = Date.now();
   if (isDue(row, now)) {
     const res = await settleAsCrash(row);
+    if (res.settled) {
+      return {
+        ok: true,
+        round: crashView({ ...row, status: "crashed", payout: 0, cashout: null }, now),
+        balance: res.balance,
+        paid: 0,
+        multiplier: 0,
+      };
+    }
+    const current = (await loadRound(opts.userId, opts.roundId)) ?? row;
     return {
       ok: true,
-      round: crashView({ ...row, status: "crashed", payout: 0, cashout: null }, now),
+      round: crashView(current, now),
       balance: res.balance,
-      paid: 0,
-      multiplier: 0,
+      paid: n(current.payout),
+      multiplier: n(current.stake) > 0 ? n(current.payout) / n(current.stake) : 0,
     };
   }
 

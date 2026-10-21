@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ArrowUpRight } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getCachedSettings } from "@/lib/catalog";
 import { GAME_CATALOG, type GameMeta } from "@/lib/games/registry";
@@ -90,6 +91,12 @@ export default async function GamesPage() {
             {games.length} {games.length === 1 ? "game" : "games"}, all provably fair. Stake your balance and
             every result settles server-side from a seed you can verify.
           </p>
+          <Link
+            href="/games/verify"
+            className="tap mt-3 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-300 underline underline-offset-2 hover:text-gold-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+          >
+            Verify a settled round <ArrowUpRight size={14} />
+          </Link>
         </div>
         <div className="panel min-w-[13rem] rounded-2xl px-5 py-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Your balance</p>
@@ -185,13 +192,19 @@ export default async function GamesPage() {
         <p className="font-display text-sm font-bold text-white">How it stays fair</p>
         <p className="mt-2">
           Each round mixes a server seed we commit to up front, a client seed you control, and a per-bet nonce
-          through HMAC-SHA256. Rotate the server seed any time to reveal the old one and re-check every past
-          result.
+          through HMAC-SHA256. Rotate it to reveal the seed that signed this session, then re-check those
+          rounds with the verifier.
         </p>
         <p className="mt-2 text-xs text-slate-400">
           The edge on each card is that game&apos;s base figure. Site payout settings can adjust the final
           return, and every settled round shows exactly what paid.
         </p>
+        <Link
+          href="/games/verify"
+          className="tap mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-gold-300 underline underline-offset-2 hover:text-gold-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+        >
+          Open the verifier <ArrowUpRight size={14} />
+        </Link>
       </div>
     </div>
   );

@@ -8,6 +8,9 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
+/blob-report/
 
 # next.js
 /.next/
@@ -46,3 +49,7 @@ supabase/.temp/
 # local credential-reset output (never commit)
 *.local.json
 RESET-CREDENTIALS.local.txt
+
+# encrypted backups and restore drill plaintext (never commit)
+/backups/
+*.json.enc

@@ -1,34 +1,20 @@
 import { NextResponse } from "next/server";
-import { createServerSupabase } from "@/lib/supabase/server";
-import { getSettings } from "@/lib/settings";
+import { requirePlayer } from "@/lib/games/api-guard";
 import { getSeedView, rotateSeed, setClientSeed } from "@/lib/games/engine";
 
-async function playerId(): Promise<string | null> {
-  const supabase = createServerSupabase();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user?.id ?? null;
-}
+// Seed management stays available while the tables are paused. It changes no
+// balance and a member may need to reveal a seed to check an old round.
 
 export async function GET() {
-  const id = await playerId();
-  if (!id) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
-  const settings = await getSettings();
-  if (!settings.games_enabled) {
-    return NextResponse.json({ ok: false, error: "The casino is closed" }, { status: 403 });
-  }
-  const seed = await getSeedView(id);
+  const gate = await requirePlayer({ allowClosed: true });
+  if ("error" in gate) return gate.error;
+  const seed = await getSeedView(gate.player.id);
   return NextResponse.json({ ok: true, seed });
 }
 
 export async function POST(req: Request) {
-  const id = await playerId();
-  if (!id) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
-  const settings = await getSettings();
-  if (!settings.games_enabled) {
-    return NextResponse.json({ ok: false, error: "The casino is closed" }, { status: 403 });
-  }
+  const gate = await requirePlayer({ allowClosed: true });
+  if ("error" in gate) return gate.error;
 
   let body: { action?: unknown; clientSeed?: unknown };
   try {
@@ -39,11 +25,11 @@ export async function POST(req: Request) {
 
   const action = String(body.action ?? "");
   if (action === "rotate") {
-    const seed = await rotateSeed(id);
+    const seed = await rotateSeed(gate.player.id);
     return NextResponse.json({ ok: true, seed });
   }
   if (action === "set-client") {
-    const seed = await setClientSeed(id, String(body.clientSeed ?? ""));
+    const seed = await setClientSeed(gate.player.id, String(body.clientSeed ?? ""));
     return NextResponse.json({ ok: true, seed });
   }
   return NextResponse.json({ ok: false, error: "Unknown action" }, { status: 400 });

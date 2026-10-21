@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
+import { ArrowUpRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 import { cn, formatCrypto } from "@/lib/utils";
@@ -210,8 +210,10 @@ export function CrashView({
   const [skew, setSkew] = useState(0);
   const [busy, setBusy] = useState(false);
   const [bets, setBets] = useState<BetRow[]>([]);
+  const [historyState, setHistoryState] = useState<"loading" | "ready" | "error">("loading");
   const activeRef = useRef<CrashRound | null>(null);
   activeRef.current = active;
+  const startKeyRef = useRef<string | null>(null);
 
   const stakeNum = Number(stake);
   const belowMin = minBet > 0 && Number.isFinite(stakeNum) && stakeNum < minBet;
@@ -255,12 +257,18 @@ export function CrashView({
   }, []);
 
   const loadHistory = useCallback(async () => {
+    setHistoryState((state) => (state === "ready" ? state : "loading"));
     try {
       const res = await fetch("/api/games/history");
       const j = (await res.json()) as { ok: boolean; bets?: BetRow[] };
-      if (j.ok && j.bets) setBets(j.bets);
+      if (j.ok && j.bets) {
+        setBets(j.bets);
+        setHistoryState("ready");
+      } else {
+        setHistoryState("error");
+      }
     } catch {
-      /* history is best-effort */
+      setHistoryState("error");
     }
   }, []);
 
@@ -348,19 +356,27 @@ export function CrashView({
   async function start() {
     if (busy || !valid || phase !== "ready") return;
     setBusy(true);
+    const key = startKeyRef.current ?? crypto.randomUUID();
+    startKeyRef.current = key;
     try {
       const res = await fetch("/api/games/crash/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stake: stakeNum }),
+        body: JSON.stringify({ stake: stakeNum, idempotencyKey: key }),
       });
       const j = (await res.json()) as StateReply;
+      startKeyRef.current = null;
       if (!j.ok) {
         push(j.error || "Could not start the round", "error");
         if (typeof j.balance === "number") setBalance(j.balance);
         if (j.round) {
-          setActive(j.round);
-          setRound(null);
+          if (j.round.status === "active") {
+            setActive(j.round);
+            setRound(null);
+          } else {
+            setActive(null);
+            setRound(j.round);
+          }
           setNow(Date.now());
         }
         return;
@@ -640,32 +656,74 @@ export function CrashView({
         <div className="panel rounded-2xl p-5">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-display text-sm font-bold text-white">Crash history</h2>
-            <span className="text-xs text-slate-400">Recent</span>
+            <Link
+              href="/games/verify"
+              className="inline-flex min-h-11 items-center gap-1 text-xs font-semibold text-gold-300 underline underline-offset-2 hover:text-gold-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+            >
+              Verify <ArrowUpRight size={12} />
+            </Link>
           </div>
           <p className="mb-3 text-xs text-slate-400">
             Each round is committed to your seed before it starts. Crash points are revealed after settle.
           </p>
-          <ul className="space-y-1.5">
-            {rounds.length === 0 && (
+          {historyState === "error" && rounds.length > 0 && (
+            <p className="mb-2 text-xs text-red-300">Could not refresh history.</p>
+          )}
+          <ul className="space-y-1.5" aria-busy={historyState === "loading"}>
+            {historyState === "loading" && rounds.length === 0 && (
+              <li className="space-y-1.5" aria-hidden>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="h-9 animate-pulse rounded-lg bg-ink-900/60" />
+                ))}
+              </li>
+            )}
+            {historyState === "error" && rounds.length === 0 && (
+              <li className="rounded-lg bg-red-500/10 px-3 py-3 ring-1 ring-red-500/30">
+                <p className="text-xs text-red-200">Could not load history.</p>
+                <button
+                  type="button"
+                  onClick={() => void loadHistory()}
+                  className="tap mt-2 inline-flex h-11 items-center rounded-lg border border-red-500/30 px-4 text-xs font-semibold text-red-100 transition-colors hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
+                >
+                  Retry
+                </button>
+              </li>
+            )}
+            {historyState === "ready" && rounds.length === 0 && (
               <li className="rounded-lg border border-dashed border-slate-800 px-3 py-4 text-xs text-slate-400">
                 No crash rounds yet. Your first round lands in this list.
               </li>
             )}
             {rounds.map((b) => (
-              <li key={b.id} className="flex items-center justify-between gap-2 rounded-lg bg-ink-900/60 px-3 py-2 text-xs">
-                <span className="flex-1 truncate text-slate-300">#{b.nonce}</span>
-                <span className={cn("font-display font-bold", b.won ? "text-emerald-300" : "text-slate-400")}>
-                  {b.multiplier.toFixed(2)}x
-                </span>
-                <span
-                  className={cn(
-                    "w-24 text-right font-mono tabular-nums",
-                    b.won ? "text-emerald-300" : "text-slate-400"
-                  )}
+              <li key={b.id}>
+                <Link
+                  href={`/games/verify?bet=bet:${b.id}&game=crash`}
+                  title={`Verify round ${b.nonce}`}
+                  aria-label={`Verify round ${b.nonce}, ${b.won ? "won" : "lost"} ${formatCrypto(
+                    b.won ? b.payout : b.stake,
+                    decimals
+                  )} ${symbol}`}
+                  className="tap group flex min-h-11 items-center justify-between gap-2 rounded-lg bg-ink-900/60 px-3 py-2 text-xs ring-1 ring-transparent transition-colors hover:bg-ink-800 hover:ring-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400"
                 >
-                  {b.won ? "+" : "-"}
-                  {formatCrypto(b.won ? b.payout : b.stake, decimals)}
-                </span>
+                  <span className="flex-1 truncate text-slate-300 group-hover:text-white">#{b.nonce}</span>
+                  <span className={cn("font-display font-bold", b.won ? "text-emerald-300" : "text-slate-400")}>
+                    {b.multiplier.toFixed(2)}x
+                  </span>
+                  <span
+                    className={cn(
+                      "w-20 text-right font-mono tabular-nums",
+                      b.won ? "text-emerald-300" : "text-slate-400"
+                    )}
+                  >
+                    {b.won ? "+" : "-"}
+                    {formatCrypto(b.won ? b.payout : b.stake, decimals)}
+                  </span>
+                  <ArrowUpRight
+                    size={12}
+                    className="shrink-0 text-slate-500 group-hover:text-gold-300"
+                    aria-hidden
+                  />
+                </Link>
               </li>
             ))}
           </ul>

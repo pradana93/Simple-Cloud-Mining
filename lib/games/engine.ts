@@ -3,6 +3,7 @@ import { recordEvent } from "../risk-telemetry";
 import { floatStream, hashServerSeed, randomServerSeed } from "./rng";
 import { getInstantGame } from "./registry";
 import { applyPayout, type CasinoEcon } from "./econ";
+import { asNumber, firstRow, idempotencyKey } from "../ledger";
 import type { PlayResult } from "./types";
 
 // Server-only settle path for the casino. The client never sends an outcome and
@@ -75,25 +76,65 @@ export async function setClientSeed(userId: string, clientSeed: string): Promise
 }
 
 export async function rotateSeed(userId: string): Promise<SeedView> {
-  const row = await ensureSeedRow(userId);
+  await ensureSeedRow(userId);
   const nextSeed = randomServerSeed();
-  await createAdminSupabase()
-    .from("game_seeds")
-    .update({
-      prev_server_seed: row.server_seed,
-      prev_server_seed_hash: row.server_seed_hash,
-      server_seed: nextSeed,
-      server_seed_hash: hashServerSeed(nextSeed),
-      nonce: 0,
-      rotated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId);
+  const { error } = await createAdminSupabase().rpc("rotate_game_seed", {
+    p_user: userId,
+    p_next_seed: nextSeed,
+    p_next_hash: hashServerSeed(nextSeed),
+  });
+  if (error) throw new Error(error.message);
   return getSeedView(userId);
 }
 
 export type PlayOutcome =
   | { ok: true; result: PlayResult; payout: number; balance: number; seed: SeedView; nonce: number }
   | { ok: false; error: string; status: number };
+
+type StoredBet = {
+  id: number;
+  user_id: string;
+  game: string;
+  stake: number | string;
+  multiplier: number | string;
+  payout: number | string;
+  won: boolean;
+  result: unknown;
+  server_seed_hash: string;
+  client_seed: string;
+  nonce: number | string;
+};
+
+async function balanceOf(userId: string): Promise<number> {
+  const { data } = await createAdminSupabase()
+    .from("profiles")
+    .select("balance")
+    .eq("id", userId)
+    .maybeSingle();
+  return asNumber((data as { balance?: unknown } | null)?.balance);
+}
+
+async function outcomeFromBet(bet: StoredBet): Promise<PlayOutcome> {
+  const balance = await balanceOf(bet.user_id);
+  const nonce = asNumber(bet.nonce);
+  return {
+    ok: true,
+    result: {
+      won: Boolean(bet.won),
+      multiplier: asNumber(bet.multiplier),
+      detail: (bet.result ?? {}) as Record<string, unknown>,
+    },
+    payout: asNumber(bet.payout),
+    balance,
+    seed: {
+      serverSeedHash: bet.server_seed_hash,
+      clientSeed: bet.client_seed,
+      nonce,
+      previous: null,
+    },
+    nonce,
+  };
+}
 
 export async function playInstant(opts: {
   userId: string;
@@ -102,6 +143,7 @@ export async function playInstant(opts: {
   params: unknown;
   req?: Request;
   econ: CasinoEcon;
+  idempotencyKey?: string;
 }): Promise<PlayOutcome> {
   const game = getInstantGame(opts.gameId);
   if (!game) return { ok: false, error: "Unknown game", status: 404 };
@@ -114,85 +156,89 @@ export async function playInstant(opts: {
   }
 
   const admin = createAdminSupabase();
+  const key = idempotencyKey(opts.userId, `bet:${opts.gameId}`, opts.idempotencyKey);
+
+  // A retried request returns the original receipt without consuming a nonce.
+  const { data: existing } = await admin
+    .from("game_bets")
+    .select("id,user_id,game,stake,multiplier,payout,won,result,server_seed_hash,client_seed,nonce")
+    .eq("idempotency_key", key)
+    .eq("user_id", opts.userId)
+    .maybeSingle();
+  if (existing) return outcomeFromBet(existing as StoredBet);
+
   const seed = await ensureSeedRow(opts.userId);
-
-  // Reserve the stake first. A null result means the guarded update failed.
-  const { data: debited, error: debitError } = await admin.rpc("debit_balance", {
+  const { data: nonceData, error: nonceError } = await admin.rpc("next_game_nonce", {
     p_user_id: opts.userId,
-    p_amount: opts.stake,
   });
-  if (debitError) return { ok: false, error: debitError.message, status: 500 };
-  if (debited == null) return { ok: false, error: "Insufficient balance", status: 400 };
+  if (nonceError) return { ok: false, error: nonceError.message, status: 500 };
+  const nonce = Number(nonceData ?? 0);
 
-  try {
-    const { data: nonceData, error: nonceError } = await admin.rpc("next_game_nonce", {
-      p_user_id: opts.userId,
-    });
-    if (nonceError) throw new Error(nonceError.message);
-    const nonce = Number(nonceData ?? 0);
+  const floats = floatStream(
+    seed.server_seed,
+    seed.client_seed,
+    nonce,
+    game.floats(normalized)
+  );
+  const result = game.play(normalized, floats);
+  const paid = applyPayout(opts.econ, opts.stake, result.multiplier);
+  const payout = paid.payout;
+  const settled = { ...result, multiplier: paid.multiplier };
 
-    const floats = floatStream(
-      seed.server_seed,
-      seed.client_seed,
-      nonce,
-      game.floats(normalized)
-    );
-    const result = game.play(normalized, floats);
-    const paid = applyPayout(opts.econ, opts.stake, result.multiplier);
-    const payout = paid.payout;
-    const settled = { ...result, multiplier: paid.multiplier };
+  const { data, error } = await admin.rpc("settle_game_bet", {
+    p_user: opts.userId,
+    p_game: opts.gameId,
+    p_stake: opts.stake,
+    p_multiplier: paid.multiplier,
+    p_payout: payout,
+    p_won: result.won,
+    p_params: normalized,
+    p_result: result.detail,
+    p_seed_hash: seed.server_seed_hash,
+    p_client_seed: seed.client_seed,
+    p_nonce: nonce,
+    p_idempotency_key: key,
+  });
+  if (error) return { ok: false, error: error.message, status: 500 };
 
-    if (payout > 0) {
-      const { error: creditError } = await admin.rpc("credit_balance", {
-        p_user_id: opts.userId,
-        p_amount: payout,
-      });
-      if (creditError) throw new Error(creditError.message);
-    }
-
-    await admin.from("game_bets").insert({
-      user_id: opts.userId,
-      game: opts.gameId,
-      stake: opts.stake,
-      multiplier: paid.multiplier,
-      payout,
-      won: result.won,
-      params: normalized as object,
-      result: result.detail as object,
-      server_seed_hash: seed.server_seed_hash,
-      client_seed: seed.client_seed,
-      nonce,
-    });
-
-    const { data: profile } = await admin
-      .from("profiles")
-      .select("balance")
-      .eq("id", opts.userId)
-      .maybeSingle();
-
-    void recordEvent({
-      userId: opts.userId,
-      kind: "bet",
-      req: opts.req,
-      detail: { game: opts.gameId, stake: opts.stake, payout, multiplier: paid.multiplier },
-    });
-
-    return {
-      ok: true,
-      result: settled,
-      payout,
-      balance: Number((profile as { balance?: number } | null)?.balance ?? 0),
-      seed: {
-        serverSeedHash: seed.server_seed_hash,
-        clientSeed: seed.client_seed,
-        nonce,
-        previous: null,
-      },
-      nonce,
-    };
-  } catch (err) {
-    // Refund the reserved stake so a failure never costs the member money.
-    await admin.rpc("credit_balance", { p_user_id: opts.userId, p_amount: opts.stake });
-    return { ok: false, error: err instanceof Error ? err.message : "Bet failed", status: 500 };
+  const row = firstRow<{ status?: string; bet_id?: unknown; balance?: unknown }>(data);
+  if (row?.status === "insufficient") {
+    return { ok: false, error: "Insufficient balance", status: 400 };
   }
+  if (row?.status === "missing_user") {
+    return { ok: false, error: "Member not found", status: 404 };
+  }
+  if (row?.status === "duplicate") {
+    const { data: duplicate } = await admin
+      .from("game_bets")
+      .select("id,user_id,game,stake,multiplier,payout,won,result,server_seed_hash,client_seed,nonce")
+      .eq("id", row.bet_id)
+      .eq("user_id", opts.userId)
+      .maybeSingle();
+    if (duplicate) return outcomeFromBet(duplicate as StoredBet);
+  }
+  if (row?.status !== "applied") {
+    return { ok: false, error: "Bet was not settled", status: 500 };
+  }
+
+  void recordEvent({
+    userId: opts.userId,
+    kind: "bet",
+    req: opts.req,
+    detail: { game: opts.gameId, stake: opts.stake, payout, multiplier: paid.multiplier },
+  });
+
+  return {
+    ok: true,
+    result: settled,
+    payout,
+    balance: asNumber(row.balance),
+    seed: {
+      serverSeedHash: seed.server_seed_hash,
+      clientSeed: seed.client_seed,
+      nonce,
+      previous: null,
+    },
+    nonce,
+  };
 }

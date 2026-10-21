@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/api-admin";
 import { recordAudit } from "@/lib/audit";
+import { firstRow, idempotencyKey } from "@/lib/ledger";
 
 export const dynamic = "force-dynamic";
 
@@ -63,21 +64,47 @@ export async function POST(req: Request) {
       if (!userId || !Number.isFinite(amount)) {
         return NextResponse.json({ ok: false, error: "Member and amount are required" }, { status: 400 });
       }
+      const key = idempotencyKey(adminId, `admin-balance:${userId}`, body.idempotencyKey);
       if (mode === "add") {
-        const { data: nb, error } = await admin.rpc("credit_balance", { p_user_id: userId, p_amount: amount });
+        const { data, error } = await admin.rpc("post_balance", {
+          p_user: userId,
+          p_delta: amount,
+          p_reason: "admin_adjustment",
+          p_ref_type: "admin",
+          p_ref_id: adminId,
+          p_idempotency_key: key,
+          p_metadata: { mode, amount },
+        });
         if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-        if (nb == null) return NextResponse.json({ ok: false, error: "Member not found" }, { status: 404 });
-        const next = Number(nb);
+        const row = firstRow<{ status?: string; balance?: unknown }>(data);
+        if (row?.status === "missing_user") return NextResponse.json({ ok: false, error: "Member not found" }, { status: 404 });
+        if (row?.status === "insufficient") return NextResponse.json({ ok: false, error: "Balance cannot go below zero" }, { status: 400 });
+        if (row?.status !== "applied" && row?.status !== "unchanged" && row?.status !== "duplicate") {
+          return NextResponse.json({ ok: false, error: "Could not update the balance" }, { status: 400 });
+        }
+        const next = Number(row?.balance ?? 0);
         await recordAudit({ actor, action: "member.balance", target: userId, detail: { mode, amount, balance: next }, req });
         return NextResponse.json({ ok: true, balance: next, message: `Balance set to ${next.toFixed(8)}` });
       }
-      const { data: profile } = await admin.from("profiles").select("balance").eq("id", userId).maybeSingle();
-      if (!profile) return NextResponse.json({ ok: false, error: "Member not found" }, { status: 404 });
       const next = Math.max(0, amount);
-      const { error } = await admin.from("profiles").update({ balance: next }).eq("id", userId);
+      const { data, error } = await admin.rpc("set_balance", {
+        p_user: userId,
+        p_target: next,
+        p_reason: "admin_set_balance",
+        p_ref_type: "admin",
+        p_ref_id: adminId,
+        p_idempotency_key: key,
+        p_metadata: { mode, amount },
+      });
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-      await recordAudit({ actor, action: "member.balance", target: userId, detail: { mode, amount, balance: next }, req });
-      return NextResponse.json({ ok: true, balance: next, message: `Balance set to ${next.toFixed(8)}` });
+      const row = firstRow<{ status?: string; balance?: unknown }>(data);
+      if (row?.status === "missing_user") return NextResponse.json({ ok: false, error: "Member not found" }, { status: 404 });
+      if (row?.status !== "applied" && row?.status !== "unchanged" && row?.status !== "duplicate") {
+        return NextResponse.json({ ok: false, error: "Could not update the balance" }, { status: 400 });
+      }
+      const balance = Number(row?.balance ?? next);
+      await recordAudit({ actor, action: "member.balance", target: userId, detail: { mode, amount, balance }, req });
+      return NextResponse.json({ ok: true, balance, message: `Balance set to ${balance.toFixed(8)}` });
     }
 
     if (action === "role") {

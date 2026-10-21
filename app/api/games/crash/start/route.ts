@@ -12,9 +12,9 @@ export async function POST(req: Request) {
   const closed = gameClosed(econ, "crash");
   if (closed) return closed;
 
-  let body: { stake?: unknown };
+  let body: { stake?: unknown; idempotencyKey?: unknown };
   try {
-    body = (await req.json()) as { stake?: unknown };
+    body = (await req.json()) as { stake?: unknown; idempotencyKey?: unknown };
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });
   }
@@ -22,7 +22,14 @@ export async function POST(req: Request) {
   const stake = validateStake(body.stake, econ, gate.settings.currency_code);
   if ("error" in stake) return NextResponse.json({ ok: false, error: stake.error }, { status: 400 });
 
-  const outcome = await startCrash({ userId: gate.player.id, stake: stake.stake });
+  const outcome = await startCrash({
+    userId: gate.player.id,
+    stake: stake.stake,
+    idempotencyKey:
+      typeof body.idempotencyKey === "string"
+        ? body.idempotencyKey
+        : req.headers.get("idempotency-key") ?? undefined,
+  });
   if (!outcome.ok) {
     return NextResponse.json(
       { ok: false, error: outcome.error, round: outcome.round, balance: outcome.balance },

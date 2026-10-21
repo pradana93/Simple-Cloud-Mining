@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
 import { verifyIpnHmac } from "@/lib/coinpayments";
-import { affiliateCommission, expirationForPlan } from "@/lib/mining";
 import { recordEvent } from "@/lib/risk-telemetry";
+import { firstRow } from "@/lib/ledger";
 
 /**
  * POST /api/ipn/coinpayments: port of GatewayIpn::coinpayments().
@@ -35,7 +35,15 @@ export async function POST(req: Request) {
     await log("Transaction not found!", null, null, invoice);
     return new Response("IPN Error: Transaction not found!", { status: 400 });
   }
-  const t = tx as { id: number; status: string; amount: number; price_amount: number | null; user_id: string; plan_id: number };
+  const t = tx as {
+    id: number;
+    status: string;
+    amount: number;
+    price_amount: number | null;
+    price_currency: string | null;
+    user_id: string;
+    plan_id: number;
+  };
   if (t.status === "paid") {
     await log("Transaction already paid!", t.id, null, invoice);
     return new Response("IPN Error: already paid");
@@ -59,8 +67,9 @@ export async function POST(req: Request) {
   const status = Number(g("status"));
   const txnId = g("txn_id");
 
-  // Invoices are billed in the site price currency so buyers can pay any coin.
-  if (currency1 !== settings.price_currency) {
+  // Invoices are billed in the price currency recorded when they were created.
+  const invoiceCurrency = t.price_currency ?? settings.price_currency;
+  if (currency1 !== invoiceCurrency) {
     await log("Original currency mismatch!", t.id, null, currency1);
     return new Response("IPN Error: currency", { status: 400 });
   }
@@ -71,43 +80,23 @@ export async function POST(req: Request) {
   }
 
   if (status >= 100 || status === 2) {
-    // Claim the invoice exactly once; a racing duplicate IPN gets no row back.
-    // Ledger values stay in the site crypto (t.amount is the converted price).
+    // Claim the invoice exactly once. The deposit, active rig, and upline
+    // commission all commit or roll back together inside the database.
     const paidCrypto = Number(t.amount);
-    const { data: claimed } = await admin
-      .from("transactions_history")
-      .update({ status: "paid", paid_amount: paidCrypto, txid: txnId })
-      .eq("id", t.id)
-      .neq("status", "paid")
-      .select("id")
-      .maybeSingle();
-    if (!claimed) return new Response("IPN OK");
-    await recordEvent({ userId: t.user_id, kind: "deposit", detail: { amount: paidCrypto, txid: txnId, planId: t.plan_id } });
-    await admin.from("user_deposits").insert({ user_id: t.user_id, amount: paidCrypto, tx: txnId, status: "SUCCESS", date_paid: new Date().toISOString() });
-    const { data: plan } = await admin.from("plans").select("*").eq("id", t.plan_id).maybeSingle();
-    if (plan) {
-      const exp = expirationForPlan(Number((plan as { duration: number }).duration));
-      await admin.from("user_plan_history").insert({
-        user_id: t.user_id,
-        plan_id: t.plan_id,
-        status: "active",
-        expire_date: exp.toISOString(),
-        last_sum: new Date().toISOString(),
-      });
-      // Upline affiliate credit
-      const { data: buyer } = await admin.from("profiles").select("id,reference_user_id").eq("id", t.user_id).maybeSingle();
-      const refId = (buyer as { reference_user_id: string | null } | null)?.reference_user_id;
-      if (refId) {
-        const commission = affiliateCommission(paidCrypto, settings.aff_comission);
-        const { data: upline } = await admin.from("profiles").select("balance,affiliate_earns").eq("id", refId).maybeSingle();
-        if (upline) {
-          await admin.from("profiles").update({
-            balance: Number((upline as { balance: number }).balance) + commission,
-            affiliate_earns: Number((upline as { affiliate_earns: number }).affiliate_earns) + commission,
-          }).eq("id", refId);
-          await admin.from("affiliate_history").insert({ user_id: refId, amount: commission, status: "paid" });
-        }
-      }
+    const { data, error } = await admin.rpc("activate_paid_invoice", {
+      p_tx_id: t.id,
+      p_txid: txnId,
+      p_paid: paidCrypto,
+    });
+    if (error) return new Response("IPN Error: activation failed", { status: 500 });
+
+    const row = firstRow<{ status?: string; claimed?: unknown; commission?: unknown }>(data);
+    if (row?.status !== "paid" && row?.status !== "already_paid") {
+      await log("Invoice activation was refused", t.id, row?.status ?? null, invoice);
+      return new Response("IPN Error: activation refused", { status: 500 });
+    }
+    if (row?.status === "paid") {
+      await recordEvent({ userId: t.user_id, kind: "deposit", detail: { amount: paidCrypto, txid: txnId, planId: t.plan_id } });
     }
   } else if (status === 1) {
     await admin.from("transactions_history").update({ status: "waiting" }).eq("id", t.id);

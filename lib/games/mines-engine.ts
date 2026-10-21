@@ -4,7 +4,8 @@ import { floatStream } from "./rng";
 import { pickIndices } from "./util";
 import { MINES_TILES, minesMultiplier, minesNormalize } from "./mines";
 import { ensureSeedRow } from "./engine";
-import { applyPayout, scaleMultiplier, type CasinoEcon } from "./econ";
+import { scaleMultiplier, type CasinoEcon } from "./econ";
+import { asNumber, firstRow, idempotencyKey } from "../ledger";
 
 // Interactive Mines. The layout is drawn once at start from the committed seed
 // and kept server-side, so the client can only learn a mine by hitting it. The
@@ -34,16 +35,27 @@ type RawRound = {
   status: "active" | "busted" | "cashed";
 };
 
+function asTiles(value: unknown): number[] {
+  if (Array.isArray(value)) return value.map((v) => Number(v)).filter((v) => Number.isFinite(v));
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      return Array.isArray(parsed) ? parsed.map((v) => Number(v)).filter((v) => Number.isFinite(v)) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 function parseRound(row: RawRound): MinesRound {
-  const mines = Array.isArray(row.mines) ? (row.mines as number[]) : [];
-  const revealed = Array.isArray(row.revealed) ? (row.revealed as number[]) : [];
   return {
     id: row.id,
     user_id: row.user_id,
     stake: Number(row.stake),
     mine_count: row.mine_count,
-    mines,
-    revealed,
+    mines: asTiles(row.mines),
+    revealed: asTiles(row.revealed),
     multiplier: Number(row.multiplier),
     payout: Number(row.payout),
     status: row.status,
@@ -56,7 +68,35 @@ async function balanceOf(userId: string): Promise<number> {
     .select("balance")
     .eq("id", userId)
     .maybeSingle();
-  return Number((data as { balance?: number } | null)?.balance ?? 0);
+  return asNumber((data as { balance?: unknown } | null)?.balance);
+}
+
+async function loadRound(userId: string, roundId: number): Promise<MinesRound | null> {
+  const { data } = await createAdminSupabase()
+    .from("game_rounds")
+    .select("*")
+    .eq("id", roundId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data ? parseRound(data as RawRound) : null;
+}
+
+async function roundOutcome(round: MinesRound, econ: CasinoEcon, balance?: number): Promise<MinesOutcome> {
+  const ended = round.status !== "active";
+  return {
+    ok: true,
+    roundId: round.id,
+    mineCount: round.mine_count,
+    revealed: round.revealed,
+    multiplier: round.multiplier,
+    status: round.status,
+    payout: round.payout,
+    balance: balance ?? (await balanceOf(round.user_id)),
+    mines: ended ? round.mines : undefined,
+    nextMultiplier: ended
+      ? 0
+      : scaleMultiplier(econ, minesMultiplier(round.mine_count, round.revealed.length + 1)),
+  };
 }
 
 export type MinesActive =
@@ -117,6 +157,7 @@ export async function startMines(opts: {
   mines: unknown;
   req?: Request;
   econ: CasinoEcon;
+  idempotencyKey?: string;
 }): Promise<MinesOutcome> {
   let normalized;
   try {
@@ -126,6 +167,15 @@ export async function startMines(opts: {
   }
 
   const admin = createAdminSupabase();
+  const key = idempotencyKey(opts.userId, "mines:start", opts.idempotencyKey);
+
+  const { data: existing } = await admin
+    .from("game_rounds")
+    .select("*")
+    .eq("idempotency_key", key)
+    .eq("user_id", opts.userId)
+    .maybeSingle();
+  if (existing) return roundOutcome(parseRound(existing as RawRound), opts.econ);
 
   const { data: open } = await admin
     .from("game_rounds")
@@ -143,78 +193,62 @@ export async function startMines(opts: {
   }
 
   const seed = await ensureSeedRow(opts.userId);
-  const { data: debited, error: debitError } = await admin.rpc("debit_balance", {
+  const { data: nonceData, error: nonceError } = await admin.rpc("next_game_nonce", {
     p_user_id: opts.userId,
-    p_amount: opts.stake,
   });
-  if (debitError) return { ok: false, error: debitError.message, status: 500 };
-  if (debited == null) return { ok: false, error: "Insufficient balance", status: 400 };
+  if (nonceError) return { ok: false, error: nonceError.message, status: 500 };
+  const nonce = Number(nonceData ?? 0);
 
-  try {
-    const { data: nonceData, error: nonceError } = await admin.rpc("next_game_nonce", {
-      p_user_id: opts.userId,
-    });
-    if (nonceError) throw new Error(nonceError.message);
-    const nonce = Number(nonceData ?? 0);
+  const layout = pickIndices(
+    floatStream(seed.server_seed, seed.client_seed, nonce, normalized.mines),
+    MINES_TILES,
+    normalized.mines
+  );
 
-    const layout = pickIndices(
-      floatStream(seed.server_seed, seed.client_seed, nonce, normalized.mines),
-      MINES_TILES,
-      normalized.mines
-    );
+  const { data, error } = await admin.rpc("start_mines_round", {
+    p_user: opts.userId,
+    p_stake: opts.stake,
+    p_mine_count: normalized.mines,
+    p_mines: layout,
+    p_seed_hash: seed.server_seed_hash,
+    p_client_seed: seed.client_seed,
+    p_nonce: nonce,
+    p_idempotency_key: key,
+  });
+  if (error) return { ok: false, error: error.message, status: 500 };
 
-    const { data: inserted, error } = await admin
-      .from("game_rounds")
-      .insert({
-        user_id: opts.userId,
-        game: "mines",
-        stake: opts.stake,
-        mine_count: normalized.mines,
-        mines: layout,
-        revealed: [],
-        multiplier: 1,
-        status: "active",
-        server_seed_hash: seed.server_seed_hash,
-        client_seed: seed.client_seed,
-        nonce,
-      })
-      .select("id")
-      .maybeSingle();
-    if (error) throw new Error(error.message);
+  const res = firstRow<{ status?: string; round_id?: unknown; balance?: unknown }>(data);
+  if (res?.status === "insufficient") {
+    return { ok: false, error: "Insufficient balance", status: 400 };
+  }
+  if (res?.status === "missing_user") {
+    return { ok: false, error: "Member not found", status: 404 };
+  }
+  if (res?.status === "active_exists") {
+    return {
+      ok: false,
+      error: "Finish your open round first",
+      status: 409,
+      roundId: res.round_id == null ? undefined : Number(res.round_id),
+    };
+  }
+  if (res?.status !== "applied" && res?.status !== "duplicate") {
+    return { ok: false, error: "Could not start the round", status: 500 };
+  }
 
+  const round = res.round_id == null ? null : await loadRound(opts.userId, Number(res.round_id));
+  if (!round) return { ok: false, error: "Could not start the round", status: 500 };
+
+  if (res.status === "applied") {
     void recordEvent({
       userId: opts.userId,
       kind: "bet",
       req: opts.req,
       detail: { game: "mines", action: "start", stake: opts.stake, mines: normalized.mines },
     });
-
-    return {
-      ok: true,
-      roundId: (inserted as { id: number }).id,
-      mineCount: normalized.mines,
-      revealed: [],
-      multiplier: 1,
-      status: "active",
-      payout: 0,
-      balance: await balanceOf(opts.userId),
-      nextMultiplier: scaleMultiplier(opts.econ, minesMultiplier(normalized.mines, 1)),
-    };
-  } catch (err) {
-    await admin.rpc("credit_balance", { p_user_id: opts.userId, p_amount: opts.stake });
-    return { ok: false, error: err instanceof Error ? err.message : "Could not start", status: 500 };
   }
-}
 
-async function loadActive(userId: string, roundId: number): Promise<MinesRound | null> {
-  const { data } = await createAdminSupabase()
-    .from("game_rounds")
-    .select("*")
-    .eq("id", roundId)
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .maybeSingle();
-  return data ? parseRound(data as RawRound) : null;
+  return roundOutcome(round, opts.econ, asNumber(res.balance));
 }
 
 export async function revealMines(opts: {
@@ -224,89 +258,47 @@ export async function revealMines(opts: {
   req?: Request;
   econ: CasinoEcon;
 }): Promise<MinesOutcome> {
-  const admin = createAdminSupabase();
-  const round = await loadActive(opts.userId, opts.roundId);
-  if (!round) return { ok: false, error: "No open round", status: 404 };
-
   const tile = Math.trunc(opts.tile);
   if (!Number.isInteger(tile) || tile < 0 || tile >= MINES_TILES) {
     return { ok: false, error: "Invalid tile", status: 400 };
   }
-  if (round.revealed.includes(tile)) {
-    return { ok: false, error: "That tile is already open", status: 400 };
+
+  const { data, error } = await createAdminSupabase().rpc("settle_mines_reveal", {
+    p_round_id: opts.roundId,
+    p_user: opts.userId,
+    p_tile: tile,
+    p_edge: opts.econ.edgeBoost,
+    p_max_win: opts.econ.maxWin,
+  });
+  if (error) return { ok: false, error: error.message, status: 500 };
+
+  const res = firstRow<{ status?: string; round_status?: string; balance?: unknown }>(data);
+  if (res?.status === "missing") return { ok: false, error: "No open round", status: 404 };
+  if (res?.status === "invalid_tile") return { ok: false, error: "Invalid tile", status: 400 };
+  if (res?.status === "already_revealed") return { ok: false, error: "That tile is already open", status: 400 };
+  if (res?.status !== "applied" && res?.status !== "settled") {
+    return { ok: false, error: "That move was refused", status: 400 };
   }
 
-  const revealed = [...round.revealed, tile].sort((a, b) => a - b);
+  const round = await loadRound(opts.userId, opts.roundId);
+  if (!round) return { ok: false, error: "No open round", status: 404 };
 
-  if (round.mines.includes(tile)) {
-    await admin
-      .from("game_rounds")
-      .update({ revealed, status: "busted", payout: 0, multiplier: 0, ended_at: new Date().toISOString() })
-      .eq("id", round.id)
-      .eq("status", "active");
+  if (res.status === "applied" && round.status !== "active") {
     void recordEvent({
       userId: opts.userId,
       kind: "bet",
       req: opts.req,
-      detail: { game: "mines", action: "bust", stake: round.stake },
-    });
-    return {
-      ok: true,
-      roundId: round.id,
-      mineCount: round.mine_count,
-      revealed,
-      multiplier: 0,
-      status: "busted",
-      payout: 0,
-      balance: await balanceOf(opts.userId),
-      mines: round.mines,
-      nextMultiplier: 0,
-    };
-  }
-
-  const rawMult = minesMultiplier(round.mine_count, revealed.length);
-  const multiplier = scaleMultiplier(opts.econ, rawMult);
-  const safeTotal = MINES_TILES - round.mine_count;
-  const finished = revealed.length >= safeTotal;
-  const payout = finished ? applyPayout(opts.econ, round.stake, rawMult).payout : 0;
-
-  if (payout > 0) {
-    await admin.rpc("credit_balance", { p_user_id: opts.userId, p_amount: payout });
-  }
-
-  await admin
-    .from("game_rounds")
-    .update({
-      revealed,
-      multiplier,
-      payout,
-      status: finished ? "cashed" : "active",
-      ended_at: finished ? new Date().toISOString() : null,
-    })
-    .eq("id", round.id)
-    .eq("status", "active");
-
-  if (finished) {
-    void recordEvent({
-      userId: opts.userId,
-      kind: "bet",
-      req: opts.req,
-      detail: { game: "mines", action: "clear", stake: round.stake, payout, multiplier },
+      detail: {
+        game: "mines",
+        action: round.status === "busted" ? "bust" : "clear",
+        stake: round.stake,
+        payout: round.payout,
+        multiplier: round.multiplier,
+      },
     });
   }
 
-  return {
-    ok: true,
-    roundId: round.id,
-    mineCount: round.mine_count,
-    revealed,
-    multiplier,
-    status: finished ? "cashed" : "active",
-    payout,
-    balance: await balanceOf(opts.userId),
-    mines: finished ? round.mines : undefined,
-    nextMultiplier: scaleMultiplier(opts.econ, minesMultiplier(round.mine_count, revealed.length + 1)),
-  };
+  return roundOutcome(round, opts.econ, asNumber(res.balance));
 }
 
 export async function cashoutMines(opts: {
@@ -315,44 +307,43 @@ export async function cashoutMines(opts: {
   req?: Request;
   econ: CasinoEcon;
 }): Promise<MinesOutcome> {
-  const admin = createAdminSupabase();
-  const round = await loadActive(opts.userId, opts.roundId);
-  if (!round) return { ok: false, error: "No open round", status: 404 };
-  if (round.revealed.length === 0) {
+  const { data, error } = await createAdminSupabase().rpc("settle_mines_cashout", {
+    p_round_id: opts.roundId,
+    p_user: opts.userId,
+    p_edge: opts.econ.edgeBoost,
+    p_max_win: opts.econ.maxWin,
+  });
+  if (error) return { ok: false, error: error.message, status: 500 };
+
+  const res = firstRow<{ status?: string; round_status?: string; balance?: unknown }>(data);
+  if (res?.status === "missing") return { ok: false, error: "No open round", status: 404 };
+  if (res?.status === "no_reveals") {
     return { ok: false, error: "Reveal at least one tile first", status: 400 };
   }
-
-  const rawMult = minesMultiplier(round.mine_count, round.revealed.length);
-  const paid = applyPayout(opts.econ, round.stake, rawMult);
-  const multiplier = paid.multiplier;
-  const payout = paid.payout;
-  if (payout > 0) {
-    await admin.rpc("credit_balance", { p_user_id: opts.userId, p_amount: payout });
+  if (res?.status !== "applied" && res?.status !== "settled") {
+    return { ok: false, error: "That move was refused", status: 400 };
+  }
+  if (res.status === "settled" && res.round_status !== "cashed") {
+    return { ok: false, error: "This round is already over", status: 409 };
   }
 
-  await admin
-    .from("game_rounds")
-    .update({ multiplier, payout, status: "cashed", ended_at: new Date().toISOString() })
-    .eq("id", round.id)
-    .eq("status", "active");
+  const round = await loadRound(opts.userId, opts.roundId);
+  if (!round) return { ok: false, error: "No open round", status: 404 };
 
-  void recordEvent({
-    userId: opts.userId,
-    kind: "bet",
-    req: opts.req,
-    detail: { game: "mines", action: "cashout", stake: round.stake, payout, multiplier },
-  });
+  if (res.status === "applied") {
+    void recordEvent({
+      userId: opts.userId,
+      kind: "bet",
+      req: opts.req,
+      detail: {
+        game: "mines",
+        action: "cashout",
+        stake: round.stake,
+        payout: round.payout,
+        multiplier: round.multiplier,
+      },
+    });
+  }
 
-  return {
-    ok: true,
-    roundId: round.id,
-    mineCount: round.mine_count,
-    revealed: round.revealed,
-    multiplier,
-    status: "cashed",
-    payout,
-    balance: await balanceOf(opts.userId),
-    mines: round.mines,
-    nextMultiplier: 0,
-  };
+  return roundOutcome(round, opts.econ, asNumber(res.balance));
 }

@@ -10,9 +10,9 @@ export async function POST(req: Request) {
   const closed = gameClosed(econ, "mines");
   if (closed) return closed;
 
-  let body: { stake?: unknown; mines?: unknown };
+  let body: { stake?: unknown; mines?: unknown; idempotencyKey?: unknown };
   try {
-    body = (await req.json()) as { stake?: unknown; mines?: unknown };
+    body = (await req.json()) as { stake?: unknown; mines?: unknown; idempotencyKey?: unknown };
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });
   }
@@ -26,6 +26,10 @@ export async function POST(req: Request) {
     mines: body.mines,
     req,
     econ,
+    idempotencyKey:
+      typeof body.idempotencyKey === "string"
+        ? body.idempotencyKey
+        : req.headers.get("idempotency-key") ?? undefined,
   });
   if (!outcome.ok) {
     return NextResponse.json(
