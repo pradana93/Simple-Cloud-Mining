@@ -15,14 +15,16 @@ export function CountUp({
   cfg?: MoneyCfg;
   className?: string;
 }) {
-  const [display, setDisplay] = useState(0);
-  const fromRef = useRef(0);
+  const [display, setDisplay] = useState(value);
+  const fromRef = useRef(value);
+  const mountedRef = useRef(false);
   const fiat = cfg?.mode === "fiat" && cfg.rate > 0;
   const shownDecimals = fiat ? fiatDecimals(value * cfg!.rate) : decimals;
 
   useEffect(() => {
     const target = Number.isFinite(value) ? value : 0;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    if (!mountedRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      mountedRef.current = true;
       setDisplay(target);
       fromRef.current = target;
       return;

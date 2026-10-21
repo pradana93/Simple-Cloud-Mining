@@ -31,10 +31,14 @@ insert into public.contents (affiliate, payouts, contact) values
 on conflict do nothing;
 
 insert into public.faqs (question, answer) values
-  ('What is Simple Cloud Mining?','<p>Industry leading cloud mining pool. Mining power is backed by physical miners.</p>'),
-  ('How do I start?','<p>Sign up and start generating coins. Upgrade plans to earn more.</p>'),
-  ('How much can I earn?','<p>Free plan generates daily rewards. Paid plans increase hashrate.</p>'),
-  ('How long do withdrawals take?','<p>Usually instant; manual review can take longer.</p>')
+  ('Is the free plan really free?','<p>Yes. The starter plan activates when you create an account. It needs no card and no payment. The current daily credit is shown on the plan card.</p>'),
+  ('How does crypto payment work?','<p>Pick a coin and create an invoice. Send the exact amount shown to the deposit address. The miner activates after the network confirms the payment.</p>'),
+  ('Which coins can I pay with?','<p>The checkout lists the coins that are available right now. Send only the selected coin on the correct network.</p>'),
+  ('When does my miner activate?','<p>After the payment reaches the required confirmations. The invoice page updates automatically, and the credit lands in your balance.</p>'),
+  ('When can I withdraw?','<p>When your balance meets the minimum shown on the withdrawal page. Withdrawals are reviewed and paid by hand.</p>'),
+  ('What happens if I send the wrong coin or amount?','<p>The payment may not be credited. Send only the selected coin on the correct network, and send the exact amount. If you make a mistake, contact support with the transaction id.</p>'),
+  ('Is the projected yield guaranteed?','<p>No. The projection uses the plan published daily rate for its full term. It is not a market forecast or a guarantee.</p>'),
+  ('Do you store my private key?','<p>No. The app never asks for a wallet private key. Deposits go to a generated address and withdrawals are paid from an external wallet.</p>')
 on conflict do nothing;
 
 insert into public.addons (name) values ('demo_addon') on conflict do nothing;

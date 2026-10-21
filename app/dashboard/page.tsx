@@ -205,7 +205,7 @@ export default async function DashboardPage() {
   const nextStreak = computeStreak(checkinLast, today);
   const nextBonus = checkinBonus(Number(s.checkin_amount), nextStreak);
   const onboardingSteps = [
-    { id: "rig", label: "Deploy hashrate", hint: "Claim the free plan or buy a miner.", href: "/#plans", done: activeRows.length > 0 },
+    { id: "rig", label: "Check your starter rig", hint: "The free plan activates on first login. Paid plans are optional.", href: "/dashboard", done: activeRows.length > 0 },
     { id: "payout", label: "Save a payout address", hint: "Lock withdrawals to a wallet you trust.", href: "/withdrawal", done: hasAllowlist },
     { id: "2fa", label: "Turn on two-factor", hint: "Add a second step at sign-in and payouts.", href: "/account", done: twoFactorOn },
     { id: "bonus", label: "Claim a daily bonus", hint: "A small credit on every day you visit.", href: "/dashboard", done: checkinLast != null },
@@ -264,11 +264,13 @@ export default async function DashboardPage() {
 
   const minWithdraw = Number(s.min_withdraw);
   const nextPayout =
-    minWithdraw <= 0 || balance >= minWithdraw
-      ? "You can place a withdrawal request now."
-      : rate > 0
-        ? `About ${formatDuration((minWithdraw - balance) / rate)} until you reach the minimum.`
-        : "Deploy hashrate to reach the withdrawal minimum.";
+    balance <= 0
+      ? "Earn your first credit before requesting a withdrawal."
+      : minWithdraw <= 0 || balance >= minWithdraw
+        ? "You can place a withdrawal request now."
+        : rate > 0
+          ? `About ${formatDuration((minWithdraw - balance) / rate)} until you reach the minimum.`
+          : "Deploy hashrate to reach the withdrawal minimum.";
 
   const paidEcon = paidPlans.map((p) => ({
     p,
@@ -324,7 +326,9 @@ export default async function DashboardPage() {
                   +{formatMoney(rate, cfg, 8)}/min, credited live
                 </p>
               ) : (
-                <p className="mt-1 text-sm text-slate-400">{moneyUnit(cfg)}, withdrawable</p>
+                <p className="mt-1 text-sm text-slate-400">
+                  {balance > 0 ? `${moneyUnit(cfg)} available to withdraw` : "No credit yet."}
+                </p>
               )}
               <p className="mt-3 text-xs text-slate-400">{nextPayout}</p>
             </div>
@@ -408,8 +412,14 @@ export default async function DashboardPage() {
           </div>
           {rigs.length === 0 ? (
             <Card className="p-8 text-center">
-              <p className="text-slate-300">No rigs hashing yet.</p>
-              <p className="mt-1 text-sm text-slate-400">Claim the free plan or deploy a paid miner below.</p>
+              <p className="text-slate-300">No active rig yet.</p>
+              <p className="mt-1 text-sm text-slate-400">
+                The free starter plan activates on first login. If it does not appear, refresh this
+                page or contact support.
+              </p>
+              <Link href="/#plans" className="mt-4 inline-block text-sm font-semibold text-gold-300">
+                Compare plans
+              </Link>
             </Card>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">

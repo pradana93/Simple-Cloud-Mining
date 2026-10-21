@@ -32,7 +32,7 @@ export function PurchaseButton({ planId, coins = [] }: { planId: number; coins?:
         return;
       }
       keyRef.current = null;
-      push("Invoice created", "success");
+      push("Invoice ready", "success");
       if (j.hash) router.push(`/invoice/${j.hash}`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Purchase failed";
@@ -85,9 +85,12 @@ export function PurchaseButton({ planId, coins = [] }: { planId: number; coins?:
             <Loader2 size={16} className="animate-spin" /> Creating invoice
           </>
         ) : (
-          "Confirm purchase"
+          "Create payment invoice"
         )}
       </Button>
+      <p className="mt-2 text-xs leading-relaxed text-slate-400">
+        You will see the exact amount and deposit address on the next screen.
+      </p>
       {err && <p className="mt-2 text-sm text-red-300">{err}</p>}
     </div>
   );

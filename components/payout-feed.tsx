@@ -5,8 +5,26 @@ import { cn, formatCrypto } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney, type MoneyCfg } from "@/lib/money";
 
-type Entry = { amount: number; tx: string | null; status?: string };
+type Entry = { amount: number; tx: string | null; status?: string; created_at?: string };
 type Row = Entry & { kind: "in" | "out" };
+
+function statusLabel(row: Row): string {
+  if (row.kind === "in") return "deposit confirmed";
+  const status = String(row.status ?? "").toUpperCase();
+  if (status === "SUCCESS") return "paid";
+  if (status === "CANCELED") return "canceled";
+  if (status === "PROCESSING") return "processing";
+  return "pending review";
+}
+
+function statusVariant(row: Row): "green" | "gold" | "red" | "slate" {
+  if (row.kind === "in") return "green";
+  const status = String(row.status ?? "").toUpperCase();
+  if (status === "SUCCESS") return "green";
+  if (status === "CANCELED") return "red";
+  if (status === "PROCESSING") return "gold";
+  return "slate";
+}
 
 export function PayoutFeed({
   deposits,
@@ -72,30 +90,48 @@ export function PayoutFeed({
 
       <div key={`${tab}:${q}`} className="panel animate-fade-in divide-y divide-white/5 rounded-3xl" aria-live="polite">
         {rows.length === 0 ? (
-          <p className="p-6 text-center text-sm text-slate-400">No matching entries.</p>
+          <div className="p-6 text-center text-sm text-slate-400">
+            <p className="font-medium text-slate-200">
+              {q
+                ? "No entries match that transaction id."
+                : tab === "out"
+                  ? "No withdrawals yet."
+                  : tab === "in"
+                    ? "No confirmed deposits yet."
+                    : "No payout entries yet."}
+            </p>
+            <p className="mt-1">
+              {q
+                ? "Clear the filter to see the full feed."
+                : "This feed fills after the first confirmed deposit or completed withdrawal."}
+            </p>
+          </div>
         ) : (
-          rows.map((r, i) => {
-            const success = r.kind === "in" || String(r.status).toLowerCase() === "success";
-            return (
-              <div key={i} className="flex items-center justify-between gap-3 px-6 py-3.5 text-sm">
-                <span className="font-mono tabular-nums text-white">
+          rows.map((r, i) => (
+            <div key={i} className="flex items-center justify-between gap-3 px-6 py-3.5 text-sm">
+              <span className="min-w-0">
+                <span className="block font-mono tabular-nums text-white">
                   {cfg ? (
                     formatMoney(Number(r.amount), cfg, decimals)
                   ) : (
                     <>
-                      {formatCrypto(Number(r.amount), decimals)} <span className="text-slate-400">{currencyCode}</span>
+                      {formatCrypto(Number(r.amount), decimals)}{" "}
+                      <span className="text-slate-400">{currencyCode}</span>
                     </>
                   )}
                 </span>
-                <span className="hidden truncate font-mono text-xs text-slate-400 sm:inline">
-                  {r.tx ? `${r.tx.slice(0, 18)}…` : "no tx"}
-                </span>
-                <Badge variant={success ? "green" : "gold"}>
-                  {r.kind === "in" ? "deposit" : r.status ?? "pending"}
-                </Badge>
-              </div>
-            );
-          })
+                {r.created_at ? (
+                  <span className="mt-0.5 block text-[11px] text-slate-400">
+                    {new Date(r.created_at).toLocaleDateString()}
+                  </span>
+                ) : null}
+              </span>
+              <span className="hidden min-w-0 flex-1 truncate text-right font-mono text-xs text-slate-400 sm:block">
+                {r.tx ? r.tx.slice(0, 18) + "..." : "no tx reference"}
+              </span>
+              <Badge variant={statusVariant(r)}>{statusLabel(r)}</Badge>
+            </div>
+          ))
         )}
       </div>
     </div>

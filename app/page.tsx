@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Activity } from "lucide-react";
 import { getCachedPlans, getCachedPayouts, getCachedSettings, getCachedStats } from "@/lib/catalog";
 import { getMoneyCfg } from "@/lib/currency";
-import { formatMoney, moneyUnit } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { Card } from "@/components/ui/card";
 import { Reveal } from "@/components/motion/reveal";
 import { CountUp } from "@/components/motion/count-up";
@@ -27,6 +27,7 @@ export default async function HomePage() {
     getCachedPayouts(),
   ]);
   const cfg = await getMoneyCfg();
+  const completedPayouts = payouts.withdrawals.filter((w) => String(w.status ?? "").toUpperCase() === "SUCCESS");
 
   return (
     <div className="space-y-20 py-10 sm:py-14">
@@ -40,8 +41,8 @@ export default async function HomePage() {
           </Reveal>
           <Reveal delay={80}>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-400 sm:text-lg">
-              {s.siteslogan}. Buy a hashrate plan, watch it accrue, and withdraw on-chain. No
-              hardware to host or maintain.
+              A free starter miner is included. Paid plans are optional. Watch your balance accrue,
+              then withdraw to your own wallet.
             </p>
           </Reveal>
           <Reveal delay={160}>
@@ -50,57 +51,85 @@ export default async function HomePage() {
                 href="/register"
                 className="tap cta-glow inline-flex h-12 items-center rounded-xl bg-gold-500 px-7 font-display text-base font-bold text-ink-950 hover:bg-gold-400"
               >
-                Claim free hashrate
+                Start with a free miner
               </Link>
               <Link
                 href="/payouts"
                 className="text-sm font-semibold text-slate-300 underline-offset-4 hover:text-gold-300 hover:underline"
               >
-                See live payouts
+                See payout history
               </Link>
             </div>
+            <p className="mt-4 max-w-lg text-xs leading-relaxed text-slate-400">
+              No card required. No wallet private keys are stored. Withdrawals are reviewed by hand
+              before they are paid.
+            </p>
           </Reveal>
         </div>
         <Reveal delay={220}>
           <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-6 lg:grid-cols-4">
-            <Metric label="Active miners">
-              <CountUp value={stats.miners} />
+            <Metric label="Active rigs">
+              <CountUp value={stats.activeRigs} />
             </Metric>
             <Metric label="Hashrate plans">
               <CountUp value={plans.length} />
             </Metric>
-            <Metric label={`${moneyUnit(cfg)} paid out`}>
+            <Metric label="Completed payouts">
               <CountUp value={stats.totalPaid} decimals={s.currency_decimals} cfg={cfg} />
             </Metric>
-            <Metric label={`${moneyUnit(cfg)} staked`}>
-              <CountUp value={stats.totalDeposits} decimals={s.currency_decimals} cfg={cfg} />
+            <Metric label="Members">
+              <CountUp value={stats.members} />
             </Metric>
           </div>
         </Reveal>
       </section>
 
-      {payouts.withdrawals.length > 0 && (
-        <Reveal>
-          <section aria-label="Recent settlements" className="grid gap-6 md:grid-cols-[1fr_1.6fr]">
-            <div>
-              <h2 className="font-display text-xl font-bold text-white">Recent settlements</h2>
-              <p className="mt-2 text-sm text-slate-400">
-                Withdrawals are published here as they clear, newest first.
-              </p>
-            </div>
+      <Reveal>
+        <section aria-label="Recent payouts" className="grid gap-6 md:grid-cols-[1fr_1.6fr]">
+          <div>
+            <h2 className="font-display text-xl font-bold text-white">Recent payouts</h2>
+            <p className="mt-2 text-sm text-slate-400">
+              Completed withdrawals, newest first. Each one was reviewed and paid by hand.
+            </p>
+          </div>
+          {completedPayouts.length > 0 ? (
             <ol className="divide-y divide-white/10 border-y border-white/10">
-              {payouts.withdrawals.slice(0, 6).map((w, i) => (
-                <li key={i} className="flex items-center justify-between py-3 text-sm">
+              {completedPayouts.slice(0, 6).map((w, i) => (
+                <li key={i} className="flex items-center justify-between gap-4 py-3 text-sm">
                   <span className="font-mono tabular-nums text-white">
                     {formatMoney(Number(w.amount), cfg)}
                   </span>
-                  <span className="text-slate-400">{w.status ? w.status.toLowerCase() : "pending"}</span>
+                  <span className="min-w-0 text-right text-slate-400">
+                    {w.tx ? (
+                      <span className="block truncate font-mono text-xs" title={w.tx}>
+                        {w.tx.slice(0, 18)}...
+                      </span>
+                    ) : (
+                      "paid"
+                    )}
+                    {w.created_at ? (
+                      <span className="block text-[11px]">
+                        {new Date(w.created_at).toLocaleDateString()}
+                      </span>
+                    ) : null}
+                  </span>
                 </li>
               ))}
             </ol>
-          </section>
-        </Reveal>
-      )}
+          ) : (
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400">
+              <p className="font-medium text-slate-200">No completed payouts yet.</p>
+              <p className="mt-1 leading-relaxed">
+                This is a new deployment. Completed withdrawals will appear here with their
+                transaction reference. Canceled requests are not counted as paid.
+              </p>
+              <Link href="/faq" className="mt-3 inline-block font-semibold text-gold-300 hover:text-gold-400">
+                Read how payouts work
+              </Link>
+            </div>
+          )}
+        </section>
+      </Reveal>
 
       <Reveal>
         <section id="plans" className="scroll-mt-24">
@@ -108,8 +137,8 @@ export default async function HomePage() {
             <div>
               <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">Hashrate plans</h2>
               <p className="mt-2 max-w-lg text-sm leading-relaxed text-slate-400">
-                Pick a plan to see its projected yield. Every plan accrues daily and can be
-                withdrawn once it clears.
+                The free plan is a starter. Paid plans are optional. Every plan credits a published
+                daily rate, and the projected total is shown before you pay.
               </p>
             </div>
             <Link
@@ -139,7 +168,8 @@ export default async function HomePage() {
             <div className="panel card-hover rounded-2xl p-6">
               <h3 className="font-display text-base font-bold text-white">On-chain payouts</h3>
               <p className="mt-2 text-sm leading-relaxed text-slate-400">
-                Every deposit and withdrawal is published on the live payouts feed.
+                Confirmed deposits and completed withdrawals are published on the payout history.
+                Withdrawals are reviewed and paid by hand.
               </p>
             </div>
             <div className="panel card-hover rounded-2xl p-6">
@@ -157,13 +187,16 @@ export default async function HomePage() {
       <Reveal>
         <section className="rounded-3xl border border-white/10 px-6 py-10 sm:px-12 sm:py-14">
           <h2 className="font-display max-w-lg text-3xl font-bold text-white sm:text-4xl">
-            Create an account and the free miner starts immediately.
+            Create a free account. The starter plan is included.
           </h2>
+          <p className="mt-3 max-w-lg text-sm leading-relaxed text-slate-400">
+            No card required. Upgrade only if you want a higher daily credit.
+          </p>
           <Link
             href="/register"
             className="tap mt-7 inline-flex h-12 items-center rounded-xl bg-gold-500 px-8 font-display text-base font-bold text-ink-950 hover:bg-gold-400"
           >
-            Claim free hashrate
+            Create free account
           </Link>
         </section>
       </Reveal>

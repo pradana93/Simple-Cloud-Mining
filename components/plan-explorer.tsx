@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { cn, formatCrypto } from "@/lib/utils";
-import { formatFiat, formatMoney, formatPrice, type MoneyCfg } from "@/lib/money";
+import { formatFiat, formatPrice, type MoneyCfg } from "@/lib/money";
 
 type PlanItem = {
   id: number;
@@ -39,7 +39,10 @@ export function PlanExplorer({
   const all = useMemo(() => [...plans].sort((a, b) => Number(a.price) - Number(b.price)), [plans]);
   const [sort, setSort] = useState<"price" | "yield">("price");
   const [selectedId, setSelectedId] = useState<number | null>(all[0]?.id ?? null);
-  const money = (v: number) => (cfg ? formatMoney(v, cfg, decimals) : `${formatCrypto(v, decimals)} ${currencyCode}`);
+  const crypto = (v: number) =>
+    `${formatCrypto(v, decimals).replace(/\.?0+$/, "")} ${currencyCode}`;
+  const fiatHint = (v: number) =>
+    cfg && cfg.mode === "fiat" && cfg.rate > 0 ? `≈${formatFiat(v * cfg.rate, cfg.fiatCurrency)}` : null;
   const priceOf = (v: number) => (cfg ? formatPrice(v, cfg) : formatFiat(v, priceCurrency));
 
   const sorted = useMemo(() => {
@@ -106,7 +109,8 @@ export function PlanExplorer({
                       {p.version ? <span className="ml-2 text-xs font-normal text-slate-400">{p.version}</span> : null}
                     </div>
                     <div className="mt-0.5 text-xs text-slate-400">
-                      {String(p.speed ?? "")} · {p.duration} days
+                      {Number(p.speed) > 0 ? `${Number(p.speed)}x speed` : "speed n/a"} ·{" "}
+                      {p.duration} days
                     </div>
                   </div>
                   <div className="text-right">
@@ -124,23 +128,40 @@ export function PlanExplorer({
       <div key={sel.id} className="panel animate-scale-in h-fit rounded-3xl p-6">
         <div className="text-xs text-slate-400">Selected plan</div>
         <h3 className="font-display mt-1 text-2xl font-bold text-white">{sel.plan_name}</h3>
+        {isFree && (
+          <p className="mt-2 text-sm leading-relaxed text-slate-400">
+            This is the starter plan. It costs nothing and activates when you create an account. The
+            term is the starter plan&apos;s full duration, not a paid contract.
+          </p>
+        )}
         <dl className="mt-5 space-y-2.5 text-sm">
-          <Row label="Daily yield" value={`+${money(Number(sel.point_per_day ?? 0))}`} emerald />
-          <Row label="Hashrate" value={String(sel.speed ?? "n/a")} />
-          <Row label="Contract" value={`${sel.duration} days`} />
-          <Row label="Price" value={isFree ? "Free" : priceOf(Number(sel.price))} />
+          <Row label="Daily credit" value={`+${crypto(Number(sel.point_per_day ?? 0))}`} emerald />
+          <Row label="Plan term" value={`${sel.duration} days`} />
+          <Row
+            label="Relative speed"
+            value={Number(sel.speed) > 0 ? `${Number(sel.speed)}x` : "n/a"}
+          />
+          <Row label="One-time price" value={isFree ? "Free" : priceOf(Number(sel.price))} />
         </dl>
+        <p className="mt-2 text-xs text-slate-400">
+          {isFree ? "No payment required." : `Prices are set in ${priceCurrency}.`}
+        </p>
         <div className="mt-5 rounded-2xl border border-white/10 p-4">
           <div className="text-xs text-slate-400">Projected over {sel.duration} days</div>
           <div className="font-mono mt-1 text-2xl font-medium tabular-nums text-gold-300">
-            +{money(projected)}
+            +{crypto(projected)}
           </div>
+          {fiatHint(projected) && <div className="mt-1 text-xs text-slate-400">{fiatHint(projected)}</div>}
         </div>
+        <p className="mt-3 text-xs leading-relaxed text-slate-400">
+          Projection uses the plan&apos;s published daily rate. It is not a market forecast or a
+          guarantee.
+        </p>
         <Link
           href={isFree ? "/register" : `/purchase/${sel.id}`}
           className="tap mt-5 inline-flex h-12 w-full items-center justify-center rounded-xl bg-gold-500 font-display text-base font-bold text-ink-950 hover:bg-gold-400"
         >
-          {isFree ? "Claim free miner" : "Deploy this miner"}
+          {isFree ? "Create free account" : "View payment options"}
         </Link>
       </div>
     </div>

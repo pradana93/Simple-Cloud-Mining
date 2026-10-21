@@ -18,13 +18,17 @@ export default async function PayoutsPage() {
     <div className="space-y-8 py-8 sm:py-10">
       <Reveal>
         <div className="max-w-2xl">
-          <h1 className="font-display text-3xl font-bold text-white sm:text-5xl">Live payouts</h1>
+          <h1 className="font-display text-3xl font-bold text-white sm:text-5xl">Payout history</h1>
           <p className="mt-3 text-slate-400">
-            Every deposit and withdrawal, published as it lands.{" "}
+            Confirmed deposits and withdrawal requests, with their status.{" "}
             <span className="font-semibold text-gold-300">
               <CountUp value={stats.totalPaid} decimals={s.currency_decimals} cfg={cfg} /> {moneyUnit(cfg)}
             </span>{" "}
-            paid out so far.
+            completed payouts so far.
+          </p>
+          <p className="mt-3 text-sm leading-relaxed text-slate-400">
+            Withdrawals are reviewed and paid by hand. Canceled requests stay visible for
+            transparency, but they are not counted as paid.
           </p>
         </div>
       </Reveal>

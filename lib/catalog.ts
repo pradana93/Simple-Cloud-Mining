@@ -104,23 +104,30 @@ export const getCachedPayouts = unstable_cache(
 );
 
 export const getCachedStats = unstable_cache(
-  async (): Promise<{ miners: number; totalDeposits: number; totalPaid: number }> => {
+  async (): Promise<{ members: number; activeRigs: number; totalDeposits: number; totalPaid: number }> => {
     try {
       const supabase = createAdminSupabase();
-      const [u, d, w] = await Promise.all([
+      const now = new Date().toISOString();
+      const [u, r, d, w] = await Promise.all([
         supabase.from("profiles").select("id", { count: "exact", head: true }),
-        supabase.from("user_deposits").select("amount").limit(5000),
-        supabase.from("user_withdrawal").select("amount").limit(5000),
+        supabase
+          .from("user_plan_history")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "active")
+          .gt("expire_date", now),
+        supabase.from("user_deposits").select("amount").eq("status", "SUCCESS").limit(5000),
+        supabase.from("user_withdrawal").select("amount").eq("status", "SUCCESS").limit(5000),
       ]);
       const sum = (rows: unknown) =>
-        ((rows ?? []) as Array<{ amount: number }>).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+        ((rows ?? []) as Array<{ amount: number }>).reduce((s, row) => s + Number(row.amount ?? 0), 0);
       return {
-        miners: (u as { count: number | null }).count ?? 0,
+        members: (u as { count: number | null }).count ?? 0,
+        activeRigs: (r as { count: number | null }).count ?? 0,
         totalDeposits: sum((d as { data: unknown }).data),
         totalPaid: sum((w as { data: unknown }).data),
       };
     } catch {
-      return { miners: 0, totalDeposits: 0, totalPaid: 0 };
+      return { members: 0, activeRigs: 0, totalDeposits: 0, totalPaid: 0 };
     }
   },
   ["site-stats"],
