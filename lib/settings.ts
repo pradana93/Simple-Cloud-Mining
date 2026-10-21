@@ -10,7 +10,7 @@ export const PUBLIC_SETTINGS_COLUMNS =
 export const FALLBACK: SiteSettings = {
   id: 1,
   sitename: "Simple Cloud Mining",
-  siteslogan: "A simple console for cloud hashrate.",
+  siteslogan: "A simple console for cloud hashrate",
   keywords: "cloud,mining,crypto",
   description: "Simple Cloud Mining",
   pagination: 10,
