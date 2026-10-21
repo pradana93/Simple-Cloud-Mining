@@ -7,5 +7,8 @@ export function createAdminSupabase() {
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   return createClient<Database>(url, serviceKey, {
     auth: { persistSession: false },
+    global: {
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
 }

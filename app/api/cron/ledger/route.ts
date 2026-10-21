@@ -4,6 +4,7 @@ import { asNumber, firstRow } from "@/lib/ledger";
 import { sendAlert } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 
 export async function GET(req: Request) {
   const expected = process.env.CRON_SECRET;
