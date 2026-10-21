@@ -5,7 +5,7 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { getMoneyCfg } from "@/lib/currency";
 import { formatFiat } from "@/lib/money";
 import { planEconomics } from "@/lib/plan-math";
-import { availableCoins } from "@/lib/cryptapi";
+import { availableCoins, availableCoinsForPrice } from "@/lib/cryptapi";
 import { formatCrypto } from "@/lib/utils";
 import { PurchaseButton } from "@/components/purchase-button";
 
@@ -24,7 +24,6 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
   const { planId } = await params;
   const s = await getCachedSettings();
   const cfg = await getMoneyCfg();
-  const coins = availableCoins(s.pay_coins, s);
   let plan: PurchasePlan | null = null;
   try {
     const supabase = createServerSupabase();
@@ -48,6 +47,15 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
   const daily = Number(plan.point_per_day ?? 0);
   const duration = Number(plan.duration);
   const free = price <= 0;
+  const configuredCoins = availableCoins(s.pay_coins, s);
+  const coins = free ? [] : await availableCoinsForPrice(s.pay_coins, s, price, s.price_currency);
+  const hiddenForMinimum = Math.max(0, configuredCoins.length - coins.length);
+  const usdtListed = s.pay_coins
+    .toUpperCase()
+    .split(",")
+    .map((coin) => coin.trim())
+    .includes("USDT");
+  const usdtConfigured = Boolean(s.cryptapi_usdt_trc20_address?.trim());
   const econ = planEconomics({
     price,
     point_per_day: daily,
@@ -194,16 +202,19 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
                 .
               </p>
             )}
-            {!coins.some((coin) => coin.code === "USDT") &&
-              s.pay_coins
-                .toUpperCase()
-                .split(",")
-                .map((coin) => coin.trim())
-                .includes("USDT") && (
-                <p className="mt-3 text-xs leading-relaxed text-slate-400">
-                  USDT TRC20 needs a separate receiving address and is temporarily unavailable.
-                </p>
-              )}
+            {usdtListed && !coins.some((coin) => coin.code === "USDT") && (
+              <p className="mt-3 text-xs leading-relaxed text-slate-400">
+                {usdtConfigured
+                  ? "USDT TRC20 has a network minimum above this plan's price, so it is hidden for this plan. Choose another coin."
+                  : "USDT TRC20 needs a separate receiving address and is temporarily unavailable."}
+              </p>
+            )}
+            {hiddenForMinimum > 0 && (
+              <p className="mt-3 text-xs leading-relaxed text-slate-400">
+                Some coins are hidden because this plan is below their network minimum. Choose one
+                of the coins shown above.
+              </p>
+            )}
           </div>
         </div>
       )}

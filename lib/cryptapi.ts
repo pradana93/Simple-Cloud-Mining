@@ -77,6 +77,50 @@ export function availableCoins(
   return coinOptions(csv).filter((coin) => Boolean(paymentAddress(coin.code, settings)));
 }
 
+type TickerInfo = { minimum: number; prices: Record<string, number> };
+const infoCache = new Map<string, { at: number; value: TickerInfo }>();
+const INFO_TTL_MS = 5 * 60 * 1000;
+
+export async function getTickerInfo(ticker: string): Promise<TickerInfo | null> {
+  const cached = infoCache.get(ticker);
+  if (cached && Date.now() - cached.at < INFO_TTL_MS) return cached.value;
+  try {
+    const data = await getJson(`${API_BASE}/${ticker}/info/`);
+    const rawPrices = (data.prices ?? {}) as Record<string, unknown>;
+    const prices: Record<string, number> = {};
+    for (const [code, value] of Object.entries(rawPrices)) {
+      const price = Number(value);
+      if (Number.isFinite(price) && price > 0) prices[code.toUpperCase()] = price;
+    }
+    const value = { minimum: Number(data.minimum_transaction_coin) || 0, prices };
+    infoCache.set(ticker, { at: Date.now(), value });
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+export async function availableCoinsForPrice(
+  csv: string | null | undefined,
+  settings: Partial<PaymentAddresses> | null | undefined,
+  amount: number,
+  currency: string
+): Promise<PayCoin[]> {
+  const coins = availableCoins(csv, settings);
+  const checked = await Promise.all(
+    coins.map(async (coin) => {
+      const ticker = cryptoTicker(coin.code);
+      if (!ticker) return null;
+      const info = await getTickerInfo(ticker);
+      if (!info) return coin;
+      const unit = info.prices[currency.toUpperCase()] ?? info.prices.USD ?? 0;
+      if (unit > 0 && info.minimum * unit > amount) return null;
+      return coin;
+    })
+  );
+  return checked.filter((coin): coin is PayCoin => coin !== null);
+}
+
 function requiredAddress(coin: string, settings?: Partial<PaymentAddresses> | null): string {
   const address = paymentAddress(coin, settings);
   if (!address) throw new Error(`CryptAPI receiving address is not configured for ${coin}.`);

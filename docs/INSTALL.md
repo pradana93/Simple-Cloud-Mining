@@ -225,9 +225,10 @@ CRYPTAPI_USDT_TRC20_ADDRESS=...
 
 The app creates a unique deposit address per invoice and passes
 `https://YOUR-DOMAIN/api/webhooks/cryptapi` as the callback. USDT TRC20 needs a
-different receiving address from TRX. Do not put a wallet private key anywhere
-in the app. Withdrawals are manual: send from your wallet, then record the txid
-in Admin > Withdrawals.
+different receiving address from TRX, and CryptAPI applies a 10 USDT minimum, so
+low-priced plans hide USDT. Do not put a wallet private key anywhere in the app.
+Withdrawals are manual: send from your wallet, then record the txid in Admin >
+Withdrawals.
 
 ## 11. Go-live checklist
 
