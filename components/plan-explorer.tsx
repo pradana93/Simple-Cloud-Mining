@@ -136,7 +136,7 @@ export function PlanExplorer({
         )}
         <dl className="mt-5 space-y-2.5 text-sm">
           <Row label="Daily credit" value={`+${crypto(Number(sel.point_per_day ?? 0))}`} emerald />
-          <Row label="Plan term" value={`${sel.duration} days`} />
+          <Row label={isFree ? "Starter access" : "Plan term"} value={`${sel.duration} days`} />
           <Row
             label="Relative speed"
             value={Number(sel.speed) > 0 ? `${Number(sel.speed)}x` : "n/a"}

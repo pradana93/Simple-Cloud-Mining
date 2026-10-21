@@ -3,7 +3,7 @@ import { ArrowLeft, BadgeCheck, Coins, ShieldCheck, Timer } from "lucide-react";
 import { getCachedSettings } from "@/lib/catalog";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getMoneyCfg } from "@/lib/currency";
-import { formatFiat, formatPrice } from "@/lib/money";
+import { formatFiat } from "@/lib/money";
 import { planEconomics } from "@/lib/plan-math";
 import { availableCoins } from "@/lib/cryptapi";
 import { formatCrypto } from "@/lib/utils";
@@ -89,7 +89,7 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
               {fiatHint(daily) && <p className="mt-1 text-xs text-slate-400">{fiatHint(daily)}</p>}
             </div>
             <div className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/10">
-              <p className="text-[11px] font-medium text-slate-400">Plan term</p>
+              <p className="text-[11px] font-medium text-slate-400">Starter access</p>
               <p className="font-display mt-1 text-base font-bold text-white">{duration} days</p>
             </div>
           </div>
@@ -116,9 +116,14 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
             <div className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/10">
               <p className="text-[11px] font-medium text-slate-400">One-time price</p>
               <p className="font-display mt-1 text-base font-bold text-white">
-                {formatPrice(price, cfg)}
+                {formatFiat(price, s.price_currency)}
               </p>
-              <p className="mt-1 text-xs text-slate-400">Set in {s.price_currency}</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Set in {s.price_currency}
+                {cfg.mode === "fiat" && cfg.fiatCurrency !== s.price_currency
+                  ? ` · ≈${formatFiat(price * cfg.priceToDisplay, cfg.fiatCurrency)}`
+                  : ""}
+              </p>
             </div>
             <div className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/10">
               <p className="text-[11px] font-medium text-slate-400">Daily credit</p>

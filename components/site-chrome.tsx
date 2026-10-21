@@ -40,7 +40,7 @@ export async function SiteFooter() {
             <span className="inline-flex items-center gap-1.5">
               <Wallet size={13} className="text-gold-400" /> Withdrawals in {s.currency_code}
             </span>
-            <span>{s.aff_comission}% affiliate commission, for life</span>
+            <span>{s.aff_comission}% affiliate commission on referred upgrades</span>
           </div>
         </div>
         <div>

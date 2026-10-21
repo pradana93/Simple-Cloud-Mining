@@ -42,7 +42,7 @@ export function AffiliatePanel({
           Details
         </Link>
       </div>
-      <p className="mt-1 text-xs text-slate-400">Earn {commissionPct}% for life on every upgrade you refer.</p>
+            <p className="mt-1 text-xs text-slate-400">Earn {commissionPct}% on every upgrade you refer.</p>
 
       <dl className="mt-4 divide-y divide-white/5">
         <Row k="Invited" v={<span className="font-mono tabular-nums">{count}</span>} />

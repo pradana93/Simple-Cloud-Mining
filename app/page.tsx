@@ -74,7 +74,7 @@ export default async function HomePage() {
             <Metric label="Hashrate plans">
               <CountUp value={plans.length} />
             </Metric>
-            <Metric label="Completed payouts">
+            <Metric label={`Completed payouts (${cfg.mode === "fiat" ? cfg.fiatCurrency : cfg.code})`}>
               <CountUp value={stats.totalPaid} decimals={s.currency_decimals} cfg={cfg} />
             </Metric>
             <Metric label="Members">
@@ -120,8 +120,8 @@ export default async function HomePage() {
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-sm text-slate-400">
               <p className="font-medium text-slate-200">No completed payouts yet.</p>
               <p className="mt-1 leading-relaxed">
-                This is a new deployment. Completed withdrawals will appear here with their
-                transaction reference. Canceled requests are not counted as paid.
+                Completed withdrawals will appear here with their transaction reference. Canceled
+                requests are not counted as paid.
               </p>
               <Link href="/faq" className="mt-3 inline-block font-semibold text-gold-300 hover:text-gold-400">
                 Read how payouts work

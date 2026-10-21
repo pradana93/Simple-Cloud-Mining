@@ -9,8 +9,13 @@ type Entry = { amount: number; tx: string | null; status?: string; created_at?: 
 type Row = Entry & { kind: "in" | "out" };
 
 function statusLabel(row: Row): string {
-  if (row.kind === "in") return "deposit confirmed";
   const status = String(row.status ?? "").toUpperCase();
+  if (row.kind === "in") {
+    if (status === "SUCCESS") return "deposit confirmed";
+    if (status === "PROCESSING") return "deposit processing";
+    if (status === "CANCELED") return "deposit canceled";
+    return "deposit pending";
+  }
   if (status === "SUCCESS") return "paid";
   if (status === "CANCELED") return "canceled";
   if (status === "PROCESSING") return "processing";
@@ -18,8 +23,8 @@ function statusLabel(row: Row): string {
 }
 
 function statusVariant(row: Row): "green" | "gold" | "red" | "slate" {
-  if (row.kind === "in") return "green";
   const status = String(row.status ?? "").toUpperCase();
+  if (row.kind === "in") return status === "SUCCESS" ? "green" : "gold";
   if (status === "SUCCESS") return "green";
   if (status === "CANCELED") return "red";
   if (status === "PROCESSING") return "gold";
@@ -97,7 +102,7 @@ export function PayoutFeed({
                 : tab === "out"
                   ? "No withdrawals yet."
                   : tab === "in"
-                    ? "No confirmed deposits yet."
+                    ? "No deposits yet."
                     : "No payout entries yet."}
             </p>
             <p className="mt-1">

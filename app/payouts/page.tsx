@@ -20,7 +20,7 @@ export default async function PayoutsPage() {
         <div className="max-w-2xl">
           <h1 className="font-display text-3xl font-bold text-white sm:text-5xl">Payout history</h1>
           <p className="mt-3 text-slate-400">
-            Confirmed deposits and withdrawal requests, with their status.{" "}
+            Deposits and withdrawal requests, with their current status.{" "}
             <span className="font-semibold text-gold-300">
               <CountUp value={stats.totalPaid} decimals={s.currency_decimals} cfg={cfg} /> {moneyUnit(cfg)}
             </span>{" "}

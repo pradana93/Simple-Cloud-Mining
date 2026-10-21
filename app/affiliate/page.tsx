@@ -88,7 +88,7 @@ export default async function AffiliatePage() {
   const steps = [
     { icon: <Link2 size={18} />, t: "Share your link", d: "Every account gets a personal /referral/ID link." },
     { icon: <Users size={18} />, t: "Friends deploy miners", d: "They start on the free plan; upgrades are optional." },
-    { icon: <Percent size={18} />, t: `Take ${s.aff_comission}%`, d: "Commission on every upgrade, for life." },
+            { icon: <Percent size={18} />, t: `Take ${s.aff_comission}%`, d: "Commission on every referred upgrade." },
   ];
 
   return (
@@ -96,7 +96,7 @@ export default async function AffiliatePage() {
       <section className="panel rounded-3xl border-gold-500/20 p-6 sm:p-10">
         <p className="text-xs font-semibold uppercase tracking-wide text-gold-300">Affiliate program</p>
         <h1 className="font-display mt-2 max-w-2xl text-3xl font-bold leading-tight text-white sm:text-4xl">
-          Earn <span className="gold-text">{s.aff_comission}%</span> for life on every referral upgrade.
+          Earn <span className="gold-text">{s.aff_comission}%</span> on every referral upgrade.
         </h1>
         <p className="mt-3 max-w-lg text-sm leading-relaxed text-slate-400 sm:text-base">
           When someone you invited buys a hashrate plan, you take {s.aff_comission}% of the purchase.
@@ -121,7 +121,7 @@ export default async function AffiliatePage() {
               href="/register"
               className="tap inline-flex h-12 items-center rounded-xl bg-gold-500 px-7 font-display text-base font-bold text-ink-950 transition-colors hover:bg-gold-400"
             >
-              Claim free hashrate
+              Create a free account
             </Link>
             <Link
               href="/login"
@@ -138,7 +138,7 @@ export default async function AffiliatePage() {
           <Readout label="Invited" hint="members you referred" value={String(invited)} />
           <Readout label="Earned" hint="lifetime, before fees" value={formatMoney(earns, cfg)} tone="emerald" />
           <Readout label="Paid out" hint="already settled to you" value={formatMoney(paid, cfg)} />
-          <Readout label="Commission" hint="per upgrade, for life" value={`${s.aff_comission}%`} tone="gold" />
+          <Readout label="Commission" hint="per referred upgrade" value={`${s.aff_comission}%`} tone="gold" />
         </section>
       ) : (
         <section className="panel divide-y divide-white/10 rounded-3xl">

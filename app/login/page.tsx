@@ -173,7 +173,7 @@ export default function LoginPage() {
             <p className="mt-6 text-center text-sm text-slate-400">
               No account?{" "}
               <Link href="/register" className="font-semibold text-gold-300 hover:text-gold-400">
-                Claim free hashrate
+                Create a free account
               </Link>
             </p>
           )}

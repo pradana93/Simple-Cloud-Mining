@@ -397,7 +397,7 @@ export function SettingsForm({ initial }: { initial: SiteSettings }) {
               {draft.currency_code}
             </p>
             <span className="mt-3 inline-flex h-9 items-center rounded-lg bg-gold-500 px-3 font-display text-xs font-bold text-ink-950">
-              Claim free hashrate
+              Create free account
             </span>
           </div>
         </aside>
