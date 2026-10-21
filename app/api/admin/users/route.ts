@@ -34,18 +34,50 @@ export async function POST(req: Request) {
       if (!Number.isFinite(durationDays) || durationDays < 1) {
         return NextResponse.json({ ok: false, error: "Duration must be at least 1 day" }, { status: 400 });
       }
+      const key = idempotencyKey(adminId, `admin-grant:${userId}`, body.idempotencyKey ?? req.headers.get("idempotency-key"));
+      const { data: existing, error: existingError } = await admin
+        .from("user_plan_history")
+        .select("id")
+        .eq("idempotency_key", key)
+        .maybeSingle();
+      if (existingError) return NextResponse.json({ ok: false, error: existingError.message }, { status: 400 });
+      if (existing) {
+        return NextResponse.json({ ok: true, id: (existing as { id: number }).id, message: "Plan already granted" });
+      }
+
       const now = new Date();
       const expire = new Date(now.getTime() + durationDays * 86400000);
-      const { error } = await admin.from("user_plan_history").insert({
-        user_id: userId,
-        plan_id: planId,
-        status: "active",
-        expire_date: expire.toISOString(),
-        last_sum: now.toISOString(),
+      const { data: inserted, error } = await admin
+        .from("user_plan_history")
+        .insert({
+          user_id: userId,
+          plan_id: planId,
+          status: "active",
+          expire_date: expire.toISOString(),
+          last_sum: now.toISOString(),
+          idempotency_key: key,
+        })
+        .select("id")
+        .single();
+      if (error) {
+        if (error.code === "23505") {
+          return NextResponse.json({ ok: true, message: "Plan already granted" });
+        }
+        return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
+      }
+      const grantId = (inserted as { id?: number } | null)?.id;
+      await recordAudit({
+        actor,
+        action: "member.grant_rig",
+        target: userId,
+        detail: { planId, durationDays, grantId },
+        req,
       });
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-      await recordAudit({ actor, action: "member.grant_rig", target: userId, detail: { planId, durationDays }, req });
-      return NextResponse.json({ ok: true, message: `${(plan as { plan_name: string }).plan_name} granted for ${durationDays} days` });
+      return NextResponse.json({
+        ok: true,
+        id: grantId,
+        message: `${(plan as { plan_name: string }).plan_name} granted for ${durationDays} days`,
+      });
     }
 
     if (action === "revoke-rig") {

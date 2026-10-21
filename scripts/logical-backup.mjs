@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { banner, fail, info, loadEnv, ok, projectRefFromUrl, ROOT, warn } from "./lib/util.mjs";
+import { backupPageUrl } from "./lib/backup-page.mjs";
 
 const TABLES = [
   "profiles",
@@ -44,21 +45,19 @@ function stamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
 }
 
-function headers(from, to) {
+function authHeaders() {
   return {
     apikey: service,
     Authorization: `Bearer ${service}`,
-    Range: `${from}-${to}`,
-    Prefer: "count=exact",
   };
 }
 
 async function fetchTable(table) {
   const rows = [];
-  let from = 0;
+  let afterId = null;
   for (;;) {
-    const res = await fetch(`${url}/rest/v1/${table}?select=*`, {
-      headers: headers(from, from + pageSize - 1),
+    const res = await fetch(backupPageUrl(url, table, afterId, pageSize), {
+      headers: authHeaders(),
     });
     if (res.status === 404) return { rows, missing: true };
     if (!res.ok) {
@@ -66,8 +65,12 @@ async function fetchTable(table) {
     }
     const page = await res.json();
     rows.push(...page);
-    if (page.length < pageSize) break;
-    from += pageSize;
+    if (page.length === 0) break;
+    const last = page[page.length - 1];
+    if (!last || last.id == null) {
+      throw new Error(`${table}: page has no id cursor`);
+    }
+    afterId = String(last.id);
   }
   return { rows, missing: false };
 }

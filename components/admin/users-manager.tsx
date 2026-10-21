@@ -46,6 +46,7 @@ export function UsersManager({
   const [amount, setAmount] = useState("");
   const [mode, setMode] = useState<"add" | "set">("add");
   const balanceKeyRef = useRef<string | null>(null);
+  const grantKeyRef = useRef<string | null>(null);
 
   const shown = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -55,11 +56,15 @@ export function UsersManager({
     );
   }, [members, q]);
 
+  function resetGrantKey() {
+    grantKeyRef.current = crypto.randomUUID();
+  }
   function openGrant(m: AdminMember) {
     const first = plans[0];
     setGrantFor(m);
     setGrantPlan(first ? String(first.id) : "");
     setGrantDays(first ? String(first.duration) : "");
+    resetGrantKey();
   }
   function openBalance(m: AdminMember) {
     setBalanceFor(m);
@@ -71,16 +76,30 @@ export function UsersManager({
     setGrantPlan(id);
     const p = plans.find((x) => String(x.id) === id);
     if (p) setGrantDays(String(p.duration));
+    resetGrantKey();
+  }
+  function onGrantDaysChange(value: string) {
+    setGrantDays(value);
+    resetGrantKey();
   }
 
   async function grant() {
     if (!grantFor) return;
     const res = await run(
       "/api/admin/users",
-      { action: "grant", userId: grantFor.id, planId: Number(grantPlan), durationDays: grantDays === "" ? undefined : Number(grantDays) },
+      {
+        action: "grant",
+        userId: grantFor.id,
+        planId: Number(grantPlan),
+        durationDays: grantDays === "" ? undefined : Number(grantDays),
+        idempotencyKey: grantKeyRef.current ?? undefined,
+      },
       { success: "Plan granted" }
     );
-    if (res.ok) setGrantFor(null);
+    if (res.ok) {
+      grantKeyRef.current = null;
+      setGrantFor(null);
+    }
   }
   async function adjustBalance() {
     if (!balanceFor) return;
@@ -177,12 +196,22 @@ export function UsersManager({
 
       <Modal
         open={Boolean(grantFor)}
-        onClose={() => setGrantFor(null)}
+        onClose={() => {
+          grantKeyRef.current = null;
+          setGrantFor(null);
+        }}
         title="Grant a plan"
         description={grantFor ? `Issues a running rig to ${grantFor.username ?? "this member"}. No payment is taken.` : undefined}
         footer={
           <>
-            <Button variant="secondary" onClick={() => setGrantFor(null)} disabled={busy}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                grantKeyRef.current = null;
+                setGrantFor(null);
+              }}
+              disabled={busy}
+            >
               Cancel
             </Button>
             <Button onClick={grant} disabled={busy || !grantPlan}>
@@ -210,7 +239,7 @@ export function UsersManager({
           </div>
           <div>
             <Label htmlFor="g-days">Runs for (days)</Label>
-            <Input id="g-days" type="number" min={1} step={1} value={grantDays} onChange={(e) => setGrantDays(e.target.value)} />
+            <Input id="g-days" type="number" min={1} step={1} value={grantDays} onChange={(e) => onGrantDaysChange(e.target.value)} />
             <p className="mt-1.5 text-xs text-slate-400">Defaults to the plan duration. The rig credits yield to their balance until it expires.</p>
           </div>
         </div>

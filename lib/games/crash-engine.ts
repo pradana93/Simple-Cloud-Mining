@@ -120,6 +120,8 @@ async function loadLatest(userId: string): Promise<CrashRoundRow | null> {
   return (data as CrashRoundRow | null) ?? null;
 }
 
+// 021 writes this row inside settle_crash_round. The insert stays as a fallback
+// for deployments running ahead of the migration; the unique key makes it a no-op.
 async function recordSettled(row: CrashRoundRow, status: "cashed" | "crashed", cashout: number | null, paid: number) {
   const admin = createAdminSupabase();
   const stake = n(row.stake);
