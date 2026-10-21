@@ -32,6 +32,11 @@ describe("paymentAddress", () => {
   it("returns null when neither source is configured", () => {
     expect(paymentAddress("DOGE", { cryptapi_doge_address: null })).toBeNull();
   });
+
+  it("does not reuse a TRON address for USDT TRC20", () => {
+    const address = "TVB6tKyFmCaDnDfwMspA8kf43eUdm39Qsr";
+    expect(paymentAddress("USDT", { cryptapi_trx_address: address, cryptapi_usdt_trc20_address: address })).toBeNull();
+  });
 });
 
 describe("webhook parsing", () => {

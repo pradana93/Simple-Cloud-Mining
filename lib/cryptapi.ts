@@ -62,7 +62,12 @@ export function paymentAddress(
   }
   const key = ADDRESS_DB[code];
   const value = key ? settings?.[key]?.trim() : "";
-  return value || null;
+  if (!value) return null;
+  // CryptAPI rejects a second token on a non-multi-token TRON address. Treat a
+  // shared TRX/USDT address as unconfigured instead of showing a checkout that
+  // will fail at invoice creation.
+  if (code === "USDT" && value === paymentAddress("TRX", settings)) return null;
+  return value;
 }
 
 export function availableCoins(
