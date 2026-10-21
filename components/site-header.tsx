@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -98,7 +98,7 @@ export function SiteHeaderClient({
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="hidden items-center gap-1 lg:flex">
           {NAV_LINKS.map((l) => {
             const active = isActive(pathname, l.href);
             return (
@@ -122,7 +122,7 @@ export function SiteHeaderClient({
           })}
         </nav>
 
-        <div className="hidden items-center gap-2 md:flex">
+        <div className="hidden items-center gap-2 lg:flex">
           <CurrencyToggle enabled={fiatEnabled} cryptoCode={cryptoCode} className="mr-1" />
           <ThemeToggle />
           {authed === null ? (
@@ -154,7 +154,7 @@ export function SiteHeaderClient({
           onClick={() => setOpen((v) => !v)}
           aria-label="Toggle menu"
           aria-expanded={open}
-          className="tap panel inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 md:hidden"
+          className="tap panel inline-flex h-11 w-11 items-center justify-center rounded-xl text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-400 lg:hidden"
         >
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
@@ -162,7 +162,7 @@ export function SiteHeaderClient({
 
       <div
         className={cn(
-          "border-white/5 transition-[max-height,opacity] duration-300 md:hidden",
+          "border-white/5 transition-[max-height,opacity] duration-300 lg:hidden",
           open ? "max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain border-t opacity-100" : "max-h-0 overflow-hidden opacity-0"
         )}
       >
@@ -177,7 +177,7 @@ export function SiteHeaderClient({
               {l.label}
             </Link>
           ))}
-          <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-3 md:hidden">
+          <div className="mt-2 flex items-center justify-between border-t border-white/10 pt-3 lg:hidden">
             <span className="text-xs font-medium text-slate-400">Appearance</span>
             <ThemeToggle />
           </div>
@@ -216,3 +216,4 @@ export function SiteHeaderClient({
     </header>
   );
 }
+
