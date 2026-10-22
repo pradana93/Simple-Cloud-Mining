@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowUpRight, Receipt } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getMoneyCfg } from "@/lib/currency";
 import { formatMoney } from "@/lib/money";
+import { formatCrypto } from "@/lib/utils";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { isTwoFactorEnabled } from "@/lib/two-factor";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +11,32 @@ import { TwoFactorPanel } from "@/components/2fa/two-factor-panel";
 import { PasswordPanel } from "@/components/account/password-panel";
 
 export const dynamic = "force-dynamic";
+
+type PlanHistoryRow = {
+  id: number;
+  status: string;
+  created_at: string;
+  expire_date: string | null;
+  last_sum: string | null;
+  plan:
+    | {
+        id: number;
+        plan_name: string;
+        point_per_day: number | null;
+        earning_rate: number | null;
+        duration: number;
+        price: number;
+      }
+    | Array<{
+        id: number;
+        plan_name: string;
+        point_per_day: number | null;
+        earning_rate: number | null;
+        duration: number;
+        price: number;
+      }>
+    | null;
+};
 
 function statusVariant(s: string): "green" | "gold" | "red" | "slate" {
   const v = s.toLowerCase();
@@ -55,7 +82,8 @@ export default async function AccountPage() {
   let deposits = empty;
   let withdrawals = empty;
   let pending = empty;
-  let accrualRows: AccrualRow[] = [];
+  let accrualRows: Array<AccrualRow & { status?: string }> = [];
+  let planHistory: PlanHistoryRow[] = [];
   try {
     const [r1, r2, r3, r4, r5, ar] = await Promise.all([
       supabase.from("profiles").select("username,created_at").eq("reference_user_id", userId).order("created_at", { ascending: false }),
@@ -63,18 +91,23 @@ export default async function AccountPage() {
       supabase.from("user_deposits").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
       supabase.from("user_withdrawal").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
       supabase.from("transactions_history").select("*").eq("user_id", userId).neq("status", "paid").order("date", { ascending: false }),
-      supabase.from("user_plan_history").select("id,expire_date,last_sum,created_at,plan:plans(earning_rate)").eq("user_id", userId).eq("status", "active"),
+      supabase
+        .from("user_plan_history")
+        .select("id,status,created_at,expire_date,last_sum,plan:plans(id,plan_name,point_per_day,earning_rate,duration,price)")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false }),
     ]);
     referrals = (r1 as typeof empty);
     aff = (r2 as typeof empty);
     deposits = (r3 as typeof empty);
     withdrawals = (r4 as typeof empty);
     pending = (r5 as typeof empty);
-    accrualRows = (((ar as { data: unknown }).data ?? []) as AccrualRow[]);
+    accrualRows = (((ar as { data: unknown }).data ?? []) as Array<AccrualRow & { status?: string }>);
+    planHistory = accrualRows as unknown as PlanHistoryRow[];
   } catch {
     // render empty sections
   }
-  await accrueOwnPlans(userId, { rows: accrualRows });
+  await accrueOwnPlans(userId, { rows: accrualRows.filter((row) => row.status === "active") });
 
   const sections: Array<{ title: string; rows: Array<Record<string, number | string | null>>; render: (r: Record<string, number | string | null>, i: number) => React.ReactNode; emptyText: string }> = [
     {
@@ -151,6 +184,39 @@ export default async function AccountPage() {
             )}
           </div>
         ))}
+      </div>
+
+      <div className="panel rounded-2xl p-5">
+        <h2 className="font-display mb-2 text-base font-bold text-white">Plan payouts</h2>
+        <p className="mb-3 text-xs leading-relaxed text-slate-400">
+          Each paid plan pays a fixed daily credit until its end date. Expected total is the full
+          published payout; it does not change if the crypto price moves.
+        </p>
+        {planHistory.length === 0 ? (
+          <p className="py-3 text-sm text-slate-400">No plans yet.</p>
+        ) : (
+          planHistory.map((row) => {
+            const plan = Array.isArray(row.plan) ? row.plan[0] : row.plan;
+            if (!plan) return null;
+            const total = Number(plan.point_per_day ?? 0) * Number(plan.duration);
+            return (
+              <div key={row.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-white/5 py-2.5 text-sm last:border-0">
+                <div>
+                  <p className="font-medium text-slate-100">{plan.plan_name}</p>
+                  <p className="text-xs text-slate-400">
+                    {row.expire_date ? `Ends ${new Date(row.expire_date).toLocaleDateString()}` : "No end date"}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="font-mono text-slate-200">
+                    {formatCrypto(total, cfg.decimals)} {cfg.code}
+                  </p>
+                  <Badge variant={statusVariant(row.status)}>{row.status}</Badge>
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
 
       <div className="panel rounded-2xl p-5">

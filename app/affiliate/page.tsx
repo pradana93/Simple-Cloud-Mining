@@ -47,6 +47,9 @@ export default async function AffiliatePage() {
   let earns = 0;
   let paid = 0;
   let invited = 0;
+  let bonusPaid = 0;
+  let bonusPending = 0;
+  let tierCommission: Array<{ name: string; price: number; commission: number }> = [];
   if (userId) {
     try {
       const { data: prof } = await supabase
@@ -73,6 +76,46 @@ export default async function AffiliatePage() {
       invited = count ?? 0;
     } catch {
       invited = 0;
+    }
+
+    try {
+      const admin = createAdminSupabase();
+      const [bonusRes, pendingRes, plansRes] = await Promise.all([
+        admin
+          .from("affiliate_history")
+          .select("amount,ref_type")
+          .eq("user_id", userId)
+          .eq("ref_type", "referral_bonus"),
+        admin
+          .from("profiles")
+          .select("id")
+          .eq("reference_user_id", userId)
+          .not("id", "is", null),
+        admin.from("plans").select("plan_name,price").gt("price", 0).order("price"),
+      ]);
+      bonusPaid = ((bonusRes.data ?? []) as Array<{ amount: number }>).reduce(
+        (sum, row) => sum + Number(row.amount ?? 0),
+        0
+      );
+      const referredIds = ((pendingRes.data ?? []) as Array<{ id: string }>).map((row) => row.id);
+      if (referredIds.length > 0) {
+        const { data: paidRows } = await admin
+          .from("transactions_history")
+          .select("user_id")
+          .in("user_id", referredIds)
+          .eq("status", "paid");
+        const paidIds = new Set(((paidRows ?? []) as Array<{ user_id: string }>).map((row) => row.user_id));
+        bonusPending = referredIds.filter((id) => !paidIds.has(id)).length;
+      }
+      tierCommission = ((plansRes.data ?? []) as Array<{ plan_name: string; price: number }>).map((plan) => ({
+        name: plan.plan_name,
+        price: Number(plan.price),
+        commission: (Number(plan.price) * Number(s.aff_comission || 0)) / 100,
+      }));
+    } catch {
+      bonusPaid = 0;
+      bonusPending = 0;
+      tierCommission = [];
     }
   }
 
@@ -140,7 +183,54 @@ export default async function AffiliatePage() {
           <Readout label="Paid out" hint="already settled to you" value={formatMoney(paid, cfg)} />
           <Readout label="Commission" hint="per referred upgrade" value={`${s.aff_comission}%`} tone="gold" />
         </section>
-      ) : (
+      ) : null}
+
+      {userId ? (
+        <section className="grid gap-4 sm:grid-cols-2">
+          <Readout
+            label="First-purchase bonuses"
+            hint="earned from a referral's first paid plan"
+            value={formatMoney(bonusPaid, cfg)}
+            tone="emerald"
+          />
+          <Readout
+            label="Awaiting first purchase"
+            hint="referred members who have not paid yet"
+            value={String(bonusPending)}
+          />
+        </section>
+      ) : null}
+
+      {userId && tierCommission.length > 0 ? (
+        <section className="panel rounded-3xl p-6">
+          <h2 className="font-display text-lg font-bold text-white">What each tier pays you</h2>
+          <p className="mt-1 text-xs text-slate-400">
+            Standard {s.aff_comission}% commission on the referred purchase.
+          </p>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-xs text-slate-400">
+                <tr>
+                  <th className="py-2 pr-4 font-medium">Plan</th>
+                  <th className="py-2 pr-4 font-medium">Price</th>
+                  <th className="py-2 font-medium">You earn</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tierCommission.map((tier) => (
+                  <tr key={tier.name} className="border-t border-white/10">
+                    <td className="py-2 pr-4 text-slate-200">{tier.name}</td>
+                    <td className="font-mono py-2 pr-4 text-slate-300">{formatMoney(tier.price, cfg)}</td>
+                    <td className="font-mono py-2 text-emerald-300">{formatMoney(tier.commission, cfg)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {!userId && (
         <section className="panel divide-y divide-white/10 rounded-3xl">
           {steps.map((f) => (
             <div key={f.t} className="flex items-start gap-4 p-6">

@@ -30,12 +30,16 @@ export function PlanExplorer({
   decimals,
   priceCurrency = "USD",
   cfg,
+  popularity = {},
+  recentPurchases = [],
 }: {
   plans: PlanItem[];
   currencyCode: string;
   decimals: number;
   priceCurrency?: string;
   cfg?: MoneyCfg;
+  popularity?: Record<number, number>;
+  recentPurchases?: Array<{ planId: number; at: string }>;
 }) {
   const all = useMemo(() => [...plans].sort((a, b) => Number(a.price) - Number(b.price)), [plans]);
   const [sort, setSort] = useState<"price" | "yield">("price");
@@ -96,12 +100,28 @@ export function PlanExplorer({
     returns.length > 0
       ? `Member return ranges from +${Math.min(...returns).toFixed(1)}% to +${Math.max(...returns).toFixed(1)}% across paid tiers.`
       : null;
+  const bestValueId = paid.reduce<PlanItem | null>((best, plan) => {
+    const e = econOf(plan);
+    if (!e) return best;
+    if (!best) return plan;
+    const bestE = econOf(best);
+    return bestE && e.userRoiPct > bestE.userRoiPct ? plan : best;
+  }, null)?.id;
+  const mostPopularId = Object.entries(popularity).sort((a, b) => b[1] - a[1])[0]?.[0];
 
   return (
     <div className="grid gap-5 md:grid-cols-[1.2fr_1fr]">
       <div>
         {returnRange && (
-          <p className="mb-3 text-xs leading-relaxed text-slate-400">{returnRange}</p>
+          <p className="mb-2 text-xs leading-relaxed text-slate-400">{returnRange}</p>
+        )}
+        {recentPurchases.length > 0 && (
+          <p className="mb-3 text-xs leading-relaxed text-slate-500">
+            Recent activity: {recentPurchases.slice(0, 3).map((row) => {
+              const plan = all.find((p) => p.id === row.planId);
+              return plan ? plan.plan_name : null;
+            }).filter(Boolean).join(" · ")}
+          </p>
         )}
         <div className="mb-3 inline-flex rounded-xl border border-slate-700 p-1" role="tablist" aria-label="Sort plans">
           {(["price", "yield"] as const).map((m) => (
@@ -138,9 +158,19 @@ export function PlanExplorer({
               >
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="font-display font-bold text-white">
+                    <div className="flex flex-wrap items-center gap-2 font-display font-bold text-white">
                       {p.plan_name}
-                      {p.version ? <span className="ml-2 text-xs font-normal text-slate-400">{p.version}</span> : null}
+                      {p.version ? <span className="text-xs font-normal text-slate-400">{p.version}</span> : null}
+                      {p.id === bestValueId && (
+                        <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-300">
+                          Best return
+                        </span>
+                      )}
+                      {String(p.id) === mostPopularId && (
+                        <span className="rounded-full bg-gold-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gold-300">
+                          Most bought
+                        </span>
+                      )}
                     </div>
                     <div className="mt-0.5 text-xs text-slate-400">
                       {Number(p.speed) > 0 ? `${Number(p.speed)}x speed` : "speed n/a"} ·{" "}

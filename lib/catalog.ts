@@ -103,6 +103,37 @@ export const getCachedPayouts = unstable_cache(
   { revalidate: 30, tags: ["payouts"] }
 );
 
+export const getCachedPlanPopularity = unstable_cache(
+  async (): Promise<{ counts: Record<number, number>; recent: Array<{ planId: number; at: string }> }> => {
+    try {
+      const db = createAdminSupabase();
+      const [all, recent] = await Promise.all([
+        db.from("user_plan_history").select("plan_id"),
+        db
+          .from("user_plan_history")
+          .select("plan_id,created_at")
+          .order("created_at", { ascending: false })
+          .limit(8),
+      ]);
+      const counts: Record<number, number> = {};
+      for (const row of (all.data ?? []) as Array<{ plan_id: number }>) {
+        counts[row.plan_id] = (counts[row.plan_id] ?? 0) + 1;
+      }
+      return {
+        counts,
+        recent: ((recent.data ?? []) as Array<{ plan_id: number; created_at: string }>).map((row) => ({
+          planId: row.plan_id,
+          at: row.created_at,
+        })),
+      };
+    } catch {
+      return { counts: {}, recent: [] };
+    }
+  },
+  ["plan-popularity"],
+  { revalidate: 60, tags: ["plans", "plan-popularity"] }
+);
+
 export const getCachedStats = unstable_cache(
   async (): Promise<{ members: number; activeRigs: number; totalDeposits: number; totalPaid: number }> => {
     try {

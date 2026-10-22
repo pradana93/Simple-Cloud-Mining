@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { Activity } from "lucide-react";
-import { getCachedPlans, getCachedPayouts, getCachedSettings, getCachedStats } from "@/lib/catalog";
+import {
+  getCachedPlanPopularity,
+  getCachedPlans,
+  getCachedPayouts,
+  getCachedSettings,
+  getCachedStats,
+} from "@/lib/catalog";
 import { getMoneyCfg } from "@/lib/currency";
 import { formatMoney } from "@/lib/money";
 import { Card } from "@/components/ui/card";
@@ -20,11 +26,12 @@ function Metric({ children, label }: { children: React.ReactNode; label: string 
 }
 
 export default async function HomePage() {
-  const [s, plans, stats, payouts] = await Promise.all([
+  const [s, plans, stats, payouts, popularity] = await Promise.all([
     getCachedSettings(),
     getCachedPlans(),
     getCachedStats(),
     getCachedPayouts(),
+    getCachedPlanPopularity(),
   ]);
   const cfg = await getMoneyCfg();
   const completedPayouts = payouts.withdrawals.filter((w) => String(w.status ?? "").toUpperCase() === "SUCCESS");
@@ -148,7 +155,15 @@ export default async function HomePage() {
               How reward plans work
             </Link>
           </div>
-          <PlanExplorer plans={plans} currencyCode={s.currency_code} decimals={s.currency_decimals} priceCurrency={s.price_currency} cfg={cfg} />
+          <PlanExplorer
+            plans={plans}
+            currencyCode={s.currency_code}
+            decimals={s.currency_decimals}
+            priceCurrency={s.price_currency}
+            cfg={cfg}
+            popularity={popularity.counts}
+            recentPurchases={popularity.recent}
+          />
         </section>
       </Reveal>
 
