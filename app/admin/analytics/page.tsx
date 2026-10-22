@@ -101,8 +101,13 @@ export default async function AdminAnalytics() {
   const unpriced = paid.length - priced.length;
   const revenue = priced.reduce((s, t) => s + num(t.price_amount), 0);
   const pendingCount = txs.filter((t) => (t.status ?? "").toLowerCase() === "pending").length;
-  const buyers = new Set(paid.map((t) => t.user_id).filter(Boolean)).size;
-  const members = profiles.filter((p) => !p.is_admin).length;
+  const memberIds = new Set(profiles.filter((p) => !p.is_admin).map((p) => p.id));
+  const buyers = new Set(
+    paid
+      .map((t) => t.user_id)
+      .filter((id): id is string => typeof id === "string" && memberIds.has(id))
+  ).size;
+  const members = memberIds.size;
   const conversion = members > 0 ? (buyers / members) * 100 : 0;
   const arpu = members > 0 ? revenue / members : 0;
   const avgOrder = priced.length > 0 ? revenue / priced.length : 0;

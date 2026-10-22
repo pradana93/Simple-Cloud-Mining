@@ -109,7 +109,7 @@ export const getCachedStats = unstable_cache(
       const supabase = createAdminSupabase();
       const now = new Date().toISOString();
       const [u, r, d, w] = await Promise.all([
-        supabase.from("profiles").select("id", { count: "exact", head: true }),
+        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("is_admin", false),
         supabase
           .from("user_plan_history")
           .select("id", { count: "exact", head: true })
