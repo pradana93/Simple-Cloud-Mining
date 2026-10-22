@@ -253,7 +253,7 @@ export function solvePlan(intent: PlanIntent, context: PlanContext = {}): PlanPr
       ? `Up to ${intent.userMultiple}x`
       : price > 0
         ? `${e.userRoiPct >= 0 ? "+" : ""}${e.userRoiPct.toFixed(0)}% ROI in ${duration} days`
-        : "Free starter hashrate");
+        : "Free starter plan");
 
   const rationale = [
     `Price ${price} ${code}, term ${duration} days.`,

@@ -23,7 +23,7 @@ insert into public.urlchains (name, url) values
 on conflict do nothing;
 
 insert into public.settings (sitename, siteslogan, currency_name, currency_symbol, currency_code, currency_decimals, min_withdraw, max_withdraw, aff_comission, max_pending_transactions, coin_cur1, coin_cur2, coin_mode, coin_email, theme, start_date)
-values ('Simple Cloud Mining','A simple console for cloud hashrate','Dogecoin','Ð','DOGE',8,10,1000,2,3,'DOGE','DOGE','gateway','user','dogeminer', CURRENT_DATE)
+values ('Simple Cloud Mining','A simple console for daily rewards','Dogecoin','Ã','DOGE',8,10,1000,2,3,'DOGE','DOGE','gateway','user','dogeminer', CURRENT_DATE)
 on conflict do nothing;
 
 insert into public.contents (affiliate, payouts, contact) values
@@ -43,3 +43,4 @@ on conflict do nothing;
 
 insert into public.addons (name) values ('demo_addon') on conflict do nothing;
 insert into public.addons_menu (slug, name, route, icon) values ('demo_addon','Demo Addon','demo_addon','fa-cube') on conflict do nothing;
+

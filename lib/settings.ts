@@ -10,7 +10,7 @@ export const PUBLIC_SETTINGS_COLUMNS =
 export const FALLBACK: SiteSettings = {
   id: 1,
   sitename: "Simple Cloud Mining",
-  siteslogan: "A simple console for cloud hashrate",
+  siteslogan: "A simple console for daily rewards",
   keywords: "cloud,mining,crypto",
   description: "Simple Cloud Mining",
   pagination: 10,
@@ -19,7 +19,7 @@ export const FALLBACK: SiteSettings = {
   max_withdraw: 100,
   aff_comission: 2,
   currency_name: "Dogecoin",
-  currency_symbol: "Ð",
+  currency_symbol: "Ã",
   currency_code: "DOGE",
   currency_decimals: 8,
   fiat_enabled: false,
@@ -101,3 +101,4 @@ export async function getAdminSettings(): Promise<SiteSettings> {
     return FALLBACK;
   }
 }
+

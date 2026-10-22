@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Simple Cloud Mining",
     short_name: "Cloud Mining",
     description:
-      "Reward plan console with live daily credits, per-block accrual, affiliate rewards, and on-chain payouts.",
+      "Reward plan console with live daily credits, daily accrual, affiliate rewards, and on-chain payouts.",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",
@@ -19,5 +19,6 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
   };
 }
+
 
 
