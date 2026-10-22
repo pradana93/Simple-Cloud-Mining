@@ -6,9 +6,8 @@ start, and how to get a site running. The full walkthrough is in
 
 ## What this is
 
-A Next.js 15 application for running a cloud mining site. Members sign up, get a
-mining plan, watch a balance grow, and withdraw. You run the store from an admin
-area.
+A Next.js 15 application for running a reward-plan site. Members sign up, get a
+plan, watch a balance grow, and withdraw. You run the store from an admin area.
 
 Included features:
 
@@ -35,7 +34,7 @@ Included features:
 |---|---|
 | `app/` | Pages and API routes |
 | `components/` | UI components |
-| `lib/` | Business logic: mining, money, plans, security, payouts |
+| `lib/` | Business logic: plans, money, security, payouts |
 | `supabase/` | Database schema and migrations, applied in order |
 | `tests/` | Unit tests (run with `npm test`) |
 | `scripts/` | The setup wizard, the admin helper, the packager |
