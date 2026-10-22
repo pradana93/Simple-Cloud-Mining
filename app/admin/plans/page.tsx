@@ -45,6 +45,8 @@ export default async function AdminPlans() {
       cryptoToPrice={cryptoToPrice}
       affiliatePct={Number(settings.aff_comission) || 0}
       rateAvailable={cryptoToPrice > 0}
+      minWithdraw={Number(settings.min_withdraw) || 0}
+      maxWithdraw={Number(settings.max_withdraw) || 0}
     />
   );
 }

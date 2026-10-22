@@ -164,6 +164,8 @@ export function PlansManager({
   cryptoToPrice,
   affiliatePct,
   rateAvailable,
+  minWithdraw,
+  maxWithdraw,
 }: {
   plans: AdminPlan[];
   usage: Record<number, number>;
@@ -174,6 +176,8 @@ export function PlansManager({
   cryptoToPrice: number;
   affiliatePct: number;
   rateAvailable: boolean;
+  minWithdraw: number;
+  maxWithdraw: number;
 }) {
   const { run, busy } = useAdminAction();
   const [editing, setEditing] = useState<AdminPlan | null | undefined>(undefined);
@@ -419,6 +423,10 @@ export function PlansManager({
                 currencyCode: priceCurrency,
                 cryptoCode: code,
                 cryptoToPrice,
+                affiliatePct,
+                processorPct: 0.25,
+                minWithdraw,
+                maxWithdraw,
                 isEdit: Boolean(editing),
               }}
               code={code}

@@ -12,6 +12,10 @@ export type PlanContext = {
   currencyCode?: string;
   cryptoCode?: string;
   cryptoToPrice?: number;
+  affiliatePct?: number;
+  processorPct?: number;
+  minWithdraw?: number;
+  maxWithdraw?: number;
   isEdit?: boolean;
 };
 
@@ -22,6 +26,7 @@ export type PlanIntent = {
   dailyYield?: number | null;
   userRoiPct?: number | null;
   userMultiple?: number | null;
+  payoutRatioPct?: number | null;
   ownerMarginPct?: number | null;
   name?: string | null;
   version?: string | null;
@@ -110,6 +115,12 @@ export function parseGoal(goal: string, context: PlanContext = {}): PlanIntent {
     ]);
     if (roi != null) intent.userRoiPct = roi;
 
+    const payoutRatio = firstMatch(text, [
+      /([\d]+(?:\.\d+)?)\s*%\s*(?:payout|paid\s+out|returned|to\s+members?|of\s+price)/,
+      /(?:payout|paid\s+out|returned|members?\s+get|members?\s+receive)\D{0,14}?([\d]+(?:\.\d+)?)\s*%/,
+    ]);
+    if (payoutRatio != null) intent.payoutRatioPct = payoutRatio;
+
     const margin = firstMatch(text, [
       /([\d]+(?:\.\d+)?)\s*%\s*(?:margin|for\s+(?:us|me|the\s+house)|ours)/,
       /(?:margin|keep|take|cut|profit\s+margin)\D{0,14}?([\d]+(?:\.\d+)?)\s*%/,
@@ -154,6 +165,7 @@ export function coerceIntent(raw: unknown): PlanIntent {
     "dailyYield",
     "userRoiPct",
     "userMultiple",
+    "payoutRatioPct",
     "ownerMarginPct",
   ];
   for (const k of numKeys) {
@@ -220,6 +232,9 @@ export function solvePlan(intent: PlanIntent, context: PlanContext = {}): PlanPr
   } else if (intent.userRoiPct != null) {
     payout = price * (1 + intent.userRoiPct / 100);
     basis = `${intent.userRoiPct}% return`;
+  } else if (intent.payoutRatioPct != null) {
+    payout = price * (intent.payoutRatioPct / 100);
+    basis = `${intent.payoutRatioPct}% of price paid out`;
   } else if (intent.ownerMarginPct != null) {
     payout = price * (1 - intent.ownerMarginPct / 100);
     basis = `${intent.ownerMarginPct}% owner margin`;
