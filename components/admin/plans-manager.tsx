@@ -412,28 +412,28 @@ export function PlansManager({
           </>
         }
       >
-        <div className="grid gap-5 lg:grid-cols-2">
+        <PlanAssistant
+          key={editing ? `edit-${editing.id}` : "new"}
+          context={{
+            price: Number(draft.price || 0),
+            durationDays: Number(draft.duration || 0),
+            pointPerDay: Number(draft.point_per_day || 0),
+            currencyCode: priceCurrency,
+            cryptoCode: code,
+            cryptoToPrice,
+            affiliatePct,
+            processorPct: 0.25,
+            minWithdraw,
+            maxWithdraw,
+            isEdit: Boolean(editing),
+          }}
+          code={code}
+          decimals={decimals}
+          priceCurrency={priceCurrency}
+          onApply={applyProposal}
+        />
+        <div className="mt-5 grid gap-5 lg:grid-cols-2">
           <div className="space-y-4">
-            <PlanAssistant
-              key={editing ? `edit-${editing.id}` : "new"}
-              context={{
-                price: Number(draft.price || 0),
-                durationDays: Number(draft.duration || 0),
-                pointPerDay: Number(draft.point_per_day || 0),
-                currencyCode: priceCurrency,
-                cryptoCode: code,
-                cryptoToPrice,
-                affiliatePct,
-                processorPct: 0.25,
-                minWithdraw,
-                maxWithdraw,
-                isEdit: Boolean(editing),
-              }}
-              code={code}
-              decimals={decimals}
-              priceCurrency={priceCurrency}
-              onApply={applyProposal}
-            />
             <div>
               <Label htmlFor="p-name">Plan name</Label>
               <Input id="p-name" value={draft.plan_name} onChange={(e) => set("plan_name", e.target.value)} className={invalid("plan_name")} placeholder="Plan V1.3" />

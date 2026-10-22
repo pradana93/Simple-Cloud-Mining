@@ -42,7 +42,7 @@ export function Modal({
       <div
         className={cn(
           "animate-scale-in relative z-10 max-h-[92vh] w-full overflow-y-auto rounded-t-3xl border border-white/10 bg-ink-900 p-6 shadow-2xl sm:rounded-3xl",
-          wide ? "sm:max-w-3xl" : "sm:max-w-lg"
+          wide ? "sm:max-w-6xl" : "sm:max-w-lg"
         )}
       >
         <div className="mb-5 flex items-start justify-between gap-4">
