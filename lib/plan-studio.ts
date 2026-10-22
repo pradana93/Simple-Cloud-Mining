@@ -13,6 +13,7 @@ export type StrategyBrief = {
   objective?: StrategyObjective;
   price?: number | null;
   durationDays?: number | null;
+  dailyProfit?: number | null;
   targetRoiPct?: number | null;
   minMarginPct?: number | null;
   maxPayoutRatioPct?: number | null;
@@ -59,13 +60,6 @@ const DEFAULT_PRICE: Record<StrategyObjective, number> = {
   retention: 5,
 };
 
-const DEFAULT_PAYOUT_RATIO: Record<StrategyObjective, number> = {
-  profit: 45,
-  balanced: 70,
-  growth: 85,
-  retention: 75,
-};
-
 function objectiveOf(value: unknown): StrategyObjective {
   return value === "profit" || value === "growth" || value === "retention" ? value : "balanced";
 }
@@ -96,9 +90,11 @@ function scoreOf(
           : netMarginPct * 0.7 + userRoiPct * 0.7;
 
   let penalty = 0;
-  if (netProfit <= 0) penalty += 100;
-  if (netMarginPct < minMarginPct - MARGIN_EPSILON_PCT) penalty += 50;
-  if ((sensitivity.find((s) => s.priceMultiple === 2)?.netProfit ?? 0) < 0) penalty += 20;
+  if (minMarginPct > 0 && netProfit <= 0) penalty += 100;
+  if (minMarginPct > 0 && netMarginPct < minMarginPct - MARGIN_EPSILON_PCT) penalty += 50;
+  if (minMarginPct > 0 && (sensitivity.find((s) => s.priceMultiple === 2)?.netProfit ?? 0) < 0) {
+    penalty += 20;
+  }
   if (!minWithdrawCovered) penalty += 15;
   return round(base - penalty, 4);
 }
@@ -115,12 +111,14 @@ function variantWarnings(
   price: number
 ): string[] {
   const warnings: string[] = [];
-  if (price > 0 && netProfit <= 0) warnings.push("This plan loses money at the current DOGE price.");
-  if (price > 0 && netMarginPct < minMarginPct - MARGIN_EPSILON_PCT) {
+  if (price > 0 && minMarginPct > 0 && netProfit <= 0) {
+    warnings.push("This plan loses money at the current DOGE price.");
+  }
+  if (price > 0 && minMarginPct > 0 && netMarginPct < minMarginPct - MARGIN_EPSILON_PCT) {
     warnings.push(`Net margin is below your ${minMarginPct.toFixed(0)}% floor.`);
   }
   if (userRoiPct < -30) warnings.push("Members lose more than 30% of the price over the term.");
-  if (sensitivity.find((s) => s.priceMultiple === 2)?.netProfit !== undefined) {
+  if (minMarginPct > 0 && sensitivity.find((s) => s.priceMultiple === 2)?.netProfit !== undefined) {
     const double = sensitivity.find((s) => s.priceMultiple === 2)!;
     if (double.netProfit < 0) warnings.push("At 2x the current DOGE price, this plan loses money.");
   }
@@ -142,8 +140,8 @@ export function generateStrategy(
   const c2p = Number(context.cryptoToPrice ?? 1) || 0;
   const processorPct = Math.max(0, context.processorPct ?? 0.25);
   const affiliatePct = Math.max(0, context.affiliatePct ?? 0);
-  const minMarginPct = clamp(numberOrNull(brief.minMarginPct) ?? 15, 0, 90);
-  const maxPayoutRatioPct = clamp(numberOrNull(brief.maxPayoutRatioPct) ?? 85, 5, 100);
+  const minMarginPct = clamp(numberOrNull(brief.minMarginPct) ?? 0, 0, 90);
+  const maxPayoutRatioPct = clamp(numberOrNull(brief.maxPayoutRatioPct) ?? 300, 5, 300);
   const minWithdraw = Math.max(0, context.minWithdraw ?? 0);
   const assumptions: string[] = [];
   const warnings: string[] = [];
@@ -223,10 +221,17 @@ export function generateStrategy(
     };
   }
 
-  let targetRatio: number;
-  if (numberOrNull(brief.targetRoiPct) != null) {
+  let targetRatio: number | null = null;
+  const dailyProfit = numberOrNull(brief.dailyProfit);
+  if (dailyProfit != null) {
+    targetRatio = ((price + Math.max(0, dailyProfit) * duration) / price) * 100;
+    understood.push(`${dailyProfit} ${priceCurrency}/day member profit`);
+  } else if (numberOrNull(brief.targetRoiPct) != null) {
     targetRatio = 100 + Number(brief.targetRoiPct);
     understood.push(`${brief.targetRoiPct}% member ROI target`);
+  } else if (intent.dailyProfit != null) {
+    targetRatio = ((price + Math.max(0, intent.dailyProfit) * duration) / price) * 100;
+    understood.push(`${intent.dailyProfit} ${priceCurrency}/day member profit`);
   } else if (intent.userMultiple != null) {
     targetRatio = intent.userMultiple * 100;
     understood.push(`${intent.userMultiple}x payout target`);
@@ -245,14 +250,27 @@ export function generateStrategy(
   } else if (intent.dailyYield != null) {
     targetRatio = (intent.dailyYield * duration * c2p * 100) / price;
     understood.push(`${intent.dailyYield} ${cryptoCode}/day`);
-  } else {
-    targetRatio = DEFAULT_PAYOUT_RATIO[objective];
-    assumptions.push(`No payout target given; started from a ${targetRatio}% payout ratio.`);
+  }
+  if (targetRatio == null) {
+    return {
+      variants: [],
+      recommendedId: null,
+      objective,
+      assumptions,
+      warnings: [
+        "Enter a daily member profit or a target member ROI so the plan does not underpay members.",
+      ],
+      understood,
+    };
   }
 
   // The floor protects the owner after fees. The ceiling protects members from
   // a plan that returns almost nothing.
-  const capRatio = Math.min(maxPayoutRatioPct, 100 - minMarginPct - processorPct - affiliatePct);
+  const marginCap =
+    minMarginPct > 0
+      ? 100 - minMarginPct - processorPct - affiliatePct
+      : maxPayoutRatioPct;
+  const capRatio = Math.min(maxPayoutRatioPct, marginCap);
   if (capRatio < 5) {
     return {
       variants: [],
@@ -264,6 +282,11 @@ export function generateStrategy(
       ],
       understood,
     };
+  }
+  if (targetRatio > capRatio + MARGIN_EPSILON_PCT) {
+    assumptions.push(
+      `Requested ${targetRatio.toFixed(1)}% total payout, capped at ${capRatio.toFixed(1)}% by the maximum payout.`
+    );
   }
   const base = clamp(targetRatio, 5, capRatio);
   const ratios: Array<{ id: StrategyVariant["id"]; label: string; ratio: number }> = [
@@ -371,11 +394,14 @@ export function generateStrategy(
     growth: "aggressive",
     retention: "balanced",
   };
+  const marginMode = minMarginPct > 0;
   const preferred = variants.find(
     (variant) =>
       variant.id === preference[objective] &&
-      variant.netProfit > 0 &&
-      variant.netMarginPct >= minMarginPct - MARGIN_EPSILON_PCT
+      (marginMode
+        ? variant.netProfit > 0 &&
+          variant.netMarginPct >= minMarginPct - MARGIN_EPSILON_PCT
+        : variant.userRoiPct >= 0)
   );
   const best = preferred ?? variants.reduce((a, b) => (b.score > a.score ? b : a), variants[0]);
   for (const variant of variants) variant.recommended = variant.id === best.id;

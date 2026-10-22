@@ -146,8 +146,9 @@ function Calculator({
         </p>
       )}
       {negative && (
-        <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-red-300">
-          <AlertTriangle size={12} /> This plan loses money after processor and affiliate costs. Saving is blocked.
+        <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-amber-300">
+          <AlertTriangle size={12} /> This plan returns more than the price. The house funds the
+          difference after processor and affiliate costs.
         </p>
       )}
     </div>
@@ -235,20 +236,6 @@ export function PlansManager({
         setErrors({ price: "Live DOGE rate is unavailable. Try again before saving a paid plan." });
         return;
       }
-      const net = planNetEconomics({
-        price,
-        point_per_day: Number(draft.point_per_day || 0),
-        duration: Number(draft.duration || 0),
-        cryptoToPrice,
-        processorPct: 0.25,
-        affiliatePct,
-      });
-      if (net.netProfit <= 0) {
-        setErrors({
-          price: `This plan loses money after fees (${net.netMarginPct.toFixed(1)}% margin). Lower the daily credit or raise the price.`,
-        });
-        return;
-      }
     }
     const body = {
       plan_name: draft.plan_name,
@@ -329,6 +316,7 @@ export function PlansManager({
                   <th className="py-3 pr-4 font-medium">Duration</th>
                   <th className="py-3 pr-4 font-medium">Net profit</th>
                   <th className="py-3 pr-4 font-medium">Net margin</th>
+                  <th className="py-3 pr-4 font-medium">Member ROI</th>
                   <th className="py-3 pr-4 font-medium">Rigs</th>
                   <th className="py-3 pr-4 font-medium text-right">Actions</th>
                 </tr>
@@ -368,6 +356,18 @@ export function PlansManager({
                       </td>
                       <td className={cn("font-mono py-3 pr-4 tabular-nums", p.is_default ? "text-slate-300" : e.netMarginPct < 0 ? "text-red-300" : "text-emerald-300")}>
                         {p.is_default ? "-" : `${e.netMarginPct.toFixed(1)}%`}
+                      </td>
+                      <td
+                        className={cn(
+                          "font-mono py-3 pr-4 tabular-nums",
+                          p.is_default
+                            ? "text-slate-300"
+                            : e.userRoiPct < 0
+                              ? "text-red-300"
+                              : "text-emerald-300"
+                        )}
+                      >
+                        {p.is_default ? "-" : `${e.userRoiPct >= 0 ? "+" : ""}${e.userRoiPct.toFixed(1)}%`}
                       </td>
                       <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{usage[p.id] ?? 0}</td>
                       <td className="py-3 pr-4">

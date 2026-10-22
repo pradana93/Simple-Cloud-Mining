@@ -28,10 +28,10 @@ const PRESETS: Preset[] = [
 ];
 
 const EXAMPLES = [
-  "$1 entry plan, 30 days, keep 15% margin",
-  "$5 plan, 90 days, 85% back",
-  "$25 balanced, 70% back",
-  "$100 premium, 180 days, keep 40% margin",
+  "$5 plan, 90 days, $0.10 daily profit",
+  "$20 plan, 30 days, $0.05 daily profit",
+  "$100 plan, 180 days, 1.4x total payout",
+  "$25 plan, 90 days, +40% member ROI",
 ];
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -78,7 +78,10 @@ function StrategyCard({
   const free = variant.price <= 0;
   const double = variant.sensitivity.find((s) => s.priceMultiple === 2);
   const memberValue = variant.price * (variant.payoutRatioPct / 100);
+  const memberProfit = memberValue - variant.price;
   const roi = `${variant.userRoiPct >= 0 ? "+" : ""}${variant.userRoiPct.toFixed(1)}%`;
+  const houseCost = Math.abs(variant.netProfit);
+  const houseCostPct = Math.abs(variant.netMarginPct);
 
   return (
     <div
@@ -117,16 +120,37 @@ function StrategyCard({
         ) : (
           <>
             <Metric
-              label="You keep"
-              value={money(variant.netProfit, priceCurrency)}
-              detail={`${variant.netMarginPct.toFixed(1)}% margin`}
+              label={variant.netProfit < 0 ? "House top-up" : "You keep"}
+              value={money(houseCost, priceCurrency)}
+              detail={
+                variant.netProfit < 0
+                  ? `${houseCostPct.toFixed(1)}% of price`
+                  : `${variant.netMarginPct.toFixed(1)}% margin`
+              }
               tone={variant.netProfit < 0 ? "bad" : "good"}
             />
             <Metric label="Member ROI" value={roi} tone={variant.userRoiPct < 0 ? "bad" : "good"} />
             <Metric
+              label="Member profit"
+              value={money(memberProfit, priceCurrency)}
+              tone={memberProfit < 0 ? "bad" : "good"}
+            />
+            <Metric
               label="If DOGE doubles"
-              value={double ? `${money(double.netProfit, priceCurrency)} kept` : "Rate unavailable"}
-              detail={double ? `${double.netMarginPct.toFixed(1)}% margin` : undefined}
+              value={
+                double
+                  ? `${money(Math.abs(double.netProfit), priceCurrency)} ${
+                      double.netProfit < 0 ? "top-up" : "kept"
+                    }`
+                  : "Rate unavailable"
+              }
+              detail={
+                double
+                  ? double.netProfit < 0
+                    ? `${Math.abs(double.netMarginPct).toFixed(1)}% of price`
+                    : `${double.netMarginPct.toFixed(1)}% margin`
+                  : undefined
+              }
               tone={double && double.netProfit < 0 ? "bad" : "good"}
             />
           </>
@@ -208,9 +232,10 @@ export function PlanAssistant({
   const [objective, setObjective] = useState<StrategyObjective>("balanced");
   const [price, setPrice] = useState(context.price && context.price > 0 ? String(context.price) : "");
   const [duration, setDuration] = useState(context.durationDays ? String(context.durationDays) : "30");
+  const [dailyProfit, setDailyProfit] = useState("");
   const [targetRoi, setTargetRoi] = useState("");
-  const [minMargin, setMinMargin] = useState("15");
-  const [maxPayout, setMaxPayout] = useState("85");
+  const [minMargin, setMinMargin] = useState("0");
+  const [maxPayout, setMaxPayout] = useState("300");
   const [freePlan, setFreePlan] = useState(Boolean(context.isEdit && context.price === 0));
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -230,15 +255,27 @@ export function PlanAssistant({
     setPrice(preset.price);
     setDuration(preset.duration);
     setObjective(preset.objective);
+    setDailyProfit("");
     setTargetRoi("");
-    setMinMargin("15");
-    setMaxPayout("85");
+    setMinMargin("0");
+    setMaxPayout("300");
     setVariants([]);
     setWarnings([]);
     setAssumptions([]);
     setUnderstood([]);
     setApplied(null);
     setError(null);
+  }
+
+  function setGoalText(value: string) {
+    setGoal(value);
+    if (activePreset) {
+      setDailyProfit("");
+      setTargetRoi("");
+      setMinMargin("0");
+      setMaxPayout("300");
+    }
+    setActivePreset(null);
   }
 
   async function generate() {
@@ -250,6 +287,15 @@ export function PlanAssistant({
     const numericDuration = duration.trim() ? Number(duration) : null;
     if (numericDuration != null && (!Number.isFinite(numericDuration) || numericDuration < 1)) {
       setError("Enter a term of at least one day.");
+      return;
+    }
+    const numericDailyProfit = dailyProfit.trim() ? Number(dailyProfit) : null;
+    if (numericDailyProfit != null && (!Number.isFinite(numericDailyProfit) || numericDailyProfit < 0)) {
+      setError("Enter a daily member profit of zero or more.");
+      return;
+    }
+    if (!freePlan && !goal.trim() && numericDailyProfit == null && !targetRoi.trim()) {
+      setError("Enter a daily member profit, a target ROI, or a goal sentence.");
       return;
     }
 
@@ -267,9 +313,10 @@ export function PlanAssistant({
             objective,
             price: numericPrice,
             durationDays: numericDuration,
+            dailyProfit: numericDailyProfit,
             targetRoiPct: targetRoi.trim() ? Number(targetRoi) : null,
-            minMarginPct: minMargin.trim() ? Number(minMargin) : 15,
-            maxPayoutRatioPct: maxPayout.trim() ? Number(maxPayout) : 85,
+            minMarginPct: minMargin.trim() ? Number(minMargin) : 0,
+            maxPayoutRatioPct: maxPayout.trim() ? Number(maxPayout) : 300,
             freePlan,
           },
           context: {
@@ -281,7 +328,7 @@ export function PlanAssistant({
       });
       const j = (await res.json()) as ApiResponse;
       if (!j.ok || !j.variants?.length) {
-        setError(j.error ?? "Could not build a viable plan.");
+        setError(j.error ?? j.warnings?.[0] ?? "Could not build a viable plan.");
         setVariants([]);
         setWarnings(j.warnings ?? []);
         return;
@@ -358,12 +405,9 @@ export function PlanAssistant({
             <textarea
               id={goalId}
               value={goal}
-              onChange={(e) => {
-                setGoal(e.target.value);
-                setActivePreset(null);
-              }}
+              onChange={(e) => setGoalText(e.target.value)}
               rows={2}
-              placeholder="e.g. $1 entry plan, 30 days, members get 70% back"
+              placeholder="e.g. $20 plan, 30 days, $0.10 daily profit"
               className="mt-1 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25"
             />
             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
@@ -371,7 +415,7 @@ export function PlanAssistant({
                 <button
                   key={example}
                   type="button"
-                  onClick={() => setGoal(example)}
+                  onClick={() => setGoalText(example)}
                   className="text-left text-[11px] text-slate-400 underline decoration-slate-700 underline-offset-2 hover:text-slate-200"
                 >
                   {example}
@@ -380,7 +424,7 @@ export function PlanAssistant({
             </div>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className="block text-xs font-medium text-slate-400">
               Price ({priceCurrency})
               <input
@@ -394,6 +438,22 @@ export function PlanAssistant({
                 step="0.01"
                 disabled={freePlan}
                 placeholder="auto"
+                className={cn(FIELD, "mt-1 font-mono disabled:opacity-50")}
+              />
+            </label>
+            <label className="block text-xs font-medium text-slate-400">
+              Daily member profit ({priceCurrency})
+              <input
+                value={dailyProfit}
+                onChange={(e) => {
+                  setDailyProfit(e.target.value);
+                  setActivePreset(null);
+                }}
+                inputMode="decimal"
+                min="0"
+                step="0.01"
+                disabled={freePlan}
+                placeholder="0.00"
                 className={cn(FIELD, "mt-1 font-mono disabled:opacity-50")}
               />
             </label>
@@ -428,6 +488,9 @@ export function PlanAssistant({
               </select>
             </label>
           </div>
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+            Daily profit is paid on top of the price. Total returned = price + (daily profit × days).
+          </p>
 
           <label className="mt-3 flex items-start gap-2 text-xs text-slate-300">
             <input
@@ -469,7 +532,7 @@ export function PlanAssistant({
                 />
               </label>
               <label className="block text-xs font-medium text-slate-400">
-                Minimum owner margin (%)
+                Owner margin floor (%)
                 <input
                   value={minMargin}
                   onChange={(e) => {
@@ -493,6 +556,11 @@ export function PlanAssistant({
                 />
               </label>
             </div>
+            <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+              A payout ratio above 100% means the member profits. The daily profit field is the
+              direct way to set the total. Leave the owner margin floor at 0 for member-positive
+              plans, or raise it to cap the payout for house margin.
+            </p>
           </details>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -526,8 +594,15 @@ export function PlanAssistant({
               <dd className="text-slate-500">The share of the price they get back before fees.</dd>
             </div>
             <div>
-              <dt className="font-medium text-slate-300">You keep</dt>
-              <dd className="text-slate-500">What is left after the payout, processor fee, and affiliate cut.</dd>
+              <dt className="font-medium text-slate-300">Member profit</dt>
+              <dd className="text-slate-500">Total returned minus the price they paid.</dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-300">House margin</dt>
+              <dd className="text-slate-500">
+                What is left after the payout, processor fee, and affiliate cut. A negative result is
+                the top-up the house funds.
+              </dd>
             </div>
           </dl>
           <p className="mt-4 border-t border-white/10 pt-3 text-[11px] leading-relaxed text-slate-500">
@@ -548,7 +623,8 @@ export function PlanAssistant({
               <p className="text-sm font-semibold text-slate-200">Choose a plan</p>
               <p className="mt-1 text-xs text-slate-400">
                 {variants.length} options for {resultPrice > 0 ? formatFiat(resultPrice, priceCurrency) : "a free starter"}{" "}
-                over {resultDuration} days. Each one clears your margin floor or says why it does not.
+                over {resultDuration} days. Your target sets the top payout; the other two step it down
+                so you can compare.
               </p>
             </div>
             <p className="text-[11px] text-slate-500">Read by {parserLabel}</p>

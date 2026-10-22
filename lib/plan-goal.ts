@@ -24,6 +24,7 @@ export type PlanIntent = {
   durationDays?: number | null;
   dailyRatePct?: number | null;
   dailyYield?: number | null;
+  dailyProfit?: number | null;
   userRoiPct?: number | null;
   userMultiple?: number | null;
   payoutRatioPct?: number | null;
@@ -104,6 +105,12 @@ export function parseGoal(goal: string, context: PlanContext = {}): PlanIntent {
   const dailyRate = firstMatch(text, [/([\d]+(?:\.\d+)?)\s*%\s*(?:per\s*day|daily|a\s*day|\/\s*day)/]);
   if (dailyRate != null) intent.dailyRatePct = dailyRate;
 
+  const dailyProfit = firstMatch(text, [
+    /(?:\$|usd\s*)?\s*([\d][\d,]*(?:\.\d+)?)\s*(?:usd|dollars?)?\s*(?:daily\s+)?profit\b/,
+    /(?:daily\s+profit|profit\s+per\s+day)\D{0,12}?([\d][\d,]*(?:\.\d+)?)/,
+  ]);
+  if (dailyProfit != null) intent.dailyProfit = dailyProfit;
+
   const multipleWord = text.match(/\b(double|triple|quadruple|half)\b/)?.[1];
   const multipleNum = firstMatch(text, [/([\d]+(?:\.\d+)?)\s*x\b/]);
   if (multipleNum != null) intent.userMultiple = multipleNum;
@@ -117,8 +124,8 @@ export function parseGoal(goal: string, context: PlanContext = {}): PlanIntent {
     if (roi != null) intent.userRoiPct = roi;
 
     const payoutRatio = firstMatch(text, [
-      /([\d]+(?:\.\d+)?)\s*%\s*(?:payout|paid\s+out|returned|to\s+members?|of\s+price)/,
-      /(?:payout|paid\s+out|returned|members?\s+get|members?\s+receive)\D{0,14}?([\d]+(?:\.\d+)?)\s*%/,
+      /([\d]+(?:\.\d+)?)\s*%\s*(?:(?:total\s+)?payout|paid\s+out|returned|to\s+members?|of\s+price)/,
+      /(?:(?:total\s+)?payout|paid\s+out|returned|members?\s+get|members?\s+receive)\D{0,14}?([\d]+(?:\.\d+)?)\s*%/,
     ]);
     if (payoutRatio != null) intent.payoutRatioPct = payoutRatio;
 
@@ -164,6 +171,7 @@ export function coerceIntent(raw: unknown): PlanIntent {
     "durationDays",
     "dailyRatePct",
     "dailyYield",
+    "dailyProfit",
     "userRoiPct",
     "userMultiple",
     "payoutRatioPct",
@@ -224,6 +232,9 @@ export function solvePlan(intent: PlanIntent, context: PlanContext = {}): PlanPr
   if (intent.dailyYield != null) {
     payout = intent.dailyYield * duration;
     basis = `${intent.dailyYield} ${cryptoCode}/day`;
+  } else if (intent.dailyProfit != null) {
+    payout = price + intent.dailyProfit * duration;
+    basis = `${intent.dailyProfit} ${code}/day member profit`;
   } else if (intent.dailyRatePct != null) {
     payout = price * (intent.dailyRatePct / 100) * duration;
     basis = `${intent.dailyRatePct}% of price per day`;

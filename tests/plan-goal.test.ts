@@ -26,6 +26,20 @@ describe("parseGoal", () => {
     expect(intent.userRoiPct).toBeUndefined();
   });
 
+  it("reads a total payout target", () => {
+    const intent = parseGoal("$5 plan, 90 days, 150% total payout");
+    expect(intent.price).toBe(5);
+    expect(intent.durationDays).toBe(90);
+    expect(intent.payoutRatioPct).toBe(150);
+  });
+
+  it("reads a daily member profit", () => {
+    const intent = parseGoal("$5 plan, 90 days, $0.10 daily profit");
+    expect(intent.price).toBe(5);
+    expect(intent.durationDays).toBe(90);
+    expect(intent.dailyProfit).toBe(0.1);
+  });
+
   it("reads a free/default flag", () => {
     expect(parseGoal("free starter plan").isDefault).toBe(true);
   });

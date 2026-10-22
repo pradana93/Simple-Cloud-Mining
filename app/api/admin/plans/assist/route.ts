@@ -12,6 +12,7 @@ Allowed keys (snake_case, numbers without % or currency symbols):
 - durationDays: integer
 - dailyRatePct: number (percent of price earned per day)
 - dailyYield: number (absolute coins earned per day)
+- dailyProfit: number (member profit per day in the price currency)
 - userRoiPct: number (total percent return over the term)
 - userMultiple: number (e.g. 1.5 for "1.5x their money")
 - payoutRatioPct: number (percent of price returned to the member)
@@ -84,6 +85,7 @@ function parseBrief(raw: unknown): StrategyBrief {
     objective: objectiveOf(r.objective),
     price: numberOrNull(r.price),
     durationDays: numberOrNull(r.durationDays),
+    dailyProfit: numberOrNull(r.dailyProfit),
     targetRoiPct: numberOrNull(r.targetRoiPct),
     minMarginPct: numberOrNull(r.minMarginPct),
     maxPayoutRatioPct: numberOrNull(r.maxPayoutRatioPct),
@@ -181,6 +183,7 @@ export async function POST(req: Request) {
   const hasBrief = Boolean(
     brief.price != null ||
       brief.durationDays != null ||
+      brief.dailyProfit != null ||
       brief.targetRoiPct != null ||
       brief.freePlan ||
       body.mode === "strategy"

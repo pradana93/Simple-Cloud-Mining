@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/api-admin";
-import { earningRateFromDaily, planNetEconomics } from "@/lib/plan-math";
+import { earningRateFromDaily } from "@/lib/plan-math";
 import { getSettings } from "@/lib/settings";
 import { getFxTable } from "@/lib/fx";
 import { recordAudit } from "@/lib/audit";
@@ -72,20 +72,6 @@ async function validateEconomics(value: Parsed["value"]): Promise<{ error: strin
   }
   if (!(cryptoToPrice > 0)) {
     return { error: "Live DOGE rate is unavailable. Try again before saving a paid plan.", status: 503 };
-  }
-  const net = planNetEconomics({
-    price: value.price,
-    point_per_day: value.point_per_day,
-    duration: value.duration,
-    cryptoToPrice,
-    processorPct: 0.25,
-    affiliatePct: Number(settings.aff_comission) || 0,
-  });
-  if (net.netProfit <= 0) {
-    return {
-      error: `This plan loses money after fees and affiliate commission (${net.netMarginPct.toFixed(1)}% margin). Lower the daily credit or raise the price.`,
-      status: 422,
-    };
   }
   return null;
 }
