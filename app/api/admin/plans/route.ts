@@ -134,11 +134,48 @@ export async function PATCH(req: Request) {
 
   try {
     const admin = createAdminSupabase();
+    const { data: current } = await admin
+      .from("plans")
+      .select("price,point_per_day,duration,earning_rate")
+      .eq("id", id)
+      .maybeSingle();
+    if (!current) return NextResponse.json({ ok: false, error: "Plan not found" }, { status: 404 });
+
+    const { count: activeRigs } = await admin
+      .from("user_plan_history")
+      .select("id", { count: "exact", head: true })
+      .eq("plan_id", id)
+      .eq("status", "active");
+    if ((activeRigs ?? 0) > 0) {
+      const before = current as { price: number; point_per_day: number; duration: number; earning_rate: number };
+      const locked =
+        Number(before.price) !== value.price ||
+        Number(before.point_per_day) !== value.point_per_day ||
+        Number(before.duration) !== value.duration ||
+        Number(before.earning_rate) !== value.earning_rate;
+      if (locked) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "This plan has active rigs. Create a new plan version instead of changing its price, daily credit, or term.",
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const { error } = await admin.from("plans").update(value).eq("id", id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     if (value.is_default) await clearOtherDefaults(id);
     revalidateTag("plans");
-    await recordAudit({ actor: { id: gate.userId, name: gate.name }, action: "plan.update", target: value.plan_name, detail: { id }, req });
+    await recordAudit({
+      actor: { id: gate.userId, name: gate.name },
+      action: "plan.update",
+      target: value.plan_name,
+      detail: { id, before: current, after: value },
+      req,
+    });
     return NextResponse.json({ ok: true, message: "Plan updated" });
   } catch {
     return NextResponse.json({ ok: false, error: "Update failed" }, { status: 500 });

@@ -8,6 +8,7 @@ import { cryptoTicker, isPayableCoin } from "@/lib/checkout";
 import { getFxTable } from "@/lib/fx";
 import { requestIdempotencyKey } from "@/lib/ledger";
 import { sendAlert } from "@/lib/alerts";
+import { TERMS_VERSION } from "@/lib/terms";
 
 type StoredInvoice = {
   hash: string;
@@ -29,8 +30,19 @@ export async function POST(req: Request) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
 
-  const body = (await req.json()) as { planId: number; coin?: string; idempotencyKey?: string };
-  const { planId, coin } = body;
+  const body = (await req.json()) as {
+    planId: number;
+    coin?: string;
+    idempotencyKey?: string;
+    acceptedTerms?: boolean;
+  };
+  const { planId, coin, acceptedTerms } = body;
+  if (acceptedTerms !== true) {
+    return NextResponse.json(
+      { ok: false, error: "Accept the plan terms before creating an invoice." },
+      { status: 422 }
+    );
+  }
   const key = requestIdempotencyKey(req, user.id, "purchase", body.idempotencyKey);
   const admin = createAdminSupabase();
 
@@ -76,14 +88,34 @@ export async function POST(req: Request) {
   const price = Number((plan as { price: number }).price);
   const priceCurrency = settings.price_currency.toUpperCase();
   let siteAmount = price;
+  let cryptoToPrice = 1;
   if (priceCurrency !== settings.currency_code.toUpperCase()) {
     const table = await getFxTable(settings.currency_code);
     const perCoin = table?.rates[priceCurrency] ?? 0;
     if (!(perCoin > 0)) {
       return NextResponse.json({ ok: false, error: "Live rates are unavailable right now. Try again in a minute." }, { status: 503 });
     }
+    cryptoToPrice = perCoin;
     siteAmount = price / perCoin;
   }
+
+  // Lock the terms and rate used for this quote so a later plan or rate edit
+  // cannot rewrite what the buyer was shown.
+  const planRow = plan as { point_per_day: number | null; duration: number };
+  const quotedDaily = Number(planRow.point_per_day ?? 0);
+  const quotedDuration = Number(planRow.duration);
+  const quotedPayout = quotedDaily * quotedDuration;
+  const quote = {
+    price,
+    priceCurrency,
+    duration: quotedDuration,
+    pointPerDay: quotedDaily,
+    cryptoToPrice,
+    payoutToUser: quotedPayout,
+    payoutInPrice: quotedPayout * cryptoToPrice,
+    userRoiPct: price > 0 ? ((quotedPayout * cryptoToPrice - price) / price) * 100 : 0,
+    capturedAt: new Date().toISOString(),
+  };
 
   let payAmount: number;
   let payment: Awaited<ReturnType<typeof createPayment>>;
@@ -141,6 +173,9 @@ export async function POST(req: Request) {
       timeout: 20 * 60,
       payCoin,
       ticker,
+      quote,
+      termsVersion: TERMS_VERSION,
+      termsAcceptedAt: new Date().toISOString(),
     },
   });
   if (insertError) {

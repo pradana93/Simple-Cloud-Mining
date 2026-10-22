@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AlertTriangle, ArrowLeft, BadgeCheck, Hourglass, QrCode, ShieldCheck } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
+import { formatFiat } from "@/lib/money";
 import { CopyButton } from "@/components/copy-button";
 import { Countdown } from "@/components/countdown";
 import { InvoiceWatch } from "@/components/invoice-watch";
@@ -23,6 +24,17 @@ type Invoice = {
     pending_coin?: string;
     received_amount?: number;
     received_coin?: string;
+    quote?: {
+      price: number;
+      priceCurrency: string;
+      duration: number;
+      pointPerDay: number;
+      cryptoToPrice: number;
+      payoutToUser: number;
+      payoutInPrice: number;
+      userRoiPct: number;
+      capturedAt: string;
+    };
   } | null;
   date: string;
 };
@@ -111,6 +123,34 @@ export default async function InvoicePage({ params }: { params: Promise<{ hash: 
               : "Complete your payment"}
         </h1>
         <p className="mt-1 break-all font-mono text-xs text-slate-400">Invoice {hash}</p>
+
+        {p.quote && (
+          <dl className="mt-4 grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs sm:grid-cols-4">
+            <div>
+              <dt className="text-slate-400">Price locked</dt>
+              <dd className="font-mono mt-0.5 text-slate-100">
+                {formatFiat(p.quote.price, p.quote.priceCurrency)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Term</dt>
+              <dd className="font-mono mt-0.5 text-slate-100">{p.quote.duration} days</dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Total back</dt>
+              <dd className="font-mono mt-0.5 text-slate-100">
+                {formatFiat(p.quote.payoutInPrice, p.quote.priceCurrency)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-slate-400">Member return</dt>
+              <dd className="font-mono mt-0.5 text-emerald-300">
+                {p.quote.userRoiPct >= 0 ? "+" : ""}
+                {p.quote.userRoiPct.toFixed(1)}%
+              </dd>
+            </div>
+          </dl>
+        )}
 
         {inv.status === "canceled" ? (
           <div className="mt-6 space-y-4">

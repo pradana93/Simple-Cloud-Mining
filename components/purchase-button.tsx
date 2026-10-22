@@ -6,16 +6,28 @@ import { Button } from "./ui/button";
 import { useToast } from "@/components/ui/toast";
 import type { PayCoin } from "@/lib/checkout";
 import { cn } from "@/lib/utils";
+import { CHECKOUT_TERMS, TERMS_VERSION } from "@/lib/terms";
 
-export function PurchaseButton({ planId, coins = [] }: { planId: number; coins?: PayCoin[] }) {
+export function PurchaseButton({
+  planId,
+  coins = [],
+}: {
+  planId: number;
+  coins?: PayCoin[];
+}) {
   const router = useRouter();
   const { push } = useToast();
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [coin, setCoin] = useState<string>(coins[0]?.code ?? "");
   const keyRef = useRef<string | null>(null);
 
   async function buy() {
+    if (!acceptedTerms) {
+      setErr("Accept the terms before creating an invoice.");
+      return;
+    }
     if (!keyRef.current) keyRef.current = crypto.randomUUID();
     setLoading(true);
     setErr(null);
@@ -23,7 +35,12 @@ export function PurchaseButton({ planId, coins = [] }: { planId: number; coins?:
       const res = await fetch("/api/purchase", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planId, coin: coin || undefined, idempotencyKey: keyRef.current }),
+        body: JSON.stringify({
+          planId,
+          coin: coin || undefined,
+          idempotencyKey: keyRef.current,
+          acceptedTerms,
+        }),
       });
       const j = await res.json();
       if (!j.ok) {
@@ -45,6 +62,26 @@ export function PurchaseButton({ planId, coins = [] }: { planId: number; coins?:
 
   return (
     <div>
+      <div className="mb-5 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+        <h2 className="font-display text-sm font-bold text-white">Before you pay</h2>
+        <ul className="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-relaxed text-slate-400">
+          {CHECKOUT_TERMS.map((term) => (
+            <li key={term}>{term}</li>
+          ))}
+        </ul>
+        <label className="mt-3 flex items-start gap-2 text-xs text-slate-300">
+          <input
+            type="checkbox"
+            checked={acceptedTerms}
+            onChange={(e) => setAcceptedTerms(e.target.checked)}
+            className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-ink-900 accent-gold-500"
+          />
+          <span>
+            I have read and accept these terms.
+            <span className="block text-[11px] text-slate-500">Terms version {TERMS_VERSION}</span>
+          </span>
+        </label>
+      </div>
       {coins.length > 1 ? (
         <div className="mb-5">
           <p className="text-xs font-medium text-slate-400">Pay with</p>
@@ -79,7 +116,7 @@ export function PurchaseButton({ planId, coins = [] }: { planId: number; coins?:
           </div>
         </div>
       ) : null}
-      <Button onClick={buy} disabled={loading} className="w-full">
+      <Button onClick={buy} disabled={loading || !acceptedTerms} className="w-full">
         {loading ? (
           <>
             <Loader2 size={16} className="animate-spin" /> Creating invoice
