@@ -43,7 +43,12 @@ begin
   delete from public.game_seeds;
   delete from public.checkins;
   delete from public.affiliate_history;
+  -- The ledger is append-only during normal operation. A reset is the one
+  -- explicit exception; the disable/enable pair is transactional with the
+  -- function call, so a failure cannot leave the trigger off.
+  alter table public.balance_ledger disable trigger balance_ledger_append_only;
   delete from public.balance_ledger;
+  alter table public.balance_ledger enable trigger balance_ledger_append_only;
   delete from public.withdrawal_allowlist;
   delete from public.user_deposits;
   delete from public.user_withdrawal;
