@@ -84,6 +84,7 @@ export function parseGoal(goal: string, context: PlanContext = {}): PlanIntent {
 
   const price = firstMatch(text, [
     /(?:price|cost|charge|priced(?:\s*at)?|sell(?:ing)?\s+for|go(?:es)?\s+for)\s*[:=]?\s*\$?\s*([\d][\d,]*(?:\.\d+)?)/,
+    /\$\s*([\d][\d,]*(?:\.\d+)?)/,
     /(?:for|at)\s*[:=]?\s*\$?\s*([\d][\d,]*(?:\.\d+)?)(?![\d])(?!\s*(?:days?|weeks?|months?|years?|per\s*day|daily|a\s*day))/,
     /\$?\s*([\d][\d,]*(?:\.\d+)?)(?![\d])\s*(?:doge|coins?|usd|dollars?)/,
     /([\d][\d,]*(?:\.\d+)?)(?![\d])\s*(?:plan|tier)/,
@@ -110,8 +111,8 @@ export function parseGoal(goal: string, context: PlanContext = {}): PlanIntent {
 
   if (intent.dailyRatePct == null) {
     const roi = firstMatch(text, [
-      /([\d]+(?:\.\d+)?)\s*%\s*(?:roi|return|back|gain|apy)/,
-      /(?:roi|return|back|gain|profit\s+for\s+(?:the\s+)?(?:miner|user|member))\D{0,12}?([\d]+(?:\.\d+)?)\s*%/,
+      /([\d]+(?:\.\d+)?)\s*%\s*(?:roi|return|gain|apy)/,
+      /(?:roi|return|gain|profit\s+for\s+(?:the\s+)?(?:miner|user|member))\D{0,12}?([\d]+(?:\.\d+)?)\s*%/,
     ]);
     if (roi != null) intent.userRoiPct = roi;
 

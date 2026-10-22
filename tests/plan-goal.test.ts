@@ -18,6 +18,14 @@ describe("parseGoal", () => {
     expect(intent.ownerMarginPct).toBe(40);
   });
 
+  it("reads a dollar price at the start of a sentence", () => {
+    const intent = parseGoal("$1 entry plan, 30 days, members get 70% back");
+    expect(intent.price).toBe(1);
+    expect(intent.durationDays).toBe(30);
+    expect(intent.payoutRatioPct).toBe(70);
+    expect(intent.userRoiPct).toBeUndefined();
+  });
+
   it("reads a free/default flag", () => {
     expect(parseGoal("free starter plan").isDefault).toBe(true);
   });
@@ -54,6 +62,16 @@ describe("solvePlan", () => {
     );
     expect(p.payoutToUser).toBeCloseTo(125, 3);
     expect(p.point_per_day).toBeCloseTo(125 / 90, 5);
+  });
+
+  it("solves a $1 plan from a payout ratio", () => {
+    const p = solvePlan(
+      { price: 1, payoutRatioPct: 70, durationDays: 30 },
+      { cryptoToPrice: 0.08 }
+    );
+    expect(p.payoutToUser).toBeCloseTo(8.75, 4);
+    expect(p.point_per_day).toBeCloseTo(8.75 / 30, 4);
+    expect(p.ownerMarginPct).toBeCloseTo(30, 4);
   });
 
   it("flags a plan that loses money", () => {

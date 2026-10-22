@@ -7,6 +7,8 @@ import type { PlanContext, PlanIntent, PlanProposal } from "./plan-goal";
 
 export type StrategyObjective = "profit" | "balanced" | "growth" | "retention";
 
+const MARGIN_EPSILON_PCT = 0.01;
+
 export type StrategyBrief = {
   objective?: StrategyObjective;
   price?: number | null;
@@ -95,7 +97,7 @@ function scoreOf(
 
   let penalty = 0;
   if (netProfit <= 0) penalty += 100;
-  if (netMarginPct < minMarginPct) penalty += 50;
+  if (netMarginPct < minMarginPct - MARGIN_EPSILON_PCT) penalty += 50;
   if ((sensitivity.find((s) => s.priceMultiple === 2)?.netProfit ?? 0) < 0) penalty += 20;
   if (!minWithdrawCovered) penalty += 15;
   return round(base - penalty, 4);
@@ -114,7 +116,7 @@ function variantWarnings(
 ): string[] {
   const warnings: string[] = [];
   if (price > 0 && netProfit <= 0) warnings.push("This plan loses money at the current DOGE price.");
-  if (price > 0 && netMarginPct < minMarginPct) {
+  if (price > 0 && netMarginPct < minMarginPct - MARGIN_EPSILON_PCT) {
     warnings.push(`Net margin is below your ${minMarginPct.toFixed(0)}% floor.`);
   }
   if (userRoiPct < -30) warnings.push("Members lose more than 30% of the price over the term.");
@@ -147,7 +149,9 @@ export function generateStrategy(
   const warnings: string[] = [];
   const understood: string[] = [];
 
-  const requestedPrice = numberOrNull(brief.price) ?? intent.price ?? context.price ?? null;
+  const contextPrice =
+    context.isEdit || (context.price != null && context.price > 0) ? context.price : null;
+  const requestedPrice = numberOrNull(brief.price) ?? intent.price ?? contextPrice ?? null;
   const price = requestedPrice == null ? DEFAULT_PRICE[objective] : Math.max(0, requestedPrice);
   const duration = Math.max(
     1,
@@ -263,9 +267,9 @@ export function generateStrategy(
   }
   const base = clamp(targetRatio, 5, capRatio);
   const ratios: Array<{ id: StrategyVariant["id"]; label: string; ratio: number }> = [
-    { id: "conservative", label: "Conservative", ratio: clamp(base * 0.8, 5, capRatio) },
+    { id: "conservative", label: "Lower payout", ratio: clamp(base * 0.8, 5, capRatio) },
     { id: "balanced", label: "Balanced", ratio: clamp(base * 0.9, 5, capRatio) },
-    { id: "aggressive", label: "Aggressive", ratio: base },
+    { id: "aggressive", label: "Higher payout", ratio: base },
   ];
 
   const variants: StrategyVariant[] = ratios.map(({ id, label, ratio }) => {
@@ -361,7 +365,19 @@ export function generateStrategy(
     };
   });
 
-  const best = variants.reduce((a, b) => (b.score > a.score ? b : a), variants[0]);
+  const preference: Record<StrategyObjective, StrategyVariant["id"]> = {
+    profit: "conservative",
+    balanced: "balanced",
+    growth: "aggressive",
+    retention: "balanced",
+  };
+  const preferred = variants.find(
+    (variant) =>
+      variant.id === preference[objective] &&
+      variant.netProfit > 0 &&
+      variant.netMarginPct >= minMarginPct - MARGIN_EPSILON_PCT
+  );
+  const best = preferred ?? variants.reduce((a, b) => (b.score > a.score ? b : a), variants[0]);
   for (const variant of variants) variant.recommended = variant.id === best.id;
   warnings.push(...variants.flatMap((v) => v.warnings));
   return {
