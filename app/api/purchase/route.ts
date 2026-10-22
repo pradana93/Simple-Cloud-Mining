@@ -85,7 +85,20 @@ export async function POST(req: Request) {
 
   // The plan is priced in the site price currency. The ledger stays in the
   // site currency, while the invoice shows an exact amount in the buyer's coin.
-  const price = Number((plan as { price: number }).price);
+  const listPrice = Number((plan as { price: number }).price);
+  let firstPurchaseDiscount = 0;
+  const discountPct = Math.max(0, Number(settings.first_purchase_discount_percent ?? 0));
+  if (discountPct > 0) {
+    const { count: paidBefore } = await admin
+      .from("transactions_history")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .eq("status", "paid");
+    if ((paidBefore ?? 0) === 0) {
+      firstPurchaseDiscount = Math.round(listPrice * discountPct) / 100;
+    }
+  }
+  const price = Math.max(0, Number((listPrice - firstPurchaseDiscount).toFixed(2)));
   const priceCurrency = settings.price_currency.toUpperCase();
   let siteAmount = price;
   let cryptoToPrice = 1;
@@ -107,6 +120,9 @@ export async function POST(req: Request) {
   const quotedPayout = quotedDaily * quotedDuration;
   const quote = {
     price,
+    listPrice,
+    firstPurchaseDiscount,
+    firstPurchaseDiscountPercent: firstPurchaseDiscount > 0 ? discountPct : 0,
     priceCurrency,
     duration: quotedDuration,
     pointPerDay: quotedDaily,

@@ -113,7 +113,28 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
     ladderPlans = [];
   }
 
-  const price = Number(plan.price);
+  const listPrice = Number(plan.price);
+  let firstPurchaseEligible = false;
+  try {
+    const supabase = createServerSupabase();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { count } = await supabase
+        .from("transactions_history")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "paid");
+      firstPurchaseEligible = (count ?? 0) === 0;
+    }
+  } catch {
+    firstPurchaseEligible = false;
+  }
+  const discountPct = Math.max(0, Number(s.first_purchase_discount_percent ?? 0));
+  const discount =
+    firstPurchaseEligible && discountPct > 0
+      ? Math.min(listPrice, Number(((listPrice * discountPct) / 100).toFixed(2)))
+      : 0;
+  const price = Number((listPrice - discount).toFixed(2));
   const daily = Number(plan.point_per_day ?? 0);
   const duration = Number(plan.duration);
   const free = price <= 0;
@@ -189,6 +210,23 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
           <p className="mt-1 text-sm text-slate-400">
             {plan.version ? `${plan.version} · ` : ""}Starts after your payment is confirmed.
           </p>
+
+          {discount > 0 && (
+            <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.06] p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-300">
+                First plan offer
+              </p>
+              <p className="mt-1 text-sm text-slate-200">
+                {discountPct.toFixed(0)}% off your first paid plan: pay{" "}
+                <span className="font-semibold text-white">{formatFiat(price, s.price_currency)}</span>{" "}
+                instead of{" "}
+                <span className="line-through text-slate-400">{formatFiat(listPrice, s.price_currency)}</span>.
+              </p>
+              <p className="mt-1 text-[11px] text-slate-400">
+                Applies once per account, on the first confirmed paid plan.
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 grid gap-3 text-center sm:grid-cols-3">
             <div className="rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/10">

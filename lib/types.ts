@@ -108,6 +108,7 @@ export type SiteSettings = {
   min_withdraw: number;
   max_withdraw: number;
   aff_comission: number;
+  first_purchase_discount_percent: number;
   currency_name: string;
   currency_symbol: string;
   currency_code: string;
