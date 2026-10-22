@@ -114,15 +114,18 @@ deploys. `.env.example` lists them with comments.
 | `CRYPTAPI_TRX_ADDRESS` | At least one | Your wallet | TRON deposits |
 | `CRYPTAPI_USDT_TRC20_ADDRESS` | At least one | Your wallet | USDT TRC20 deposits |
 | `RISK_SALT` | No | You generate it | Salt for hashing IPs in anti-fraud data |
+| `PLAN_AI_BASE_URL` | No | Your AI provider | Use this with `PLAN_AI_API_KEY` for OpenAgentic, Qodeer, or any OpenAI-compatible endpoint |
 | `NEXT_PUBLIC_SENTRY_DSN` | No | Sentry project settings | Error reporting in the browser |
 | `SENTRY_DSN` | No | Sentry project settings | Error reporting on the server and edge |
 | `ALERT_WEBHOOK_URL` | No | Slack or Discord webhook | Money and ledger drift alerts |
 | `BACKUP_ENCRYPTION_KEY` | Recommended | You generate 32+ random characters | Encrypts logical backups |
 | `SUPABASE_ACCESS_TOKEN` | For backup checks | Supabase account settings | Reads native backup posture |
 | `SMTP_SENDER` | No | Your mail provider | From address on outbound email |
-| `OPENAI_API_KEY` | No | OpenAI | Powers the admin plan assistant |
-| `ANTHROPIC_API_KEY` | No | Anthropic | Alternative provider for the plan assistant |
-| `PLAN_AI_MODEL` | No | Provider docs | Overrides the assistant model name |
+| `PLAN_AI_BASE_URL` | No | Your AI provider | Base URL for an OpenAI-compatible provider |
+| `PLAN_AI_API_KEY` | No | Your AI provider | API key for that provider |
+| `PLAN_AI_MODEL` | No | Your AI provider | Model name, required for the custom provider |
+| `OPENAI_API_KEY` | No | OpenAI | Powers the admin plan strategy studio |
+| `ANTHROPIC_API_KEY` | No | Anthropic | Alternative provider for the plan strategy studio |
 
 ## 7. First login and admin access
 
