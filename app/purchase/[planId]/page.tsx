@@ -8,8 +8,65 @@ import { planEconomics } from "@/lib/plan-math";
 import { availableCoins, availableCoinsForPrice } from "@/lib/cryptapi";
 import { formatCrypto } from "@/lib/utils";
 import { PurchaseButton } from "@/components/purchase-button";
+import { paidLadder, type LadderPlan } from "@/lib/ladder";
 
 export const dynamic = "force-dynamic";
+
+function PlanComparison({
+  plans,
+  currentId,
+  cryptoToPrice,
+  priceCurrency,
+  code,
+  decimals,
+}: {
+  plans: LadderPlan[];
+  currentId: number;
+  cryptoToPrice: number;
+  priceCurrency: string;
+  code: string;
+  decimals: number;
+}) {
+  const rows = paidLadder(plans, cryptoToPrice);
+  if (rows.length < 2) return null;
+  return (
+    <div className="mt-5 rounded-2xl bg-white/[0.03] p-5 ring-1 ring-white/10">
+      <h2 className="font-display text-base font-bold text-white">Compare every tier</h2>
+      <p className="mt-1 text-xs text-slate-400">
+        Same rate and terms for every plan. Totals use today&apos;s {code} rate and are not a guarantee.
+      </p>
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-left text-xs sm:text-sm">
+          <thead className="text-slate-400">
+            <tr>
+              <th className="py-2 pr-3 font-medium">Plan</th>
+              <th className="py-2 pr-3 font-medium">Price</th>
+              <th className="py-2 pr-3 font-medium">Term</th>
+              <th className="py-2 pr-3 font-medium">Per day</th>
+              <th className="py-2 pr-3 font-medium">Total back</th>
+              <th className="py-2 font-medium">Return</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                className={row.id === currentId ? "border-t border-white/10 bg-gold-500/[0.06] text-white" : "border-t border-white/10 text-slate-300"}
+              >
+                <td className="py-2 pr-3 font-semibold">{row.plan_name}</td>
+                <td className="font-mono py-2 pr-3">{formatFiat(row.price, priceCurrency)}</td>
+                <td className="py-2 pr-3">{row.duration} days</td>
+                <td className="font-mono py-2 pr-3">{formatCrypto(Number(row.point_per_day ?? 0), decimals)} {code}</td>
+                <td className="font-mono py-2 pr-3">{formatCrypto(row.totalReturn, decimals)} {code}</td>
+                <td className="font-mono py-2 text-emerald-300">+{row.roiPct.toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 type PurchasePlan = {
   id: number;
@@ -41,6 +98,19 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
         </Link>
       </div>
     );
+  }
+
+  let ladderPlans: LadderPlan[] = [];
+  try {
+    const supabase = createServerSupabase();
+    const { data } = await supabase
+      .from("plans")
+      .select("id,plan_name,price,point_per_day,duration")
+      .gt("price", 0)
+      .order("price");
+    ladderPlans = (data ?? []) as LadderPlan[];
+  } catch {
+    ladderPlans = [];
   }
 
   const price = Number(plan.price);
@@ -167,6 +237,15 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
               </li>
             </ul>
           </div>
+
+          <PlanComparison
+            plans={ladderPlans}
+            currentId={plan.id}
+            cryptoToPrice={cfg.cryptoToPrice}
+            priceCurrency={s.price_currency}
+            code={s.currency_code}
+            decimals={s.currency_decimals}
+          />
 
           <div className="mt-5 space-y-3 rounded-2xl bg-white/[0.03] p-5 text-sm ring-1 ring-white/10">
             <p className="flex items-center gap-2 text-slate-300">

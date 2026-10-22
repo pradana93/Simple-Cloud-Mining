@@ -5,10 +5,11 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getCachedSettings } from "@/lib/catalog";
 import { getMoneyCfg } from "@/lib/currency";
-import { formatMoney, formatPrice, moneyUnit } from "@/lib/money";
+import { formatFiat, formatMoney, formatPrice, moneyUnit } from "@/lib/money";
 import { totalMiningRate } from "@/lib/mining";
 import { planEconomics } from "@/lib/plan-math";
-import { cn, formatDuration } from "@/lib/utils";
+import { nextTier, paidLadder } from "@/lib/ladder";
+import { cn, formatCrypto, formatDuration } from "@/lib/utils";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { ensureProfile } from "@/lib/ensure-profile";
 import { checkinBonus, computeStreak, utcDay } from "@/lib/checkin";
@@ -28,6 +29,7 @@ import { Onboarding } from "@/components/dashboard/onboarding";
 export const dynamic = "force-dynamic";
 
 type PlanMeta = {
+  id: number;
   plan_name: string;
   version: string | null;
   earning_rate: number | null;
@@ -46,6 +48,67 @@ type PaidPlan = { id: number; plan_name: string; price: number; point_per_day: n
 
 function planOf(row: { plan: PlanMeta | PlanMeta[] | null }): PlanMeta | null {
   return Array.isArray(row.plan) ? row.plan[0] : row.plan;
+}
+
+// Ladder badge plus the next paid tier. Numbers come from the same plan
+// economics as the comparison table; nothing here implies urgency or loss.
+function TierProgress({
+  plans,
+  reachedPlanIds,
+  cryptoToPrice,
+  priceCurrency,
+  code,
+  decimals,
+}: {
+  plans: PaidPlan[];
+  reachedPlanIds: number[];
+  cryptoToPrice: number;
+  priceCurrency: string;
+  code: string;
+  decimals: number;
+}) {
+  const ladder = paidLadder(plans, cryptoToPrice);
+  if (ladder.length === 0) return null;
+  const { highest, next } = nextTier(ladder, reachedPlanIds);
+  const tierNames = ladder.map((r) => r.plan_name);
+  const highestIndex = highest ? tierNames.indexOf(highest.plan_name) : -1;
+  return (
+    <div className="panel rounded-3xl p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-medium text-slate-400">Your tier</p>
+          <p className="font-display mt-1 text-lg font-bold text-white">
+            {highest ? highest.plan_name : "Starter (free)"}
+          </p>
+        </div>
+        <div className="flex gap-1.5">
+          {ladder.map((row, i) => (
+            <span
+              key={row.id}
+              title={row.plan_name}
+              className={`h-2 w-6 rounded-full ${i <= highestIndex ? "bg-gold-500" : "bg-white/10"}`}
+            />
+          ))}
+        </div>
+      </div>
+      {next ? (
+        <div className="mt-4 rounded-2xl bg-white/[0.03] p-4 ring-1 ring-white/10">
+          <p className="text-xs font-medium text-slate-400">Next tier</p>
+          <p className="mt-1 text-sm text-slate-200">
+            <span className="font-semibold text-white">{next.plan_name}</span> at{" "}
+            {formatFiat(next.price, priceCurrency)} returns{" "}
+            <span className="font-mono text-emerald-300">{formatCrypto(next.totalReturn, decimals)} {code}</span>{" "}
+            over {next.duration} days (+{next.roiPct.toFixed(1)}%).
+          </p>
+          <Link href={`/purchase/${next.id}`} className="mt-3 inline-flex text-sm font-semibold text-gold-300 hover:text-gold-400">
+            See {next.plan_name}
+          </Link>
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-slate-300">You have reached the top tier.</p>
+      )}
+    </div>
+  );
 }
 
 function txVariant(status: string): "green" | "gold" | "red" | "slate" {
@@ -107,7 +170,7 @@ export default async function DashboardPage() {
   const s = await getCachedSettings();
   const cfg = await getMoneyCfg();
   const now = Date.now();
-  const historySelect = "id,status,created_at,expire_date,last_sum,plan:plans(plan_name,version,earning_rate,price,duration)";
+  const historySelect = "id,status,created_at,expire_date,last_sum,plan:plans(id,plan_name,version,earning_rate,price,duration)";
 
   type ProfileLite = { balance: number; username: string; reference_user_id: string | null; unique_id: number; affiliate_earns: number; affiliate_paid: number };
   let profile: ProfileLite | null = null;
@@ -311,6 +374,15 @@ export default async function DashboardPage() {
       </div>
 
       <Onboarding steps={onboardingSteps} />
+
+      <TierProgress
+        plans={paidPlans}
+        reachedPlanIds={rows.map((r) => planOf(r)?.id ?? null).filter((id): id is number => id != null)}
+        cryptoToPrice={cfg.cryptoToPrice}
+        priceCurrency={s.price_currency}
+        code={s.currency_code}
+        decimals={s.currency_decimals}
+      />
 
       <Reveal>
         <div className="panel rounded-3xl border-t-2 border-t-gold-500/70 p-6 sm:p-7">

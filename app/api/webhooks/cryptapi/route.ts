@@ -167,6 +167,25 @@ async function handle(req: Request, body: string | null) {
     return new Response("Activation refused", { status: 500 });
   }
   if (row?.status === "paid") {
+    try {
+      const { data: buyer } = await admin
+        .from("profiles")
+        .select("reference_user_id")
+        .eq("id", tx.user_id)
+        .maybeSingle();
+      const referrer = (buyer as { reference_user_id: string | null } | null)?.reference_user_id ?? null;
+      if (referrer) {
+        const { error: bonusError } = await admin.rpc("post_referral_bonus", {
+          p_referee: tx.user_id,
+          p_referrer: referrer,
+          p_paid: Number(tx.amount),
+          p_tx_id: tx.id,
+        });
+        if (bonusError) await log("referral bonus failed", tx.id, null, bonusError.message);
+      }
+    } catch {
+      // Activation already succeeded; a bonus failure must not fail the webhook.
+    }
     await recordEvent({
       userId: tx.user_id,
       kind: "deposit",
