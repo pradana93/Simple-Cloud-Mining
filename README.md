@@ -74,3 +74,6 @@ job alerts when stored balances drift from the append-only ledger.
   minimum. The webhook verifies CryptAPI's RSA signature.
 - Backups are encrypted locally. Set `BACKUP_UPLOAD_URL` (and optional
   `BACKUP_UPLOAD_TOKEN`) to copy each backup offsite.
+- Admin > Settings > **Reset app progression** clears members and activity while
+  keeping admin accounts, settings, plans, content, payment addresses, and the
+  audit log. It requires a fresh authenticator check and typing `RESET`.

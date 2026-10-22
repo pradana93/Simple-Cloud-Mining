@@ -23,7 +23,8 @@ export type AuditAction =
   | "risk.rescan"
   | "security.run"
   | "maintenance.accrue"
-  | "maintenance.revalidate";
+  | "maintenance.revalidate"
+  | "progress.reset";
 
 export type AuditActor = { id: string; name: string | null };
 
@@ -48,6 +49,7 @@ export const AUDIT_LABELS: Record<string, string> = {
   "security.run": "Ran security checks",
   "maintenance.accrue": "Ran accrual",
   "maintenance.revalidate": "Refreshed public caches",
+  "progress.reset": "Reset app progression",
 };
 
 export function auditLabel(action: string): string {
