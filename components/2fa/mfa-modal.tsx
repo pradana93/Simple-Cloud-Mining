@@ -10,10 +10,14 @@ export function MfaModal({
   open,
   onClose,
   onDone,
+  title = "Confirm it is you",
+  description = "Payouts and wallet changes need a fresh code from your authenticator.",
 }: {
   open: boolean;
   onClose: () => void;
   onDone: () => void;
+  title?: string;
+  description?: string;
 }) {
   const { push } = useToast();
   const [code, setCode] = useState("");
@@ -48,8 +52,8 @@ export function MfaModal({
       onClose={() => {
         if (!busy) onClose();
       }}
-      title="Confirm it is you"
-      description="Payouts and wallet changes need a fresh code from your authenticator."
+      title={title}
+      description={description}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={busy}>
