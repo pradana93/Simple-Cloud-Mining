@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/types";
+import {
+  TRUSTED_DEVICE_COOKIE,
+  revokeCurrentTrustedDevice,
+  trustedDeviceCookieOptions,
+} from "@/lib/trusted-device";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +24,11 @@ export async function POST() {
       },
     },
   });
+  await revokeCurrentTrustedDevice();
   await supabase.auth.signOut();
+  res.cookies.set(TRUSTED_DEVICE_COOKIE, "", {
+    ...trustedDeviceCookieOptions(),
+    maxAge: 0,
+  });
   return res;
 }

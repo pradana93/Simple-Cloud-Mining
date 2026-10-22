@@ -3,6 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { recordAudit } from "@/lib/audit";
+import {
+  TRUSTED_DEVICE_COOKIE,
+  revokeAllTrustedDevices,
+  trustedDeviceCookieOptions,
+} from "@/lib/trusted-device";
 import type { Database } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -51,11 +56,17 @@ export async function POST(req: Request) {
   const { error } = await admin.auth.admin.updateUserById(user.id, { password: newPassword });
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
 
+  await revokeAllTrustedDevices(user.id);
   await recordAudit({
     actor: { id: user.id, name: null },
     action: "member.password_change",
     target: user.id,
     req,
   });
-  return NextResponse.json({ ok: true, message: "Password updated" });
+  const res = NextResponse.json({ ok: true, message: "Password updated" });
+  res.cookies.set(TRUSTED_DEVICE_COOKIE, "", {
+    ...trustedDeviceCookieOptions(),
+    maxAge: 0,
+  });
+  return res;
 }

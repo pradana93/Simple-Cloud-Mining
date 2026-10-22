@@ -83,7 +83,20 @@ export function parseGoal(goal: string, context: PlanContext = {}): PlanIntent {
   const text = goal.toLowerCase();
   const intent: PlanIntent = {};
 
-  const price = firstMatch(text, [
+  // Read daily profit before price. Otherwise "$0.10 daily profit" looks like
+  // a $0.10 plan price to the generic dollar matcher.
+  const dailyProfitPatterns = [
+    /(?:\$|usd\s*)?\s*([\d][\d,]*(?:\.\d+)?)\s*(?:usd|dollars?)?\s*(?:daily\s+)?profit\b/,
+    /([\d][\d,]*(?:\.\d+)?)\s*(?:usd|dollars?)?\s*(?:per\s*day|daily|a\s*day|\/\s*day)\s*(?:member\s+)?profit\b/,
+    /(?:daily\s+(?:member\s+)?profit|(?:member\s+)?profit\s+per\s*day)\D{0,12}?([\d][\d,]*(?:\.\d+)?)/,
+    /(?:member\s+)?profit\D{0,12}?([\d][\d,]*(?:\.\d+)?)(?!\s*%)\s*(?:per\s*day|daily|a\s*day|\/\s*day)/,
+  ];
+  const dailyProfitMatch = dailyProfitPatterns.map((re) => text.match(re)).find(Boolean) ?? null;
+  const dailyProfit = dailyProfitMatch ? toNum(dailyProfitMatch[1]) : null;
+  if (dailyProfit != null) intent.dailyProfit = dailyProfit;
+
+  const priceText = dailyProfitMatch ? text.replace(dailyProfitMatch[0], " ") : text;
+  const price = firstMatch(priceText, [
     /(?:price|cost|charge|priced(?:\s*at)?|sell(?:ing)?\s+for|go(?:es)?\s+for)\s*[:=]?\s*\$?\s*([\d][\d,]*(?:\.\d+)?)/,
     /\$\s*([\d][\d,]*(?:\.\d+)?)/,
     /(?:for|at)\s*[:=]?\s*\$?\s*([\d][\d,]*(?:\.\d+)?)(?![\d])(?!\s*(?:days?|weeks?|months?|years?|per\s*day|daily|a\s*day))/,
@@ -104,12 +117,6 @@ export function parseGoal(goal: string, context: PlanContext = {}): PlanIntent {
 
   const dailyRate = firstMatch(text, [/([\d]+(?:\.\d+)?)\s*%\s*(?:per\s*day|daily|a\s*day|\/\s*day)/]);
   if (dailyRate != null) intent.dailyRatePct = dailyRate;
-
-  const dailyProfit = firstMatch(text, [
-    /(?:\$|usd\s*)?\s*([\d][\d,]*(?:\.\d+)?)\s*(?:usd|dollars?)?\s*(?:daily\s+)?profit\b/,
-    /(?:daily\s+profit|profit\s+per\s+day)\D{0,12}?([\d][\d,]*(?:\.\d+)?)/,
-  ]);
-  if (dailyProfit != null) intent.dailyProfit = dailyProfit;
 
   const multipleWord = text.match(/\b(double|triple|quadruple|half)\b/)?.[1];
   const multipleNum = firstMatch(text, [/([\d]+(?:\.\d+)?)\s*x\b/]);

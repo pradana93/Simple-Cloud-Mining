@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [ticket, setTicket] = useState<string | null>(null);
   const [code, setCode] = useState("");
+  const [rememberDevice, setRememberDevice] = useState(true);
 
   async function submit(fd: FormData) {
     setErr(null);
@@ -50,7 +51,11 @@ export default function LoginPage() {
       const res = await fetch("/api/2fa/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticket, code: String(fd.get("code")) }),
+        body: JSON.stringify({
+          ticket,
+          code: String(fd.get("code")),
+          remember: rememberDevice,
+        }),
       });
       const j = await res.json();
       if (!j.ok) {
@@ -144,6 +149,20 @@ export default function LoginPage() {
                     required
                   />
                 </div>
+                <label className="flex items-start gap-2 text-xs text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={rememberDevice}
+                    onChange={(e) => setRememberDevice(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-ink-900 accent-gold-500"
+                  />
+                  <span>
+                    Trust this device for 30 days
+                    <span className="block text-[11px] text-slate-500">
+                      Skip the code on this browser after you sign in with your password.
+                    </span>
+                  </span>
+                </label>
                 <Button type="submit" className="w-full" disabled={loading || code.length < 6}>
                   {loading ? (
                     <>

@@ -75,6 +75,36 @@ describe("generateStrategy", () => {
     expect(top?.userRoiPct).toBeCloseTo(15, 4);
   });
 
+  it("warns when members get back less than they paid", () => {
+    const result = generateStrategy(
+      {},
+      { objective: "balanced", price: 5, durationDays: 30, targetRoiPct: -20 },
+      context
+    );
+
+    expect(result.variants[0]?.userRoiPct).toBeLessThan(0);
+    expect(result.variants[0]?.warnings).toContain(
+      "Members get back less than the price over the term."
+    );
+  });
+
+  it("does not return duplicate options when the payout cap flattens them", () => {
+    const result = generateStrategy(
+      {},
+      {
+        objective: "balanced",
+        price: 5,
+        durationDays: 30,
+        targetRoiPct: 50,
+        maxPayoutRatioPct: 5,
+      },
+      context
+    );
+
+    expect(result.variants).toHaveLength(1);
+    expect(result.variants[0]?.payoutRatioPct).toBe(5);
+  });
+
   it("asks for a payout target instead of inventing a losing default", () => {
     const result = generateStrategy(
       {},

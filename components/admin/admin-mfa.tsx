@@ -68,7 +68,8 @@ export function AdminMfaProvider({ children }: { children: React.ReactNode }) {
         onClose={() => settle(false)}
         onDone={() => settle(true)}
         title="Confirm it is you"
-        description="Enter the current 6-digit code from your authenticator to continue with this admin action."
+        description="Enter the current 6-digit code from your authenticator to continue with admin tools."
+        allowRemember
       />
     </>
   );

@@ -62,6 +62,19 @@ export function TwoFactorPanel({ enabled }: { enabled: boolean }) {
     }
   }
 
+  async function forgetDevices() {
+    setBusy(true);
+    try {
+      const res = await fetch("/api/2fa/trusted-devices", { method: "DELETE" });
+      const j = (await res.json()) as { ok: boolean; error?: string };
+      push(j.ok ? "Trusted devices forgotten" : j.error ?? "Could not forget devices", j.ok ? "success" : "error");
+    } catch (err) {
+      push(err instanceof Error ? err.message : "Request failed", "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function disable() {
     setBusy(true);
     try {
@@ -96,7 +109,7 @@ export function TwoFactorPanel({ enabled }: { enabled: boolean }) {
           <h2 className="font-display text-base font-bold text-white">Two-factor sign-in</h2>
           <p className="text-xs text-slate-400">
             {enabled
-              ? "On. New sign-ins and payouts ask for a code from your app."
+              ? "On. Trusted devices skip the code for 30 days; payouts still ask."
               : "Off. Add an authenticator app for a second step at sign-in."}
           </p>
         </div>
@@ -191,6 +204,14 @@ export function TwoFactorPanel({ enabled }: { enabled: boolean }) {
               "Turn off two-factor"
             )}
           </Button>
+          <div className="border-t border-white/10 pt-3">
+            <Button variant="secondary" onClick={forgetDevices} disabled={busy}>
+              Forget trusted devices
+            </Button>
+            <p className="mt-1.5 text-[11px] text-slate-400">
+              Use this on a shared browser. All remembered devices will need a code again.
+            </p>
+          </div>
         </div>
       ) : (
         <div className="mt-5">

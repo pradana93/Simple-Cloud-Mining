@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { createServerSupabase } from "./supabase/server";
 import { createAdminSupabase } from "./supabase/admin";
 import { hasFreshMfa } from "./mfa-cookie";
+import { hasTrustedDevice } from "./trusted-device";
 import { isTwoFactorEnabled } from "./two-factor";
 
 // Shared guard for admin-only API routes: 401 for anonymous, 403 for non-admins.
-// Admins must also have TOTP enabled and a fresh code (15 minutes), so a stolen
-// password alone cannot change money or configuration.
+// Admins must have TOTP enabled and either a fresh code (15 minutes) or a
+// remembered device, so a stolen password alone cannot change money or config.
 export async function requireAdminApi(): Promise<{ userId: string; name: string | null } | { error: NextResponse }> {
   let userId: string | null = null;
   try {
@@ -31,7 +32,13 @@ export async function requireAdminApi(): Promise<{ userId: string; name: string 
         ),
       };
     }
-    if (!(await hasFreshMfa(userId))) {
+    let trusted = false;
+    try {
+      trusted = await hasTrustedDevice(userId);
+    } catch {
+      trusted = false;
+    }
+    if (!(await hasFreshMfa(userId)) && !trusted) {
       return {
         error: NextResponse.json(
           { ok: false, error: "Confirm your authenticator code to continue.", mfaRequired: true },

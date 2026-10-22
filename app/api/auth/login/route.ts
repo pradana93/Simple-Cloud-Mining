@@ -5,6 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { recordEvent } from "@/lib/risk-telemetry";
 import { isTwoFactorEnabled } from "@/lib/two-factor";
+import { MFA_COOKIE, issueMfaToken, mfaCookieOptions } from "@/lib/mfa-cookie";
+import { hasTrustedDevice } from "@/lib/trusted-device";
 import {
   LOGIN_IP_LIMIT,
   LOGIN_NAME_LIMIT,
@@ -16,6 +18,27 @@ import {
 import type { Database } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
+
+async function attachSession(
+  res: NextResponse,
+  accessToken: string,
+  refreshToken: string
+): Promise<NextResponse> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabase = createServerClient<Database>(url, anon, {
+    cookies: {
+      async getAll() {
+        return (await cookies()).getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+      },
+    },
+  });
+  await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  return res;
+}
 
 // Credentials are username + password only. Usernames live on `profiles`,
 // which RLS hides from the browser, so the lookup runs with the service role
@@ -94,8 +117,30 @@ export async function POST(req: Request) {
     await admin.from("login_attempts").delete().eq("login", loginKey);
     await recordEvent({ userId: signIn.user.id, kind: "login", req });
 
-    // Members with 2FA on are not signed in until they clear the code gate.
+    // Members with 2FA on are not signed in until they clear the code gate,
+    // unless this browser was previously trusted after a valid code.
     if (await isTwoFactorEnabled(signIn.user.id)) {
+      const userAgent = req.headers.get("user-agent");
+      let trusted = false;
+      try {
+        trusted = await hasTrustedDevice(signIn.user.id, userAgent);
+      } catch {
+        trusted = false;
+      }
+      if (trusted) {
+        const res = NextResponse.json({
+          ok: true,
+          isAdmin: Boolean(row.is_admin),
+          trustedDevice: true,
+        });
+        await attachSession(res, signIn.session.access_token, signIn.session.refresh_token);
+        res.cookies.set(MFA_COOKIE, issueMfaToken(signIn.user.id), {
+          ...mfaCookieOptions(),
+          maxAge: 900,
+        });
+        return res;
+      }
+
       const { data: pending } = await admin
         .from("login_pending_2fa")
         .insert({
@@ -111,21 +156,7 @@ export async function POST(req: Request) {
     }
 
     const res = NextResponse.json({ ok: true, isAdmin: Boolean(row.is_admin) });
-    const supabase = createServerClient<Database>(url, anon, {
-      cookies: {
-      async getAll() {
-        return (await cookies()).getAll();
-      },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
-        },
-      },
-    });
-    await supabase.auth.setSession({
-      access_token: signIn.session.access_token,
-      refresh_token: signIn.session.refresh_token,
-    });
-    return res;
+    return attachSession(res, signIn.session.access_token, signIn.session.refresh_token);
   } catch {
     return NextResponse.json({ ok: false, error: "Sign-in is unavailable right now" }, { status: 500 });
   }

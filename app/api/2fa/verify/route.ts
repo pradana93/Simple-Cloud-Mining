@@ -6,6 +6,12 @@ import { createAdminSupabase } from "@/lib/supabase/admin";
 import { verifyUserCode } from "@/lib/two-factor";
 import { MFA_COOKIE, issueMfaToken, mfaCookieOptions } from "@/lib/mfa-cookie";
 import {
+  TRUSTED_DEVICE_COOKIE,
+  trustDevice,
+  trustedDeviceCookieOptions,
+} from "@/lib/trusted-device";
+import { TRUSTED_DEVICE_MAX_AGE_SECONDS } from "@/lib/trusted-device-token";
+import {
   TFA_LIMIT,
   TFA_WINDOW_MS,
   clientIp,
@@ -27,14 +33,15 @@ type Pending = {
 // Two callers: the login step (holds a ticket, no session yet) and step-up for a
 // sensitive action (already signed in). Both must clear the same TOTP gate.
 export async function POST(req: Request) {
-  let body: { ticket?: unknown; code?: unknown };
+  let body: { ticket?: unknown; code?: unknown; remember?: unknown };
   try {
-    body = (await req.json()) as { ticket?: unknown; code?: unknown };
+    body = (await req.json()) as { ticket?: unknown; code?: unknown; remember?: unknown };
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });
   }
   const ticket = typeof body.ticket === "string" ? body.ticket : "";
   const code = String(body.code ?? "");
+  const remember = body.remember === true;
   const admin = createAdminSupabase();
 
   let userId: string | null = null;
@@ -94,6 +101,16 @@ export async function POST(req: Request) {
 
   const res = NextResponse.json({ ok: true, usedRecovery: result.usedRecovery, isAdmin });
   res.cookies.set(MFA_COOKIE, issueMfaToken(userId), { ...mfaCookieOptions(), maxAge: 900 });
+
+  if (remember) {
+    const token = await trustDevice(userId, req.headers.get("user-agent"));
+    if (token) {
+      res.cookies.set(TRUSTED_DEVICE_COOKIE, token, {
+        ...trustedDeviceCookieOptions(),
+        maxAge: TRUSTED_DEVICE_MAX_AGE_SECONDS,
+      });
+    }
+  }
 
   if (pending) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;

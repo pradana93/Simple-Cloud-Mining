@@ -117,6 +117,7 @@ function variantWarnings(
   if (price > 0 && minMarginPct > 0 && netMarginPct < minMarginPct - MARGIN_EPSILON_PCT) {
     warnings.push(`Net margin is below your ${minMarginPct.toFixed(0)}% floor.`);
   }
+  if (userRoiPct < 0) warnings.push("Members get back less than the price over the term.");
   if (userRoiPct < -30) warnings.push("Members lose more than 30% of the price over the term.");
   if (minMarginPct > 0 && sensitivity.find((s) => s.priceMultiple === 2)?.netProfit !== undefined) {
     const double = sensitivity.find((s) => s.priceMultiple === 2)!;
@@ -226,6 +227,9 @@ export function generateStrategy(
   if (dailyProfit != null) {
     targetRatio = ((price + Math.max(0, dailyProfit) * duration) / price) * 100;
     understood.push(`${dailyProfit} ${priceCurrency}/day member profit`);
+    if (numberOrNull(brief.targetRoiPct) != null) {
+      assumptions.push("Daily member profit takes priority over the target ROI field.");
+    }
   } else if (numberOrNull(brief.targetRoiPct) != null) {
     targetRatio = 100 + Number(brief.targetRoiPct);
     understood.push(`${brief.targetRoiPct}% member ROI target`);
@@ -289,11 +293,18 @@ export function generateStrategy(
     );
   }
   const base = clamp(targetRatio, 5, capRatio);
-  const ratios: Array<{ id: StrategyVariant["id"]; label: string; ratio: number }> = [
-    { id: "conservative", label: "Lower payout", ratio: clamp(base * 0.8, 5, capRatio) },
+  const candidates: Array<{ id: StrategyVariant["id"]; label: string; ratio: number }> = [
+    { id: "conservative", label: "House-safe", ratio: clamp(base * 0.8, 5, capRatio) },
     { id: "balanced", label: "Balanced", ratio: clamp(base * 0.9, 5, capRatio) },
-    { id: "aggressive", label: "Higher payout", ratio: base },
+    { id: "aggressive", label: "Full target", ratio: base },
   ];
+  const seenRatios = new Set<string>();
+  const ratios = candidates.filter((candidate) => {
+    const key = candidate.ratio.toFixed(4);
+    if (seenRatios.has(key)) return false;
+    seenRatios.add(key);
+    return true;
+  });
 
   const variants: StrategyVariant[] = ratios.map(({ id, label, ratio }) => {
     const totalPayoutPrice = price * (ratio / 100);

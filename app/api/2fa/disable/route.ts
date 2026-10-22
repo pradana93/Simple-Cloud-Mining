@@ -3,6 +3,11 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getTwoFactor, verifyUserCode } from "@/lib/two-factor";
 import { MFA_COOKIE, mfaCookieOptions } from "@/lib/mfa-cookie";
+import {
+  TRUSTED_DEVICE_COOKIE,
+  revokeAllTrustedDevices,
+  trustedDeviceCookieOptions,
+} from "@/lib/trusted-device";
 
 export const dynamic = "force-dynamic";
 
@@ -31,8 +36,13 @@ export async function POST(req: Request) {
 
   const admin = createAdminSupabase();
   await admin.from("user_2fa").delete().eq("user_id", user.id);
+  await revokeAllTrustedDevices(user.id);
 
   const res = NextResponse.json({ ok: true });
   res.cookies.set(MFA_COOKIE, "", { ...mfaCookieOptions(), maxAge: 0 });
+  res.cookies.set(TRUSTED_DEVICE_COOKIE, "", {
+    ...trustedDeviceCookieOptions(),
+    maxAge: 0,
+  });
   return res;
 }

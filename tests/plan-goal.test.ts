@@ -40,6 +40,25 @@ describe("parseGoal", () => {
     expect(intent.dailyProfit).toBe(0.1);
   });
 
+  it("does not mistake a daily profit amount for the plan price", () => {
+    const intent = parseGoal("30 days, $0.10 daily profit");
+    expect(intent.price).toBeUndefined();
+    expect(intent.durationDays).toBe(30);
+    expect(intent.dailyProfit).toBe(0.1);
+  });
+
+  it("reads per-day member profit wording", () => {
+    const intent = parseGoal("$20 plan, 30 days, 0.10 per day member profit");
+    expect(intent.price).toBe(20);
+    expect(intent.dailyProfit).toBe(0.1);
+  });
+
+  it("reads profit before a per-day amount", () => {
+    const intent = parseGoal("$20 plan, 30 days, profit 0.10 per day");
+    expect(intent.price).toBe(20);
+    expect(intent.dailyProfit).toBe(0.1);
+  });
+
   it("reads a free/default flag", () => {
     expect(parseGoal("free starter plan").isDefault).toBe(true);
   });

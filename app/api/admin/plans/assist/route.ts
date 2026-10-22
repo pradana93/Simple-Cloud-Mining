@@ -155,8 +155,11 @@ async function readIntent(
         config.source === "anthropic"
           ? await extractAnthropic(goal, context, config)
           : await extractCompatible(goal, context, config);
-      const intent = coerceIntent(raw);
-      if (Object.keys(intent).length > 0) return { intent, source: config.source };
+      const local = parseGoal(goal, context);
+      const intent = { ...coerceIntent(raw), ...local };
+      if (Object.keys(intent).length > 0) {
+        return { intent, source: config.source };
+      }
     } catch {
       // A provider failure must not block the local planner.
     }
