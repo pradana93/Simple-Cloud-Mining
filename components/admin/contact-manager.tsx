@@ -14,6 +14,7 @@ export type AdminMessage = {
   email: string;
   subject: string;
   message: string;
+  reference: string | null;
   status: string;
   created_at: string | null;
 };
@@ -77,6 +78,9 @@ export function ContactManager({ rows }: { rows: AdminMessage[] }) {
                       {m.created_at ? ` · ${new Date(m.created_at).toLocaleString()}` : ""}
                     </p>
                     <p className={cn("mt-1 text-sm text-slate-300", expanded === m.id ? "" : "line-clamp-1")}>{m.message}</p>
+                    {m.reference && (
+                      <p className="mt-1 font-mono text-[11px] text-gold-300">Ref: {m.reference}</p>
+                    )}
                   </button>
                   <div className="flex shrink-0 items-center gap-2">
                     <Badge variant={variant(m.status)}>{m.status}</Badge>

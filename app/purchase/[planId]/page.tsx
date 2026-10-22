@@ -82,10 +82,30 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
   const s = await getCachedSettings();
   const cfg = await getMoneyCfg();
   let plan: PurchasePlan | null = null;
+  let ladderPlans: LadderPlan[] = [];
+  let firstPurchaseEligible = false;
   try {
     const supabase = createServerSupabase();
-    const { data } = await supabase.from("plans").select("*").eq("id", Number(planId)).maybeSingle();
+    const [{ data }, { data: ladder }] = await Promise.all([
+      supabase.from("plans").select("*").eq("id", Number(planId)).maybeSingle(),
+      supabase
+        .from("plans")
+        .select("id,plan_name,price,point_per_day,duration")
+        .gt("price", 0)
+        .order("price"),
+    ]);
     plan = (data as PurchasePlan | null) ?? null;
+    ladderPlans = (ladder ?? []) as LadderPlan[];
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { count } = await supabase
+        .from("transactions_history")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("status", "paid");
+      firstPurchaseEligible = (count ?? 0) === 0;
+    }
   } catch {
     plan = null;
   }
@@ -100,35 +120,7 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
     );
   }
 
-  let ladderPlans: LadderPlan[] = [];
-  try {
-    const supabase = createServerSupabase();
-    const { data } = await supabase
-      .from("plans")
-      .select("id,plan_name,price,point_per_day,duration")
-      .gt("price", 0)
-      .order("price");
-    ladderPlans = (data ?? []) as LadderPlan[];
-  } catch {
-    ladderPlans = [];
-  }
-
   const listPrice = Number(plan.price);
-  let firstPurchaseEligible = false;
-  try {
-    const supabase = createServerSupabase();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { count } = await supabase
-        .from("transactions_history")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", user.id)
-        .eq("status", "paid");
-      firstPurchaseEligible = (count ?? 0) === 0;
-    }
-  } catch {
-    firstPurchaseEligible = false;
-  }
   const discountPct = Math.max(0, Number(s.first_purchase_discount_percent ?? 0));
   const discount =
     firstPurchaseEligible && discountPct > 0
@@ -275,6 +267,34 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
               </li>
             </ul>
           </div>
+
+          {(() => {
+            const ladder = paidLadder(ladderPlans, cfg.cryptoToPrice);
+            const currentIndex = ladder.findIndex((row) => row.id === plan.id);
+            const next = currentIndex >= 0 ? ladder[currentIndex + 1] : null;
+            if (!next) return null;
+            return (
+              <div className="mt-5 rounded-2xl border border-gold-500/20 bg-gold-500/[0.05] p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gold-300">
+                  Considering the next tier
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-slate-300">
+                  <span className="font-semibold text-white">{next.plan_name}</span> costs{" "}
+                  {formatFiat(next.price, s.price_currency)} and returns{" "}
+                  <span className="font-mono text-emerald-300">
+                    {formatFiat(next.totalReturn, s.price_currency)}
+                  </span>{" "}
+                  over {next.duration} days (+{next.roiPct.toFixed(1)}%).
+                </p>
+                <Link
+                  href={`/purchase/${next.id}`}
+                  className="mt-2 inline-block text-xs font-semibold text-gold-300 hover:text-gold-400"
+                >
+                  Compare {next.plan_name}
+                </Link>
+              </div>
+            );
+          })()}
 
           <PlanComparison
             plans={ladderPlans}

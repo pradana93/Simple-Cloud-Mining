@@ -19,6 +19,7 @@ export default function ContactPage() {
           email: String(formData.get("email")),
           subject: String(formData.get("subject")),
           message: String(formData.get("message")),
+          reference: String(formData.get("reference") ?? ""),
           company: String(formData.get("company") ?? ""),
         }),
       });
@@ -58,6 +59,20 @@ export default function ContactPage() {
             <div><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" placeholder="you@wallet.com" required /></div>
           </div>
           <div><Label htmlFor="subject">Subject</Label><Input id="subject" name="subject" minLength={5} placeholder="Withdrawal question" required /></div>
+          <div>
+            <Label htmlFor="reference">Invoice or transaction id (optional)</Label>
+            <Input
+              id="reference"
+              name="reference"
+              placeholder="Invoice hash or txid"
+              maxLength={191}
+              className="font-mono"
+            />
+            <p className="mt-1 text-[11px] text-slate-400">
+              Include this for a missing credit, underpayment, or overpayment so support can match
+              the payment.
+            </p>
+          </div>
           <div>
             <Label htmlFor="message">Message</Label>
             <textarea

@@ -9,7 +9,7 @@ export default async function AdminContact() {
     const admin = createAdminSupabase();
     const { data } = await admin
       .from("contact")
-      .select("id,name,email,subject,message,status,created_at")
+      .select("id,name,email,subject,message,reference,status,created_at")
       .order("created_at", { ascending: false })
       .limit(200);
     rows = (data ?? []) as AdminMessage[];

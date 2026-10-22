@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ScrollText, ShieldCheck } from "lucide-react";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { AdminPageHeader } from "@/components/admin/page-header";
@@ -27,16 +28,29 @@ function detailChips(detail: Record<string, unknown> | null): string[] {
   return out.slice(0, 6);
 }
 
-export default async function AdminAudit() {
+export default async function AdminAudit({
+  searchParams,
+}: {
+  searchParams: Promise<{ action?: string; actor?: string; days?: string }>;
+}) {
+  const params = await searchParams;
+  const action = (params.action ?? "").trim();
+  const actor = (params.actor ?? "").trim();
+  const days = Math.min(90, Math.max(1, Number(params.days ?? 14) || 14));
+
   let rows: AuditRow[] = [];
   let failed = false;
   try {
     const admin = createAdminSupabase();
-    const { data, error } = await admin
+    let query = admin
       .from("admin_audit")
       .select("id,actor_id,actor_name,action,target,detail,ip,created_at")
+      .gte("created_at", new Date(Date.now() - days * 86400000).toISOString())
       .order("created_at", { ascending: false })
       .limit(200);
+    if (action) query = query.eq("action", action);
+    if (actor) query = query.ilike("actor_name", `%${actor}%`);
+    const { data, error } = await query;
     if (error) failed = true;
     rows = (data ?? []) as AuditRow[];
   } catch {
@@ -55,6 +69,49 @@ export default async function AdminAudit() {
           Could not load the audit trail. Reload to try again.
         </div>
       )}
+
+      <form className="panel grid gap-3 rounded-2xl p-4 sm:grid-cols-[1.4fr_1fr_auto_auto]">
+        <label className="text-xs font-medium text-slate-400">
+          Action
+          <input
+            name="action"
+            defaultValue={action}
+            placeholder="e.g. plan.update"
+            className="mt-1 h-10 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-3 font-mono text-sm text-slate-100"
+          />
+        </label>
+        <label className="text-xs font-medium text-slate-400">
+          Actor name
+          <input
+            name="actor"
+            defaultValue={actor}
+            placeholder="admin username"
+            className="mt-1 h-10 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-3 text-sm text-slate-100"
+          />
+        </label>
+        <label className="text-xs font-medium text-slate-400">
+          Days
+          <input
+            name="days"
+            type="number"
+            min="1"
+            max="90"
+            defaultValue={days}
+            className="mt-1 h-10 w-24 rounded-xl border border-slate-700/80 bg-ink-900/80 px-3 font-mono text-sm text-slate-100"
+          />
+        </label>
+        <div className="flex items-end gap-2">
+          <button
+            type="submit"
+            className="tap h-10 rounded-xl bg-gold-500 px-4 text-sm font-bold text-ink-950"
+          >
+            Filter
+          </button>
+          <Link href="/admin/audit" className="tap grid h-10 place-items-center rounded-xl border border-slate-700 px-3 text-sm text-slate-300">
+            Reset
+          </Link>
+        </div>
+      </form>
 
       <section className="panel overflow-hidden rounded-2xl">
         <div className="flex items-center gap-2 border-b border-white/10 px-6 py-4">

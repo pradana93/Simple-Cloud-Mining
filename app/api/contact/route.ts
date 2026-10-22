@@ -23,6 +23,7 @@ export async function POST(req: Request) {
   const email = String(body.email ?? "").trim();
   const subject = String(body.subject ?? "").trim();
   const message = String(body.message ?? "").trim();
+  const reference = String(body.reference ?? "").trim().slice(0, 191);
 
   if (name.length < 2 || name.length > 100) {
     return NextResponse.json({ ok: false, error: "Enter your name." }, { status: 400 });
@@ -58,7 +59,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: "Could not accept the message. Try again." }, { status: 500 });
   }
 
-  const { error } = await admin.from("contact").insert({ name, email, subject, message });
+  const { error } = await admin.from("contact").insert({ name, email, subject, message, reference });
   if (error) {
     return NextResponse.json({ ok: false, error: "Could not send the message. Try again." }, { status: 500 });
   }
