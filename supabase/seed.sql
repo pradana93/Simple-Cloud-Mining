@@ -6,9 +6,9 @@ insert into public.groups (name, description) values
 on conflict (name) do nothing;
 
 insert into public.plans (plan_name, is_default, point_per_day, version, earning_rate, image, price, duration, profit, speed) values
-  ('Free Plan', true, 0.02, 'V 1.0', 0.00001389, '1.png', 0, 1825, '2', '1'),
-  ('Plan V1.1', false, 15, 'V 1.1', 0.01041667, '2.png', 0.03, 90, '5', '10'),
-  ('Plan V1.2', false, 53, 'V 1.2', 0.03680556, '3.png', 1000, 90, '5.25', '100')
+('Free Plan', true, 0.02, 'V 1.0', 0.00001389, '1.png', 0, 30, null, '1'),
+('Plan V1.1', false, 0.24, 'V 1.1', 0.00016667, '2.png', 5, 90, null, '10'),
+('Plan V1.2', false, 2.37, 'V 1.2', 0.00164583, '3.png', 50, 90, null, '100')
 on conflict do nothing;
 
 insert into public.urlchains (name, url) values
@@ -23,7 +23,7 @@ insert into public.urlchains (name, url) values
 on conflict do nothing;
 
 insert into public.settings (sitename, siteslogan, currency_name, currency_symbol, currency_code, currency_decimals, min_withdraw, max_withdraw, aff_comission, max_pending_transactions, coin_cur1, coin_cur2, coin_mode, coin_email, theme, start_date)
-values ('Simple Cloud Mining','A simple console for cloud hashrate','Dogecoin','Ð','DOGE',8,0,100,2,3,'DOGE','DOGE','gateway','user','dogeminer', CURRENT_DATE)
+values ('Simple Cloud Mining','A simple console for cloud hashrate','Dogecoin','Ð','DOGE',8,10,1000,2,3,'DOGE','DOGE','gateway','user','dogeminer', CURRENT_DATE)
 on conflict do nothing;
 
 insert into public.contents (affiliate, payouts, contact) values

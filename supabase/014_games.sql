@@ -5,8 +5,8 @@
 
 alter table public.settings
   add column if not exists games_enabled boolean not null default false,
-  add column if not exists games_min_bet numeric(20,8) not null default 0,
-  add column if not exists games_max_bet numeric(20,8) not null default 0;
+  add column if not exists games_min_bet numeric(20,8) not null default 1,
+  add column if not exists games_max_bet numeric(20,8) not null default 10;
 
 grant select (games_enabled, games_min_bet, games_max_bet) on public.settings to anon, authenticated;
 

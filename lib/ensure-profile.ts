@@ -32,13 +32,21 @@ export async function ensureProfile(opts: {
 
     if (!row) {
       const base = (opts.usernameMeta || (opts.email ?? "").split("@")[0] || "miner").slice(0, 40);
+      let uniqueId = Math.floor(10000 + Math.random() * 89999);
+      try {
+        const { data: seq } = await admin.rpc("next_unique_id");
+        const n = Number(seq);
+        if (Number.isInteger(n) && n > 0) uniqueId = n;
+      } catch {
+        // Fallback for an older database without the sequence function.
+      }
       for (let t = 0; t < 6; t++) {
         const username = t === 0 ? base : `${base}_${t}`;
         const { error } = await admin.from("profiles").insert({
           id: opts.userId,
           username,
           email: opts.email,
-          unique_id: Math.floor(10000 + Math.random() * 89999),
+          unique_id: uniqueId,
           reference_user_id: uplineId,
         });
         if (!error) {
@@ -57,14 +65,14 @@ export async function ensureProfile(opts: {
       await admin.from("profiles").update({ reference_user_id: uplineId }).eq("id", opts.userId);
     }
 
-    // Grant the free (default) plan when the user has no active rig.
-    const active = await admin
+    // Grant the free starter plan once per account. Never renew it after it
+    // expires, and never grant a second free plan after a paid plan ends.
+    const history = await admin
       .from("user_plan_history")
       .select("id")
       .eq("user_id", opts.userId)
-      .eq("status", "active")
       .limit(1);
-    if ((((active as { data: unknown }).data ?? []) as unknown[]).length === 0) {
+    if ((((history as { data: unknown }).data ?? []) as unknown[]).length === 0) {
       const { data: def } = await admin
         .from("plans")
         .select("id,duration")

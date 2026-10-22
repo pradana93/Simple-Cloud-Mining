@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { GameView } from "@/components/games/game-view";
 import { MinesView } from "@/components/games/mines-view";
 import { CrashView } from "@/components/games/crash-view";
+import { GameRules } from "@/components/games/game-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +55,13 @@ export default async function GamePage({ params }: { params: Promise<{ game: str
         </div>
         <p className="mt-2 max-w-2xl text-slate-400">{meta.blurb}</p>
       </div>
+
+      <GameRules
+        meta={meta}
+        econ={econ}
+        code={s.currency_code}
+        decimals={s.currency_decimals}
+      />
 
       {meta.id === "crash" ? (
         <CrashView

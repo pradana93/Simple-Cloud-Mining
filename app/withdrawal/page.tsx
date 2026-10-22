@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { ArrowLeft, Wallet } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getCachedSettings } from "@/lib/catalog";
@@ -33,7 +33,7 @@ export default async function WithdrawalPage() {
           <Wallet size={28} />
         </span>
         <h1 className="font-display mt-6 text-3xl font-bold text-white">Sign in to cash out</h1>
-        <p className="mt-3 text-slate-400">Payout requests are tied to your mining balance.</p>
+        <p className="mt-3 text-slate-400">Payout requests are tied to your reward balance.</p>
         <div className="mt-7 flex justify-center gap-3">
           <Link href="/login" className="tap inline-flex h-11 items-center rounded-xl bg-gold-500 px-6 font-display text-sm font-bold text-ink-950 hover:bg-gold-400">
             Sign in
@@ -112,3 +112,4 @@ export default async function WithdrawalPage() {
     </div>
   );
 }
+

@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { requireAdminApi } from "@/lib/api-admin";
-import { earningRateFromDaily } from "@/lib/plan-math";
+import { earningRateFromDaily, planNetEconomics } from "@/lib/plan-math";
+import { getSettings } from "@/lib/settings";
+import { getFxTable } from "@/lib/fx";
 import { recordAudit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +58,38 @@ function parsePlan(body: Record<string, unknown>): Parsed {
   };
 }
 
+async function validateEconomics(value: Parsed["value"]): Promise<{ error: string; status: number } | null> {
+  if (value.price <= 0) return null;
+  if (value.is_default) {
+    return { error: "Only a free plan can be the default starter plan.", status: 422 };
+  }
+  const settings = await getSettings();
+  const priceCurrency = settings.price_currency.toUpperCase();
+  let cryptoToPrice = 1;
+  if (priceCurrency !== settings.currency_code.toUpperCase()) {
+    const table = await getFxTable(settings.currency_code);
+    cryptoToPrice = table?.rates[priceCurrency] ?? 0;
+  }
+  if (!(cryptoToPrice > 0)) {
+    return { error: "Live DOGE rate is unavailable. Try again before saving a paid plan.", status: 503 };
+  }
+  const net = planNetEconomics({
+    price: value.price,
+    point_per_day: value.point_per_day,
+    duration: value.duration,
+    cryptoToPrice,
+    processorPct: 0.25,
+    affiliatePct: Number(settings.aff_comission) || 0,
+  });
+  if (net.netProfit <= 0) {
+    return {
+      error: `This plan loses money after fees and affiliate commission (${net.netMarginPct.toFixed(1)}% margin). Lower the daily credit or raise the price.`,
+      status: 422,
+    };
+  }
+  return null;
+}
+
 async function clearOtherDefaults(id: number | null) {
   const admin = createAdminSupabase();
   const q = admin.from("plans").update({ is_default: false }).eq("is_default", true);
@@ -74,6 +108,10 @@ export async function POST(req: Request) {
   }
   const { errors, value } = parsePlan(body);
   if (Object.keys(errors).length) return NextResponse.json({ ok: false, error: "Check the highlighted fields", errors }, { status: 422 });
+  const econError = await validateEconomics(value);
+  if (econError) {
+    return NextResponse.json({ ok: false, error: econError.error }, { status: econError.status });
+  }
 
   try {
     const admin = createAdminSupabase();
@@ -103,6 +141,10 @@ export async function PATCH(req: Request) {
 
   const { errors, value } = parsePlan(body);
   if (Object.keys(errors).length) return NextResponse.json({ ok: false, error: "Check the highlighted fields", errors }, { status: 422 });
+  const econError = await validateEconomics(value);
+  if (econError) {
+    return NextResponse.json({ ok: false, error: econError.error }, { status: econError.status });
+  }
 
   try {
     const admin = createAdminSupabase();

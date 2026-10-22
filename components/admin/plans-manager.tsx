@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Pencil, Plus, Trash2, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { PlanAssistant } from "@/components/admin/plan-assistant";
 import { useAdminAction } from "@/components/admin/use-admin-action";
 import { cn, formatCrypto } from "@/lib/utils";
 import { formatFiat } from "@/lib/money";
-import { earningRateFromDaily, planEconomics } from "@/lib/plan-math";
+import { earningRateFromDaily, planEconomics, planNetEconomics } from "@/lib/plan-math";
 import type { PlanProposal } from "@/lib/plan-goal";
 
 export type AdminPlan = {
@@ -71,19 +71,47 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "go
   );
 }
 
-function Calculator({ draft, symbol, code, decimals, priceCurrency, cryptoToPrice }: { draft: Draft; symbol: string; code: string; decimals: number; priceCurrency: string; cryptoToPrice: number }) {
+function Calculator({
+  draft,
+  symbol,
+  code,
+  decimals,
+  priceCurrency,
+  cryptoToPrice,
+  affiliatePct,
+  rateAvailable,
+}: {
+  draft: Draft;
+  symbol: string;
+  code: string;
+  decimals: number;
+  priceCurrency: string;
+  cryptoToPrice: number;
+  affiliatePct: number;
+  rateAvailable: boolean;
+}) {
   const e = useMemo(
     () =>
-      planEconomics({
+      planNetEconomics({
         price: Number(draft.price || 0),
         point_per_day: Number(draft.point_per_day || 0),
         duration: Number(draft.duration || 0),
         cryptoToPrice,
+        processorPct: 0.25,
+        affiliatePct,
       }),
-    [draft.price, draft.point_per_day, draft.duration, cryptoToPrice]
+    [draft.price, draft.point_per_day, draft.duration, cryptoToPrice, affiliatePct]
   );
   const money = (v: number) => `${symbol}${formatCrypto(v, decimals)}`;
-  const negative = e.ownerProfit < 0;
+  const negative = e.netProfit < 0;
+  const doubled = planNetEconomics({
+    price: Number(draft.price || 0),
+    point_per_day: Number(draft.point_per_day || 0),
+    duration: Number(draft.duration || 0),
+    cryptoToPrice: cryptoToPrice * 2,
+    processorPct: 0.25,
+    affiliatePct,
+  });
 
   return (
     <div className="rounded-2xl border border-white/10 bg-ink-950/40 p-4">
@@ -93,18 +121,33 @@ function Calculator({ draft, symbol, code, decimals, priceCurrency, cryptoToPric
       <div className="grid grid-cols-2 gap-2.5">
         <Stat label={`Price (${priceCurrency})`} value={formatFiat(e.price, priceCurrency)} tone="mute" />
         <Stat label={`Payout to member (${code})`} value={money(e.payoutToUser)} tone="mute" />
-        <Stat label={`Profit per sale (${priceCurrency})`} value={formatFiat(e.ownerProfit, priceCurrency)} tone={negative ? "bad" : "good"} />
-        <Stat label="Owner margin" value={`${e.ownerMarginPct.toFixed(1)}%`} tone={negative ? "bad" : "good"} />
-        <Stat label="Member ROI" value={`${e.userRoiPct >= 0 ? "+" : ""}${e.userRoiPct.toFixed(1)}%`} tone="mute" />
+        <Stat label={`Net profit (${priceCurrency})`} value={formatFiat(e.netProfit, priceCurrency)} tone={negative ? "bad" : "good"} />
+        <Stat label="Net margin" value={`${e.netMarginPct.toFixed(1)}%`} tone={negative ? "bad" : "good"} />
+        <Stat label="Processor + affiliate" value={formatFiat(e.processorFee + e.affiliateCost, priceCurrency)} tone="mute" />
         <Stat label="Member break-even" value={e.breakEvenDays > 0 ? `${e.breakEvenDays.toFixed(1)} days` : "instant"} tone="mute" />
       </div>
       <p className="mt-3 text-[11px] text-slate-400">
-        Credited at <span className="font-mono text-slate-300">{earningRateFromDaily(e.daily)}</span> {code}/min ·{" "}
+        Credited at <span className="font-mono text-slate-300">{earningRateFromDaily(e.daily)}</span> {code}/min
+        {" Â· "}
         <span className="font-mono text-slate-300">{formatCrypto(e.daily, 8)}</span> {code}/day
       </p>
+      {!rateAvailable && (
+        <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-amber-300">
+          <AlertTriangle size={12} /> Live DOGE rate unavailable. Paid plans cannot be saved until the rate loads.
+        </p>
+      )}
+      {rateAvailable && (
+        <p className="mt-2 text-[11px] text-slate-400">
+          If DOGE doubles: net profit{" "}
+          <span className={doubled.netProfit < 0 ? "text-red-300" : "text-emerald-300"}>
+            {formatFiat(doubled.netProfit, priceCurrency)}
+          </span>{" "}
+          ({doubled.netMarginPct.toFixed(1)}%).
+        </p>
+      )}
       {negative && (
         <p className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-red-300">
-          <AlertTriangle size={12} /> This plan pays out more than it charges. The owner loses money per sale.
+          <AlertTriangle size={12} /> This plan loses money after processor and affiliate costs. Saving is blocked.
         </p>
       )}
     </div>
@@ -119,6 +162,8 @@ export function PlansManager({
   decimals,
   priceCurrency,
   cryptoToPrice,
+  affiliatePct,
+  rateAvailable,
 }: {
   plans: AdminPlan[];
   usage: Record<number, number>;
@@ -127,6 +172,8 @@ export function PlansManager({
   decimals: number;
   priceCurrency: string;
   cryptoToPrice: number;
+  affiliatePct: number;
+  rateAvailable: boolean;
 }) {
   const { run, busy } = useAdminAction();
   const [editing, setEditing] = useState<AdminPlan | null | undefined>(undefined);
@@ -138,11 +185,25 @@ export function PlansManager({
   const totalOwnerProfit = useMemo(
     () =>
       plans.reduce((sum, p) => {
-        const e = planEconomics({ ...p, cryptoToPrice });
-        return sum + (p.is_default ? 0 : e.ownerProfit);
+        const e = planNetEconomics({
+          ...p,
+          cryptoToPrice,
+          processorPct: 0.25,
+          affiliatePct,
+        });
+        return sum + (p.is_default ? 0 : e.netProfit);
       }, 0),
-    [plans, cryptoToPrice]
+    [plans, cryptoToPrice, affiliatePct]
   );
+  const freePlan = plans.find((p) => p.is_default);
+  const freeCost = freePlan
+    ? planEconomics({
+        price: 0,
+        point_per_day: freePlan.point_per_day,
+        duration: freePlan.duration,
+        cryptoToPrice,
+      }).payoutInPrice
+    : 0;
 
   function startCreate() {
     setDraft(toDraft(null));
@@ -160,6 +221,31 @@ export function PlansManager({
   }
 
   async function save() {
+    const price = draft.price === "" ? 0 : Number(draft.price);
+    if (draft.is_default && price > 0) {
+      setErrors({ price: "Only a free plan can be the default starter plan." });
+      return;
+    }
+    if (price > 0) {
+      if (!rateAvailable) {
+        setErrors({ price: "Live DOGE rate is unavailable. Try again before saving a paid plan." });
+        return;
+      }
+      const net = planNetEconomics({
+        price,
+        point_per_day: Number(draft.point_per_day || 0),
+        duration: Number(draft.duration || 0),
+        cryptoToPrice,
+        processorPct: 0.25,
+        affiliatePct,
+      });
+      if (net.netProfit <= 0) {
+        setErrors({
+          price: `This plan loses money after fees (${net.netMarginPct.toFixed(1)}% margin). Lower the daily credit or raise the price.`,
+        });
+        return;
+      }
+    }
     const body = {
       plan_name: draft.plan_name,
       version: draft.version,
@@ -210,11 +296,11 @@ export function PlansManager({
           title="Plans"
           description={
             <>
-              {plans.length} plan{plans.length === 1 ? "" : "s"} selling · projected profit{" "}
+              {plans.length} plan{plans.length === 1 ? "" : "s"}. Net profit if one of each paid plan sells:{" "}
               <span className={cn("font-mono", totalOwnerProfit < 0 ? "text-red-300" : "text-emerald-300")}>
                 {formatFiat(totalOwnerProfit, priceCurrency)}
-              </span>{" "}
-              per paid sale
+              </span>
+              . Free plan costs {formatFiat(freeCost, priceCurrency)} per user.
             </>
           }
         />
@@ -226,7 +312,7 @@ export function PlansManager({
       <div className="panel overflow-hidden rounded-3xl">
         {plans.length === 0 ? (
           <p className="px-6 py-10 text-center text-sm text-slate-400">
-            No plans yet. Add one to start selling hashrate.
+            No plans yet. Add one to start selling plans.
           </p>
         ) : (
           <div className="overflow-x-auto px-6 py-2 text-sm">
@@ -237,22 +323,27 @@ export function PlansManager({
                   <th className="py-3 pr-4 font-medium">Price</th>
                   <th className="py-3 pr-4 font-medium">Daily</th>
                   <th className="py-3 pr-4 font-medium">Duration</th>
-                  <th className="py-3 pr-4 font-medium">Owner profit</th>
-                  <th className="py-3 pr-4 font-medium">Margin</th>
+                  <th className="py-3 pr-4 font-medium">Net profit</th>
+                  <th className="py-3 pr-4 font-medium">Net margin</th>
                   <th className="py-3 pr-4 font-medium">Rigs</th>
                   <th className="py-3 pr-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {plans.map((p) => {
-                  const e = planEconomics({ ...p, cryptoToPrice });
+                  const e = planNetEconomics({
+                    ...p,
+                    cryptoToPrice,
+                    processorPct: 0.25,
+                    affiliatePct,
+                  });
                   return (
                     <tr key={p.id} className="border-t border-white/5">
                       <td className="py-3 pr-4">
                         <span className="font-medium text-white">{p.plan_name}</span>
                         {p.is_default && <Badge variant="gold" className="ml-2">default</Badge>}
                         <span className="block text-xs text-slate-400">
-                          {p.version ? `${p.version} · ` : ""}
+                          {p.version ? `${p.version} Â· ` : ""}
                           {String(p.speed ?? "")}
                         </span>
                       </td>
@@ -266,13 +357,13 @@ export function PlansManager({
                       <td
                         className={cn(
                           "font-mono py-3 pr-4 tabular-nums",
-                          p.is_default ? "text-slate-400" : e.ownerProfit < 0 ? "text-red-300" : "text-emerald-300"
+                          p.is_default ? "text-slate-400" : e.netProfit < 0 ? "text-red-300" : "text-emerald-300"
                         )}
                       >
-                        {p.is_default ? "free" : formatFiat(e.ownerProfit, priceCurrency)}
+                        {p.is_default ? "free" : formatFiat(e.netProfit, priceCurrency)}
                       </td>
-                      <td className="font-mono py-3 pr-4 tabular-nums text-slate-300">
-                        {p.is_default ? "—" : `${e.ownerMarginPct.toFixed(1)}%`}
+                      <td className={cn("font-mono py-3 pr-4 tabular-nums", p.is_default ? "text-slate-300" : e.netMarginPct < 0 ? "text-red-300" : "text-emerald-300")}>
+                        {p.is_default ? "â€”" : `${e.netMarginPct.toFixed(1)}%`}
                       </td>
                       <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{usage[p.id] ?? 0}</td>
                       <td className="py-3 pr-4">
@@ -346,7 +437,7 @@ export function PlansManager({
                 <Input id="p-version" value={draft.version} onChange={(e) => set("version", e.target.value)} placeholder="V1.3" />
               </div>
               <div>
-                <Label htmlFor="p-speed">Hashrate</Label>
+                <Label htmlFor="p-speed">Tier label</Label>
                 <Input id="p-speed" value={draft.speed} onChange={(e) => set("speed", e.target.value)} placeholder="50 KH/s" />
               </div>
             </div>
@@ -387,7 +478,16 @@ export function PlansManager({
               Default plan (the free starter rig)
             </label>
           </div>
-          <Calculator draft={draft} symbol={symbol} code={code} decimals={decimals} priceCurrency={priceCurrency} cryptoToPrice={cryptoToPrice} />
+          <Calculator
+            draft={draft}
+            symbol={symbol}
+            code={code}
+            decimals={decimals}
+            priceCurrency={priceCurrency}
+            cryptoToPrice={cryptoToPrice}
+            affiliatePct={affiliatePct}
+            rateAvailable={rateAvailable}
+          />
         </div>
       </Modal>
 
@@ -414,3 +514,4 @@ export function PlansManager({
     </div>
   );
 }
+

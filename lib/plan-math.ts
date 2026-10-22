@@ -19,6 +19,13 @@ export type PlanEconomics = {
   breakEvenDays: number;
 };
 
+export type PlanNetEconomics = PlanEconomics & {
+  processorFee: number;
+  affiliateCost: number;
+  netProfit: number;
+  netMarginPct: number;
+};
+
 // Plan prices are set in a stable fiat while yields are credited in the site
 // crypto. Pass `cryptoToPrice` (price-currency units per 1 crypto) so profit,
 // margin, ROI and break-even all compare in one unit. Omit it only when price
@@ -47,5 +54,28 @@ export function planEconomics(input: {
     ownerMarginPct: price > 0 ? (ownerProfit / price) * 100 : 0,
     userRoiPct: price > 0 ? ((payoutInPrice - price) / price) * 100 : 0,
     breakEvenDays: dailyInPrice > 0 ? price / dailyInPrice : 0,
+  };
+}
+
+export function planNetEconomics(
+  input: {
+    price: number | string | null | undefined;
+    point_per_day: number | string | null | undefined;
+    duration: number | string | null | undefined;
+    cryptoToPrice?: number | string | null | undefined;
+    processorPct?: number;
+    affiliatePct?: number;
+  }
+): PlanNetEconomics {
+  const base = planEconomics(input);
+  const processorFee = base.price * (Math.max(0, input.processorPct ?? 0.25) / 100);
+  const affiliateCost = base.price * (Math.max(0, input.affiliatePct ?? 0) / 100);
+  const netProfit = base.ownerProfit - processorFee - affiliateCost;
+  return {
+    ...base,
+    processorFee,
+    affiliateCost,
+    netProfit,
+    netMarginPct: base.price > 0 ? (netProfit / base.price) * 100 : 0,
   };
 }

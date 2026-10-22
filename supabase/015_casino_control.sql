@@ -6,8 +6,8 @@
 -- stay server-side. All additive.
 
 alter table public.settings
-  add column if not exists games_edge_boost numeric(5,2) not null default 0,
-  add column if not exists games_max_win numeric(20,8) not null default 0,
+  add column if not exists games_edge_boost numeric(5,2) not null default 2,
+  add column if not exists games_max_win numeric(20,8) not null default 1000,
   add column if not exists games_disabled text not null default '';
 
 -- Constrain the edge so it can never exceed the app's own ceiling.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { earningRateFromDaily, planEconomics } from "@/lib/plan-math";
+import { earningRateFromDaily, planEconomics, planNetEconomics } from "@/lib/plan-math";
 
 describe("earningRateFromDaily", () => {
   it("converts a daily rate to per-minute", () => {
@@ -42,5 +42,24 @@ describe("planEconomics (price in fiat, yield in crypto)", () => {
     const e = planEconomics({ price: 5, point_per_day: 15, duration: 90 });
     expect(e.payoutInPrice).toBe(1350);
     expect(e.breakEvenDays).toBeCloseTo(0.3333, 3);
+  });
+});
+
+describe("planNetEconomics", () => {
+  it("subtracts processor and affiliate costs from owner profit", () => {
+    const e = planNetEconomics({
+      price: 5,
+      point_per_day: 0.24,
+      duration: 90,
+      cryptoToPrice: 0.08,
+      processorPct: 0.25,
+      affiliatePct: 2,
+    });
+    expect(e.payoutInPrice).toBeCloseTo(1.728, 6);
+    expect(e.ownerProfit).toBeCloseTo(3.272, 6);
+    expect(e.processorFee).toBeCloseTo(0.0125, 6);
+    expect(e.affiliateCost).toBeCloseTo(0.1, 6);
+    expect(e.netProfit).toBeCloseTo(3.1595, 6);
+    expect(e.netMarginPct).toBeCloseTo(63.19, 1);
   });
 });

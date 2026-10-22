@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useState } from "react";
 import { Check, Loader2, Sparkles, TriangleAlert, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,7 @@ import { formatFiat } from "@/lib/money";
 import type { PlanContext, PlanProposal } from "@/lib/plan-goal";
 
 const EXAMPLES = [
-  "500 plan, 90 days, give the miner 2x their money back",
+  "500 plan, 90 days, give the member 2x their money back",
   "cheap starter plan, free, 30 days",
   "0.5 plan for 60 days with 40% margin",
 ];
@@ -79,7 +79,7 @@ export function PlanAssistant({
         value={goal}
         onChange={(e) => setGoal(e.target.value)}
         rows={2}
-        placeholder="e.g. 500 plan, 90 days, give the miner 2x their money back"
+        placeholder="e.g. 500 plan, 90 days, give the member 2x their money back"
         aria-label="Describe the plan"
         className="mt-3 w-full rounded-xl border border-slate-700/80 bg-ink-900/80 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-400 focus:border-gold-500/70 focus:outline-none focus:ring-2 focus:ring-gold-500/25"
       />
@@ -123,7 +123,7 @@ export function PlanAssistant({
           <ul className="space-y-1 text-xs text-slate-300">
             {proposal.rationale.map((r, i) => (
               <li key={i} className="flex gap-2">
-                <span className="text-gold-400">›</span> {r}
+                <span className="text-gold-400">â€º</span> {r}
               </li>
             ))}
           </ul>
@@ -157,3 +157,4 @@ function Readout({ label, value, tone }: { label: string; value: string; tone?: 
     </div>
   );
 }
+

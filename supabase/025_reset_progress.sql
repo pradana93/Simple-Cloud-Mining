@@ -36,6 +36,10 @@ begin
   delete from public.risk_events;
   delete from public.account_risk;
   delete from public.chat_messages;
+  delete from public.contact;
+  delete from public.addons_menu;
+  delete from public.addons;
+  delete from public.addon_demo;
   delete from public.game_seed_reveals;
   delete from public.game_bets;
   delete from public.game_rounds;

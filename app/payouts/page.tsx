@@ -20,7 +20,7 @@ export default async function PayoutsPage() {
         <div className="max-w-2xl">
           <h1 className="font-display text-3xl font-bold text-white sm:text-5xl">Payout history</h1>
           <p className="mt-3 text-slate-400">
-            Deposits and withdrawal requests, with their current status.{" "}
+            Plan purchases and withdrawal requests, with their current status.{" "}
             {stats.totalPaid > 0 ? (
               <>
                 <span className="font-semibold text-gold-300">

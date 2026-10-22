@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { headers } from "next/headers";
 import { Link2, Percent, Users } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -87,7 +87,7 @@ export default async function AffiliatePage() {
 
   const steps = [
     { icon: <Link2 size={18} />, t: "Share your link", d: "Every account gets a personal /referral/ID link." },
-    { icon: <Users size={18} />, t: "Friends deploy miners", d: "They start on the free plan; upgrades are optional." },
+    { icon: <Users size={18} />, t: "Friends choose plans", d: "They start on the free plan; upgrades are optional." },
             { icon: <Percent size={18} />, t: `Take ${s.aff_comission}%`, d: "Commission on every referred upgrade." },
   ];
 
@@ -99,7 +99,7 @@ export default async function AffiliatePage() {
           Earn <span className="gold-text">{s.aff_comission}%</span> on every referral upgrade.
         </h1>
         <p className="mt-3 max-w-lg text-sm leading-relaxed text-slate-400 sm:text-base">
-          When someone you invited buys a hashrate plan, you take {s.aff_comission}% of the purchase.
+          When someone you invited buys a reward plan, you take {s.aff_comission}% of the purchase.
           It lands straight in your balance, and keeps paying on every upgrade they make.
         </p>
 
@@ -162,3 +162,4 @@ export default async function AffiliatePage() {
     </div>
   );
 }
+

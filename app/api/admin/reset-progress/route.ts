@@ -11,7 +11,7 @@ const TAGS = ["site-settings", "plans", "faqs", "contents", "payouts", "site-sta
 
 async function preview() {
   const admin = createAdminSupabase();
-  const [members, rigs, invoices, deposits, withdrawals, games, chats, balances] = await Promise.all([
+  const [members, rigs, invoices, deposits, withdrawals, games, chats, contactMessages, balances] = await Promise.all([
     admin.from("profiles").select("id", { count: "exact", head: true }).eq("is_admin", false),
     admin.from("user_plan_history").select("id", { count: "exact", head: true }).eq("status", "active"),
     admin.from("transactions_history").select("id", { count: "exact", head: true }),
@@ -19,6 +19,7 @@ async function preview() {
     admin.from("user_withdrawal").select("id", { count: "exact", head: true }),
     admin.from("game_rounds").select("id", { count: "exact", head: true }),
     admin.from("chat_messages").select("id", { count: "exact", head: true }),
+    admin.from("contact").select("id", { count: "exact", head: true }),
     admin.from("profiles").select("balance").eq("is_admin", false),
   ]);
 
@@ -31,6 +32,7 @@ async function preview() {
     withdrawals: (withdrawals as { count: number | null }).count ?? 0,
     games: (games as { count: number | null }).count ?? 0,
     chatMessages: (chats as { count: number | null }).count ?? 0,
+    contactMessages: (contactMessages as { count: number | null }).count ?? 0,
     balance: balance.reduce((sum, row) => sum + Number(row.balance ?? 0), 0),
   };
 }

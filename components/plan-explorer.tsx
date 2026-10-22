@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { cn, formatCrypto } from "@/lib/utils";
-import { formatFiat, formatPrice, type MoneyCfg } from "@/lib/money";
+import { formatFiat, type MoneyCfg } from "@/lib/money";
 
 type PlanItem = {
   id: number;
@@ -43,7 +43,17 @@ export function PlanExplorer({
     `${formatCrypto(v, decimals).replace(/\.?0+$/, "")} ${currencyCode}`;
   const fiatHint = (v: number) =>
     cfg && cfg.mode === "fiat" && cfg.rate > 0 ? `≈${formatFiat(v * cfg.rate, cfg.fiatCurrency)}` : null;
-  const priceOf = (v: number) => (cfg ? formatPrice(v, cfg) : formatFiat(v, priceCurrency));
+  const priceOf = (v: number) => formatFiat(v, priceCurrency);
+  const priceHint = (v: number) => {
+    if (!cfg || v <= 0) return null;
+    if (cfg.mode === "fiat" && cfg.fiatCurrency !== priceCurrency && cfg.priceToDisplay > 0) {
+      return `≈${formatFiat(v * cfg.priceToDisplay, cfg.fiatCurrency)}`;
+    }
+    if (cfg.mode === "crypto" && cfg.cryptoToPrice > 0) {
+      return `≈${formatCrypto(v / cfg.cryptoToPrice, cfg.decimals)} ${cfg.code}`;
+    }
+    return null;
+  };
 
   const sorted = useMemo(() => {
     const copy = [...all];
@@ -144,8 +154,11 @@ export function PlanExplorer({
           <Row label="One-time price" value={isFree ? "Free" : priceOf(Number(sel.price))} />
         </dl>
         <p className="mt-2 text-xs text-slate-400">
-          {isFree ? "No payment required." : `Prices are set in ${priceCurrency}.`}
+          {isFree ? "No payment required." : `Price is set in ${priceCurrency}.`}
         </p>
+        {!isFree && priceHint(Number(sel.price)) && (
+          <p className="mt-1 text-xs text-slate-400">{priceHint(Number(sel.price))}</p>
+        )}
         <div className="mt-5 rounded-2xl border border-white/10 p-4">
           <div className="text-xs text-slate-400">Projected over {sel.duration} days</div>
           <div className="font-mono mt-1 text-2xl font-medium tabular-nums text-gold-300">

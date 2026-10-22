@@ -10,12 +10,7 @@ type Row = Entry & { kind: "in" | "out" };
 
 function statusLabel(row: Row): string {
   const status = String(row.status ?? "").toUpperCase();
-  if (row.kind === "in") {
-    if (status === "SUCCESS") return "deposit confirmed";
-    if (status === "PROCESSING") return "deposit processing";
-    if (status === "CANCELED") return "deposit canceled";
-    return "deposit pending";
-  }
+  if (row.kind === "in") return "plan purchase";
   if (status === "SUCCESS") return "paid";
   if (status === "CANCELED") return "canceled";
   if (status === "PROCESSING") return "processing";
@@ -24,7 +19,7 @@ function statusLabel(row: Row): string {
 
 function statusVariant(row: Row): "green" | "gold" | "red" | "slate" {
   const status = String(row.status ?? "").toUpperCase();
-  if (row.kind === "in") return status === "SUCCESS" ? "green" : status === "CANCELED" ? "red" : "gold";
+  if (row.kind === "in") return "green";
   if (status === "SUCCESS") return "green";
   if (status === "CANCELED") return "red";
   if (status === "PROCESSING") return "gold";
@@ -44,7 +39,7 @@ export function PayoutFeed({
   decimals: number;
   cfg?: MoneyCfg;
 }) {
-  const [tab, setTab] = useState<"all" | "in" | "out">("all");
+  const [tab, setTab] = useState<"paid" | "all" | "in" | "out">("paid");
   const [q, setQ] = useState("");
 
   const rows: Row[] = useMemo(() => {
@@ -53,14 +48,20 @@ export function PayoutFeed({
       ...withdrawals.map((w) => ({ ...w, kind: "out" as const })),
     ];
     return all
-      .filter((r) => (tab === "all" ? true : tab === "in" ? r.kind === "in" : r.kind === "out"))
+      .filter((r) => {
+        if (tab === "all") return true;
+        if (tab === "in") return r.kind === "in";
+        if (tab === "out") return r.kind === "out";
+        return r.kind === "out" && String(r.status ?? "").toUpperCase() === "SUCCESS";
+      })
       .filter((r) => !q || (r.tx ?? "").toLowerCase().includes(q.toLowerCase()));
   }, [deposits, withdrawals, tab, q]);
 
-  const tabs: Array<["all" | "in" | "out", string]> = [
+  const tabs: Array<["paid" | "all" | "in" | "out", string]> = [
+    ["paid", "Paid out"],
     ["all", "All"],
-    ["in", "Deposits"],
-    ["out", "Withdrawals"],
+    ["in", "Plan purchases"],
+    ["out", "All withdrawals"],
   ];
 
   return (
@@ -99,16 +100,20 @@ export function PayoutFeed({
             <p className="font-medium text-slate-200">
               {q
                 ? "No entries match that transaction id."
-                : tab === "out"
-                  ? "No withdrawals yet."
-                  : tab === "in"
-                    ? "No deposits yet."
-                    : "No payout entries yet."}
+                : tab === "paid"
+                  ? "No completed payouts yet."
+                  : tab === "out"
+                    ? "No withdrawals yet."
+                    : tab === "in"
+                      ? "No plan purchases yet."
+                      : "No payout entries yet."}
             </p>
             <p className="mt-1">
               {q
                 ? "Clear the filter to see the full feed."
-                : "This feed fills after the first confirmed deposit or completed withdrawal."}
+                : tab === "paid"
+                  ? "Canceled requests are listed under All withdrawals, not here."
+                  : "This feed fills after the first plan purchase or withdrawal request."}
             </p>
           </div>
         ) : (

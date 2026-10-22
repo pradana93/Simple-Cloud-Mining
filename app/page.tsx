@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Activity } from "lucide-react";
 import { getCachedPlans, getCachedPayouts, getCachedSettings, getCachedStats } from "@/lib/catalog";
 import { getMoneyCfg } from "@/lib/currency";
@@ -35,13 +35,13 @@ export default async function HomePage() {
         <div className="max-w-3xl">
           <Reveal>
             <h1 className="font-display text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-6xl">
-              Mine <span className="gold-text">{s.currency_name}</span> from a console, not a
+              Earn <span className="gold-text">{s.currency_name}</span> from a console, not a
               warehouse.
             </h1>
           </Reveal>
           <Reveal delay={80}>
             <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-400 sm:text-lg">
-              A free starter miner is included. Paid plans are optional. Watch your balance accrue,
+              A free starter plan is included. Paid plans are optional. Watch your balance accrue,
               then withdraw to your own wallet.
             </p>
           </Reveal>
@@ -51,7 +51,7 @@ export default async function HomePage() {
                 href="/register"
                 className="tap cta-glow inline-flex h-12 items-center rounded-xl bg-gold-500 px-7 font-display text-base font-bold text-ink-950 hover:bg-gold-400"
               >
-                Start with a free miner
+                Start with a free plan
               </Link>
               <Link
                 href="/payouts"
@@ -68,10 +68,10 @@ export default async function HomePage() {
         </div>
         <Reveal delay={220}>
           <div className="mt-12 grid grid-cols-2 gap-x-6 gap-y-6 lg:grid-cols-4">
-            <Metric label="Active rigs">
+            <Metric label="Active plans">
               <CountUp value={stats.activeRigs} />
             </Metric>
-            <Metric label="Hashrate plans">
+            <Metric label="Reward plans">
               <CountUp value={plans.length} />
             </Metric>
             <Metric label="Paid out">
@@ -135,20 +135,40 @@ export default async function HomePage() {
         <section id="plans" className="scroll-mt-24">
           <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
             <div>
-              <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">Hashrate plans</h2>
+              <h2 className="font-display text-3xl font-bold text-white sm:text-4xl">Reward plans</h2>
               <p className="mt-2 max-w-lg text-sm leading-relaxed text-slate-400">
-                The free plan is a starter. Paid plans are optional. Every plan credits a published
-                daily rate, and the projected total is shown before you pay.
+                The free plan is a starter. Paid plans are optional. Every plan credits a fixed
+                daily DOGE amount for its term. The projected total is shown before you pay.
               </p>
             </div>
             <Link
               href="/faq"
               className="text-sm font-semibold text-slate-300 underline-offset-4 hover:text-gold-300 hover:underline"
             >
-              How mining works
+              How reward plans work
             </Link>
           </div>
           <PlanExplorer plans={plans} currencyCode={s.currency_code} decimals={s.currency_decimals} priceCurrency={s.price_currency} cfg={cfg} />
+        </section>
+      </Reveal>
+
+      <Reveal>
+        <section className="rounded-3xl border border-white/10 px-6 py-8 sm:px-8">
+          <h2 className="font-display text-2xl font-bold text-white">How the reward plans work</h2>
+          <div className="mt-4 grid gap-4 text-sm leading-relaxed text-slate-400 sm:grid-cols-3">
+            <p>
+              A plan credits a fixed daily amount of {s.currency_code} for the number of days shown.
+              The rate and term do not change after purchase.
+            </p>
+            <p>
+              This is a fixed reward plan, not a direct share of mining pool output. We do not
+              promise a hash rate or a market return.
+            </p>
+            <p>
+              Paid plans are optional. The free starter plan is included, and every projected total
+              is shown before you pay.
+            </p>
+          </div>
         </section>
       </Reveal>
 
@@ -158,10 +178,10 @@ export default async function HomePage() {
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gold-500/15 text-gold-300">
               <Activity size={22} />
             </span>
-            <h2 className="font-display mt-5 text-2xl font-bold text-white">Earnings accrue every minute</h2>
+            <h2 className="font-display mt-5 text-2xl font-bold text-white">Rewards accrue every minute</h2>
             <p className="mt-2 max-w-md text-sm leading-relaxed text-slate-400">
-              Hashrate is credited continuously and settles into your balance automatically, so the
-              number moves while you watch it.
+              The plan&apos;s daily credit is split per minute and settles into your balance
+              automatically, so the number moves while you watch it.
             </p>
           </Card>
           <div className="space-y-4">
@@ -203,3 +223,4 @@ export default async function HomePage() {
     </div>
   );
 }
+

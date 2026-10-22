@@ -9,6 +9,7 @@ import {
 } from "@/lib/cryptapi";
 import { recordEvent } from "@/lib/risk-telemetry";
 import { firstRow } from "@/lib/ledger";
+import { sendAlert } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,7 +28,7 @@ type Invoice = {
   amount: number;
   user_id: string;
   plan_id: number;
-  params: InvoiceParams | null;
+  params: (InvoiceParams & Record<string, unknown>) | null;
 };
 
 function ok() {
@@ -93,7 +94,18 @@ async function handle(req: Request, body: string | null) {
 
   if (payment.pending === 1) {
     if (tx.status === "pending") {
-      await admin.from("transactions_history").update({ status: "waiting" }).eq("id", tx.id);
+      await admin
+        .from("transactions_history")
+        .update({
+          status: "waiting",
+          params: {
+            ...(tx.params ?? {}),
+            pending_amount: payment.value,
+            pending_coin: payment.coin,
+            pending_at: new Date().toISOString(),
+          },
+        })
+        .eq("id", tx.id);
     }
     return ok();
   }
@@ -114,6 +126,30 @@ async function handle(req: Request, body: string | null) {
     await log("missing txid_in", tx.id, null, payment.addressIn);
     return new Response("Missing transaction id", { status: 400 });
   }
+
+  if (payment.value > expected + 1e-8) {
+    await log("overpayment", tx.id, String(payment.value), `expected ${expected}`);
+    await sendAlert({
+      title: "Crypto overpayment",
+      message: `Invoice ${params.address ?? tx.id} received ${payment.value} ${payment.coin ?? ""}, expected ${expected}.`,
+      level: "warning",
+      tags: { flow: "deposit", provider: "cryptapi" },
+      extra: { transactionId: tx.id, userId: tx.user_id, txid: payment.txid },
+    });
+  }
+
+  await admin
+    .from("transactions_history")
+    .update({
+      params: {
+        ...(tx.params ?? {}),
+        received_amount: payment.value,
+        received_coin: payment.coin,
+        received_confirmations: payment.confirmations,
+        received_at: new Date().toISOString(),
+      },
+    })
+    .eq("id", tx.id);
 
   const { data, error } = await admin.rpc("activate_paid_invoice", {
     p_tx_id: tx.id,

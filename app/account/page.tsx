@@ -92,9 +92,9 @@ export default async function AccountPage() {
       ),
     },
     {
-      title: "Deposits",
+      title: "Plan purchases",
       rows: deposits.data,
-      emptyText: "No deposits yet.",
+      emptyText: "No plan purchases yet.",
       render: (r, i) => (
         <Row key={i} k={formatMoney(Number(r.amount), cfg)} v={<Badge variant={statusVariant(String(r.status ?? ""))}>{String(r.status)}</Badge>} />
       ),

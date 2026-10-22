@@ -1,10 +1,10 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/api-admin";
 import { coerceIntent, parseGoal, solvePlan, type PlanContext } from "@/lib/plan-goal";
 
 export const dynamic = "force-dynamic";
 
-const SYSTEM = `You convert a plan-manager's plain-English goal into JSON describing a mining plan.
+const SYSTEM = `You convert a plan-manager's plain-English goal into JSON describing a reward plan.
 Return ONLY a JSON object. Include a key only if the user actually stated or clearly implied it.
 Allowed keys (snake_case, numbers without % or currency symbols):
 - price: number (what the member pays)
@@ -16,7 +16,7 @@ Allowed keys (snake_case, numbers without % or currency symbols):
 - ownerMarginPct: number (percent the house keeps)
 - name: string (plan name, only if named)
 - version: short string
-- speed: string (hashrate label)
+- speed: string (tier label)
 - profit: string (short marketing blurb)
 - isDefault: boolean (true for the free/starter plan)
 Do NOT calculate derived values and do NOT output anything except the JSON object.
@@ -92,3 +92,4 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ ok: true, source: "builtin", proposal: solvePlan(parseGoal(goal, context), context) });
 }
+

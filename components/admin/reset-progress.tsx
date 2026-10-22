@@ -17,6 +17,7 @@ type Counts = {
   withdrawals: number;
   games: number;
   chatMessages: number;
+  contactMessages: number;
   balance: number;
 };
 
@@ -35,12 +36,14 @@ export function ResetProgress({
   const [counts, setCounts] = useState<Counts | null>(null);
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState("");
+  const [backupReady, setBackupReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function review() {
     setOpen(true);
     setConfirm("");
+    setBackupReady(false);
     setCounts(null);
     setError(null);
     setLoading(true);
@@ -132,7 +135,7 @@ export function ResetProgress({
             <Button
               variant="destructive"
               onClick={reset}
-              disabled={busy || loading || confirm.trim() !== "RESET"}
+              disabled={busy || loading || confirm.trim() !== "RESET" || !backupReady}
             >
               {busy ? (
                 <>
@@ -166,6 +169,7 @@ export function ResetProgress({
                 ["Withdrawals", counts.withdrawals],
                 ["Game rounds", counts.games],
                 ["Chat messages", counts.chatMessages],
+                ["Contact messages", counts.contactMessages],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
                   <dt className="text-[11px] text-slate-400">{label}</dt>
@@ -186,6 +190,19 @@ export function ResetProgress({
               Type <span className="font-mono font-bold">RESET</span> to confirm. Your admin account
               and two-factor setup stay intact.
             </div>
+            <label className="mt-5 flex items-start gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-xs leading-relaxed text-slate-300">
+              <input
+                type="checkbox"
+                checked={backupReady}
+                onChange={(event) => setBackupReady(event.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-600 bg-ink-900 accent-gold-500"
+              />
+              <span>
+                I have a recent backup, or I accept that this reset cannot be undone. Run
+                <span className="font-mono text-slate-100"> npm run backup </span>
+                before resetting if you need one.
+              </span>
+            </label>
             <div className="mt-5">
               <Label htmlFor="reset-confirm">Confirmation</Label>
               <Input

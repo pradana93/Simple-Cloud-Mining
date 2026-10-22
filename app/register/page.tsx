@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,7 +22,7 @@ export default function RegisterPage() {
       const email = String(fd.get("email"));
       const password = String(fd.get("password"));
       // Username travels as auth metadata; the DB trigger creates the profile
-      // and free miner server-side, so no RLS insert can fail.
+      // and free plan server-side, so no RLS insert can fail.
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -48,7 +48,7 @@ export default function RegisterPage() {
     <div className="mx-auto grid max-w-4xl gap-6 py-10 sm:py-14 lg:grid-cols-2">
       <div className="panel relative hidden rounded-3xl border-gold-500/20 p-10 lg:block">
         <h2 className="font-display text-3xl font-bold leading-tight text-white">
-          Start with a <span className="gold-text">free miner.</span>
+          Start with a <span className="gold-text">free plan.</span>
         </h2>
         <p className="mt-4 text-sm leading-relaxed text-slate-400">
           No card and no wallet connection. The starter plan is included. Paid plans are optional
@@ -95,3 +95,4 @@ export default function RegisterPage() {
     </div>
   );
 }
+

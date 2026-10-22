@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { cookies, headers } from "next/headers";
 import { History, Plus, WalletMinimal } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -232,7 +232,7 @@ export default async function DashboardPage() {
     const breakEvenMinutes = price > 0 && rigRate > 0 ? Math.max(0, (price - earned) / rigRate) : null;
     return {
       id: r.id,
-      name: meta?.plan_name ?? "Miner",
+      name: meta?.plan_name ?? "Plan",
       version: meta?.version ?? null,
       rate: rigRate,
       price,
@@ -248,7 +248,7 @@ export default async function DashboardPage() {
   });
 
   const activity: ActivityItem[] = [
-    ...deposits.map((d, i) => ({ id: `d${i}`, kind: "deposit" as const, label: "Deposit received", amount: Number(d.amount), at: d.created_at, status: d.status })),
+    ...deposits.map((d, i) => ({ id: `d${i}`, kind: "deposit" as const, label: "Plan purchase", amount: Number(d.amount), at: d.created_at, status: d.status })),
     ...withdrawals.map((w, i) => ({ id: `w${i}`, kind: "withdrawal" as const, label: "Withdrawal", amount: Number(w.amount), at: w.created_at, status: w.status })),
     ...affiliates.map((a, i) => ({ id: `a${i}`, kind: "affiliate" as const, label: "Affiliate commission", amount: Number(a.amount), at: a.date, status: a.status })),
     ...referrals.map((r, i) => ({ id: `r${i}`, kind: "referral" as const, label: `Referral joined${r.username ? `: ${r.username}` : ""}`, amount: null, at: r.created_at, status: null })),
@@ -270,7 +270,7 @@ export default async function DashboardPage() {
         ? "You can place a withdrawal request now."
         : rate > 0
           ? `About ${formatDuration((minWithdraw - balance) / rate)} until you reach the minimum.`
-          : "Deploy hashrate to reach the withdrawal minimum.";
+          : "Add a plan to reach the withdrawal minimum.";
 
   const paidEcon = paidPlans.map((p) => ({
     p,
@@ -333,10 +333,10 @@ export default async function DashboardPage() {
               <p className="mt-3 text-xs text-slate-400">{nextPayout}</p>
             </div>
             <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:gap-x-6">
-              <Readout label="Live hashrate" hint={`${moneyUnit(cfg)} per minute`}>
+              <Readout label="Credit rate" hint={`${moneyUnit(cfg)} per minute`}>
                 <CountUp value={rate} decimals={8} cfg={cfg} />
               </Readout>
-              <Readout label="Active rigs" hint="contracts hashing now">
+              <Readout label="Active plans" hint="plans crediting now">
                 {activeRows.length}
               </Readout>
               <Readout label="Gross earned" hint="since each rig started">
@@ -405,14 +405,14 @@ export default async function DashboardPage() {
       <Reveal>
         <section>
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-xl font-bold text-white">Active rigs</h2>
+            <h2 className="font-display text-xl font-bold text-white">Active plans</h2>
             <Link href="/#plans" className="text-sm font-semibold text-gold-300 hover:text-gold-400">
               Compare all plans
             </Link>
           </div>
           {rigs.length === 0 ? (
             <Card className="p-8 text-center">
-              <p className="text-slate-300">No active rig yet.</p>
+              <p className="text-slate-300">No active plan yet.</p>
               <p className="mt-1 text-sm text-slate-400">
                 The free starter plan activates on first login. If it does not appear, refresh this
                 page or contact support.
@@ -455,7 +455,7 @@ export default async function DashboardPage() {
                 {openInvoices.map((t, i) => (
                   <li key={t.hash ?? i} className="flex items-center justify-between gap-2 py-2.5 text-sm">
                     <Link href={`/invoice/${t.hash}`} className="font-mono text-gold-300 hover:text-gold-400">
-                      {t.hash ? `${t.hash.slice(0, 12)}…` : "invoice"}
+                      {t.hash ? `${t.hash.slice(0, 12)}â€¦` : "invoice"}
                     </Link>
                     <div className="flex items-center gap-2">
                       <span className="font-mono tabular-nums text-slate-200">
@@ -476,11 +476,11 @@ export default async function DashboardPage() {
           <section>
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="font-display text-xl font-bold text-white">Deploy more power</h2>
+                <h2 className="font-display text-xl font-bold text-white">Add another plan</h2>
                 <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-400">
                   {rate > 0
-                    ? `Your rigs are mining ${formatMoney(perDay, cfg)}/day. A plan below stacks on top and pays a fixed rate for its whole term.`
-                    : "Your rigs are idle. Deploy a plan to start earning a fixed daily rate for its full term."}
+                    ? `Your plans are crediting ${formatMoney(perDay, cfg)}/day. A plan below stacks on top and pays a fixed rate for its whole term.`
+                    : "No plan is crediting right now. Add a plan to start earning a fixed daily rate for its full term."}
                 </p>
               </div>
               <Link href="/#plans" className="text-xs font-semibold text-gold-300 hover:text-gold-400">
@@ -528,7 +528,7 @@ export default async function DashboardPage() {
                       href={`/purchase/${p.id}`}
                       className="tap mt-5 inline-flex h-11 items-center justify-center gap-1.5 rounded-xl bg-gold-500 font-display text-sm font-bold text-ink-950 transition-colors hover:bg-gold-400"
                     >
-                      <Plus size={15} /> Deploy
+                      <Plus size={15} /> Choose plan
                     </Link>
                   </div>
                 );
@@ -544,3 +544,4 @@ export default async function DashboardPage() {
     </div>
   );
 }
+

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MessageCircle, Send, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -148,7 +148,7 @@ export default function ChatWidget() {
           <header className="flex items-center justify-between border-b border-white/10 px-4 py-3">
             <div>
               <p className="font-display text-sm font-bold text-white">Support</p>
-              <p className="text-xs text-slate-400">Replies from the mining team</p>
+              <p className="text-xs text-slate-400">Replies from the support team</p>
             </div>
             <button
               onClick={() => setOpen(false)}
@@ -231,3 +231,4 @@ export default function ChatWidget() {
     </>
   );
 }
+

@@ -1,7 +1,6 @@
-"use client";
+﻿"use client";
 import { useState } from "react";
 import { Mail, Send } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -12,14 +11,23 @@ export default function ContactPage() {
     setMsg(null);
     setLoading(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.from("contact").insert({
-        name: String(formData.get("name")),
-        email: String(formData.get("email")),
-        subject: String(formData.get("subject")),
-        message: String(formData.get("message")),
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: String(formData.get("name")),
+          email: String(formData.get("email")),
+          subject: String(formData.get("subject")),
+          message: String(formData.get("message")),
+          company: String(formData.get("company") ?? ""),
+        }),
       });
-      setMsg(error ? { ok: false, text: `Error: ${error.message}` } : { ok: true, text: "Message received. We reply within 24 hours." });
+      const j = (await res.json()) as { ok?: boolean; message?: string; error?: string };
+      setMsg(
+        j.ok
+          ? { ok: true, text: j.message ?? "Message received. We reply within 24 hours." }
+          : { ok: false, text: j.error ?? "Send failed" }
+      );
     } catch (e) {
       setMsg({ ok: false, text: e instanceof Error ? e.message : "Send failed" });
     } finally {
@@ -37,6 +45,14 @@ export default function ContactPage() {
       </div>
       <div className="panel mt-8 rounded-3xl p-7">
         <form action={submit} className="space-y-4">
+          <input
+            type="text"
+            name="company"
+            tabIndex={-1}
+            autoComplete="off"
+            aria-hidden="true"
+            className="hidden"
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <div><Label htmlFor="name">Name</Label><Input id="name" name="name" placeholder="Satoshi" required /></div>
             <div><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" placeholder="you@wallet.com" required /></div>
@@ -50,7 +66,7 @@ export default function ContactPage() {
             />
           </div>
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? "Sending…" : <><Send size={15} /> Send message</>}
+            {loading ? "Sending..." : <><Send size={15} /> Send message</>}
           </Button>
         </form>
         {msg && (
@@ -62,3 +78,5 @@ export default function ContactPage() {
     </div>
   );
 }
+
+

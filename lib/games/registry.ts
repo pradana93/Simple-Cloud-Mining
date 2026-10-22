@@ -33,6 +33,8 @@ export type GameMeta = {
   name: string;
   blurb: string;
   edge: string;
+  baseRtp: number;
+  rtpNote?: string;
   category: GameCategory;
   pace: GamePace;
   interactive?: boolean;
@@ -44,6 +46,7 @@ export const GAME_CATALOG: GameMeta[] = [
     name: "Dice",
     blurb: "Roll 0 to 100 and bet under or over a target you set.",
     edge: "Base 1% house edge",
+    baseRtp: 99,
     category: "Instant",
     pace: "fast",
   },
@@ -52,6 +55,7 @@ export const GAME_CATALOG: GameMeta[] = [
     name: "Limbo",
     blurb: "Name a multiplier and see if the result reaches it.",
     edge: "Base 1% house edge",
+    baseRtp: 99,
     category: "Instant",
     pace: "fast",
   },
@@ -60,6 +64,7 @@ export const GAME_CATALOG: GameMeta[] = [
     name: "Crash",
     blurb: "The line climbs. Cash out before it crashes, or lose the stake.",
     edge: "Base 1% house edge",
+    baseRtp: 99,
     category: "Instant",
     pace: "fast",
   },
@@ -68,6 +73,7 @@ export const GAME_CATALOG: GameMeta[] = [
     name: "Coin flip",
     blurb: "Call heads or tails. A win pays 1.98x.",
     edge: "Base 1% house edge",
+    baseRtp: 99,
     category: "Instant",
     pace: "fast",
   },
@@ -76,6 +82,7 @@ export const GAME_CATALOG: GameMeta[] = [
     name: "Wheel",
     blurb: "Spin a weighted wheel across three risk levels.",
     edge: "Base 1% house edge",
+    baseRtp: 99,
     category: "Instant",
     pace: "pick",
   },
@@ -84,6 +91,8 @@ export const GAME_CATALOG: GameMeta[] = [
     name: "Plinko",
     blurb: "Drop a ball down 8, 12 or 16 rows into a payout slot.",
     edge: "Base 1% to 3% house edge",
+    baseRtp: 98,
+    rtpNote: "about 97% to 99% depending on risk",
     category: "Instant",
     pace: "pick",
   },
@@ -92,6 +101,8 @@ export const GAME_CATALOG: GameMeta[] = [
     name: "Keno",
     blurb: "Pick up to 10 numbers from 40 and match the draw.",
     edge: "Base edge varies with picks",
+    baseRtp: 90,
+    rtpNote: "about 90%, varies by pick count",
     category: "Pick",
     pace: "pick",
   },
@@ -100,6 +111,7 @@ export const GAME_CATALOG: GameMeta[] = [
     name: "Mines",
     blurb: "Reveal safe tiles, raise your multiplier, cash out before a mine.",
     edge: "Base 1% house edge",
+    baseRtp: 99,
     category: "Grid",
     pace: "step",
     interactive: true,
@@ -109,6 +121,7 @@ export const GAME_CATALOG: GameMeta[] = [
     name: "Roulette",
     blurb: "Single zero wheel. Red, black, odd, even, dozens or a number.",
     edge: "Base 2.7% house edge",
+    baseRtp: 97.3,
     category: "Table",
     pace: "pick",
   },
@@ -117,6 +130,7 @@ export const GAME_CATALOG: GameMeta[] = [
     name: "Slots",
     blurb: "Three reels. Line up a triple or catch two cherries.",
     edge: "Base 8% house edge",
+    baseRtp: 92,
     category: "Reels",
     pace: "pick",
   },

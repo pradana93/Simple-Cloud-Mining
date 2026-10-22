@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { AlertTriangle, ArrowLeft, BadgeCheck, Hourglass, QrCode, ShieldCheck } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { CopyButton } from "@/components/copy-button";
@@ -19,6 +19,10 @@ type Invoice = {
     txn_id?: string;
     payCoin?: string;
     ticker?: string;
+    pending_amount?: number;
+    pending_coin?: string;
+    received_amount?: number;
+    received_coin?: string;
   } | null;
   date: string;
 };
@@ -71,6 +75,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ hash: 
   const view = statusView(inv.status);
   const coin = p.payCoin ?? "crypto";
   const network = NETWORK[coin] ?? "the selected network";
+  const shownAmount =
+    inv.status === "paid"
+      ? p.received_amount ?? p.amount
+      : inv.status === "waiting"
+        ? p.pending_amount ?? p.amount
+        : p.amount;
+  const shownCoin = inv.status === "paid" ? p.received_coin ?? coin : inv.status === "waiting" ? p.pending_coin ?? coin : coin;
 
   return (
     <div className="mx-auto max-w-2xl py-10 sm:py-14">
@@ -118,10 +129,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ hash: 
           <div className="mt-6 space-y-4">
             <div className="rounded-2xl bg-white/[0.03] p-5 text-center ring-1 ring-white/10">
               <p className="text-xs font-medium text-slate-400">
-                {inv.status === "paid" ? "Amount paid" : inv.status === "waiting" ? "Amount sent" : "Send exactly"}
+                {inv.status === "paid" ? "Amount received" : inv.status === "waiting" ? "Amount detected" : "Send exactly"}
               </p>
               <p className="font-display mt-1 text-3xl font-bold text-gold-300">
-                {p.amount} {coin}
+                {shownAmount} {shownCoin}
               </p>
               <p className="mt-1 text-xs text-slate-400">{network}</p>
               <p className="mt-4 break-all rounded-xl bg-ink-950 p-4 font-mono text-sm text-slate-200 ring-1 ring-white/10">
@@ -148,13 +159,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ hash: 
                   ? "Payment confirmed. No further action is needed. We never ask for your wallet private key."
                   : inv.status === "waiting"
                     ? "Payment detected. Waiting for network confirmations. Do not send again unless support asks you to."
-                    : `Send only ${coin} on ${network}. Do not send from an exchange that deducts a fee. Underpayments are not credited. We never ask for your wallet private key.`}
+                    : `Send only ${coin} on ${network}. Do not send from an exchange that deducts a fee. Underpayments are not credited. Overpayments are not automatically refunded or credited; contact support with the transaction id if you send too much. We never ask for your wallet private key.`}
               </p>
             </div>
 
             {inv.status === "paid" ? (
               <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5">
-                <h2 className="font-display text-base font-bold text-white">Your miner is active</h2>
+                <h2 className="font-display text-base font-bold text-white">Your plan is active</h2>
                 <p className="mt-2 text-sm leading-relaxed text-slate-300">
                   The payment is confirmed and the credit is in your balance. Open the console to
                   watch it accrue.
@@ -175,13 +186,13 @@ export default async function InvoicePage({ params }: { params: Promise<{ hash: 
                       <>
                         <li>1. The payment was detected on the network.</li>
                         <li>2. The network is confirming the transaction.</li>
-                        <li>3. The miner activates automatically and the credit lands in your balance.</li>
+                        <li>3. The plan activates automatically and the credit lands in your balance.</li>
                       </>
                     ) : (
                       <>
                         <li>1. Send the exact amount to the address above.</li>
                         <li>2. The network confirms the transaction.</li>
-                        <li>3. The miner activates automatically and the credit lands in your balance.</li>
+                        <li>3. The plan activates automatically and the credit lands in your balance.</li>
                       </>
                     )}
                   </ol>
@@ -218,3 +229,4 @@ export default async function InvoicePage({ params }: { params: Promise<{ hash: 
     </div>
   );
 }
+

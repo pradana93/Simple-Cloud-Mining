@@ -97,21 +97,23 @@ export default async function AdminAnalytics() {
   const planName = new Map(plans.map((p) => [p.id, p.plan_name]));
 
   const paid = txs.filter((t) => (t.status ?? "").toLowerCase() === "paid");
-  const revenue = paid.reduce((s, t) => s + num(t.price_amount ?? t.amount), 0);
+  const priced = paid.filter((t) => t.price_amount != null);
+  const unpriced = paid.length - priced.length;
+  const revenue = priced.reduce((s, t) => s + num(t.price_amount), 0);
   const pendingCount = txs.filter((t) => (t.status ?? "").toLowerCase() === "pending").length;
   const buyers = new Set(paid.map((t) => t.user_id).filter(Boolean)).size;
   const members = profiles.filter((p) => !p.is_admin).length;
   const conversion = members > 0 ? (buyers / members) * 100 : 0;
   const arpu = members > 0 ? revenue / members : 0;
-  const avgOrder = paid.length > 0 ? revenue / paid.length : 0;
+  const avgOrder = priced.length > 0 ? revenue / priced.length : 0;
 
   // Revenue by plan.
   const byPlan = new Map<number, { units: number; revenue: number }>();
-  for (const t of paid) {
+  for (const t of priced) {
     const id = t.plan_id ?? -1;
     const entry = byPlan.get(id) ?? { units: 0, revenue: 0 };
     entry.units += 1;
-    entry.revenue += num(t.price_amount ?? t.amount);
+    entry.revenue += num(t.price_amount);
     byPlan.set(id, entry);
   }
   const planRevenue = Array.from(byPlan.entries())
@@ -167,8 +169,20 @@ export default async function AdminAnalytics() {
         </div>
       )}
 
+      {unpriced > 0 && (
+        <div className="panel flex items-start gap-3 rounded-2xl border-amber-500/30 px-5 py-4">
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-amber-300" />
+          <div>
+            <p className="text-sm font-medium text-white">{unpriced} paid invoice{unpriced === 1 ? "" : "s"} have no recorded price</p>
+            <p className="mt-0.5 text-xs text-slate-300">
+              They are excluded from cash collected rather than counted as if the DOGE amount were USD.
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat icon={<CreditCard size={14} />} label="Revenue booked" value={price(revenue)} hint={`${paid.length} paid invoice${paid.length === 1 ? "" : "s"}`} tone="text-emerald-300" />
+        <Stat icon={<CreditCard size={14} />} label="Cash collected" value={price(revenue)} hint={`${priced.length} priced paid invoice${priced.length === 1 ? "" : "s"}${unpriced > 0 ? `, ${unpriced} unpriced` : ""}`} tone="text-emerald-300" />
         <Stat icon={<Users size={14} />} label="Paying members" value={<CountUp value={buyers} />} hint={`of ${members} member${members === 1 ? "" : "s"}`} />
         <Stat icon={<Percent size={14} />} label="Conversion" value={`${conversion.toFixed(1)}%`} hint="buyers / members" />
         <Stat icon={<TrendingUp size={14} />} label="Avg order" value={price(avgOrder)} hint={`ARPU ${price(arpu)}`} />

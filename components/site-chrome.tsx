@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { Wallet } from "lucide-react";
 import { getCachedSettings } from "@/lib/catalog";
 import { NAV_LINKS } from "./nav-links";
@@ -34,8 +34,8 @@ export async function SiteFooter() {
             <span className="font-display text-lg font-bold text-white">{s.sitename}</span>
           </div>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-slate-400">
-            {slogan}. Buy {s.currency_name} ({s.currency_code}) hashrate, watch it accrue, and
-            withdraw on-chain.
+            {slogan}. Choose a {s.currency_name} ({s.currency_code}) reward plan, watch it accrue,
+            and withdraw on-chain.
           </p>
           <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-400">
             <span className="inline-flex items-center gap-1.5">
@@ -67,10 +67,12 @@ export async function SiteFooter() {
       </div>
       <div className="border-t border-white/5">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-4 py-5 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <span>© {new Date().getFullYear()} {s.sitename}. All rights reserved.</span>
-          <span>Mining involves risk. Past performance does not guarantee future returns.</span>
+          <span>Â© {new Date().getFullYear()} {s.sitename}. All rights reserved.</span>
+          <span>Reward plans involve risk. Past performance does not guarantee future returns.</span>
         </div>
       </div>
     </footer>
   );
 }
+
+

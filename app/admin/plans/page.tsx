@@ -43,6 +43,8 @@ export default async function AdminPlans() {
       decimals={settings.currency_decimals}
       priceCurrency={priceCurrency}
       cryptoToPrice={cryptoToPrice}
+      affiliatePct={Number(settings.aff_comission) || 0}
+      rateAvailable={cryptoToPrice > 0}
     />
   );
 }

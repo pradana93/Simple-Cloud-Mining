@@ -3,7 +3,7 @@ import crypto from "crypto";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { createAdminSupabase } from "@/lib/supabase/admin";
 import { getSettings } from "@/lib/settings";
-import { createPayment, convertToCoin, paymentAddress } from "@/lib/cryptapi";
+import { createPayment, convertToCoin, getTickerInfo, paymentAddress } from "@/lib/cryptapi";
 import { cryptoTicker, isPayableCoin } from "@/lib/checkout";
 import { getFxTable } from "@/lib/fx";
 import { requestIdempotencyKey } from "@/lib/ledger";
@@ -91,6 +91,17 @@ export async function POST(req: Request) {
     payAmount = payCoin === settings.currency_code.toUpperCase()
       ? siteAmount
       : await convertToCoin(ticker, price, priceCurrency);
+    const info = await getTickerInfo(ticker);
+    const unit = info?.prices[priceCurrency] ?? info?.prices.USD ?? 0;
+    if (info && unit > 0 && info.minimum * unit > price) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `${payCoin} has a network minimum above this plan's price. Choose another coin.`,
+        },
+        { status: 400 }
+      );
+    }
     payment = await createPayment({
       coin: payCoin,
       callbackUrl: `${baseUrl}/api/webhooks/cryptapi?invoice=${hash}`,

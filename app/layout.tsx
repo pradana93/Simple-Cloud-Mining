@@ -1,4 +1,4 @@
-import type { Metadata, Viewport } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import { Chakra_Petch, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader, SiteFooter } from "@/components/site-chrome";
@@ -25,11 +25,11 @@ const mono = IBM_Plex_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Simple Cloud Mining: live hashrate console",
-    template: "%s · Simple Cloud Mining",
+    default: "Simple Cloud Mining: live rewards console",
+    template: "%s | Simple Cloud Mining",
   },
   description:
-    "Cloud mining console with live hashrate plans, per-block accrual, affiliate rewards, and on-chain payouts.",
+    "Reward plan console with live daily credits, per-block accrual, affiliate rewards, and on-chain payouts.",
   applicationName: "Simple Cloud Mining",
   appleWebApp: { capable: true, title: "Cloud Mining", statusBarStyle: "black-translucent" },
 };
@@ -70,3 +70,6 @@ export default async function RootLayout({
     </html>
   );
 }
+
+
+

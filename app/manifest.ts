@@ -1,11 +1,11 @@
-import type { MetadataRoute } from "next";
+﻿import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Simple Cloud Mining",
     short_name: "Cloud Mining",
     description:
-      "Cloud mining console with live hashrate plans, per-block accrual, affiliate rewards, and on-chain payouts.",
+      "Reward plan console with live daily credits, per-block accrual, affiliate rewards, and on-chain payouts.",
     start_url: "/dashboard",
     scope: "/",
     display: "standalone",
@@ -19,3 +19,5 @@ export default function manifest(): MetadataRoute.Manifest {
     ],
   };
 }
+
+

@@ -1,4 +1,4 @@
-import Link from "next/link";
+﻿import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -108,9 +108,9 @@ export default async function GamesPage() {
             limits && <p className="mt-1 text-xs text-slate-400">{limits}</p>
           ) : (
             <p className="mt-1 text-xs text-slate-400">
-              Empty. Rounds stake mining earnings, so start with a{" "}
+              Empty. Rounds stake your balance, so start with a{" "}
               <Link href="/#plans" className="font-semibold text-gold-300 underline underline-offset-2 hover:text-gold-200">
-                hashrate plan
+                reward plan
               </Link>
               .
             </p>
@@ -122,7 +122,7 @@ export default async function GamesPage() {
         <div className="panel rounded-2xl p-8 text-center">
           <p className="font-display text-lg font-bold text-white">No games are open right now</p>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-400">
-            The operator has paused every table. Your balance is untouched and mining keeps running.
+            The operator has paused every table. Your balance is untouched and rewards keep accruing.
           </p>
           <Link
             href="/dashboard"
@@ -209,3 +209,5 @@ export default async function GamesPage() {
     </div>
   );
 }
+
+

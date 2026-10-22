@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useState } from "react";
 import Link from "next/link";
 import { KeyRound, Loader2, ShieldCheck } from "lucide-react";
@@ -73,7 +73,7 @@ export default function LoginPage() {
           Welcome back to the <span className="gold-text">mine.</span>
         </h2>
         <p className="mt-4 text-sm leading-relaxed text-slate-400">
-          Your rigs keep hashing while you are away. Sign in to watch earnings land, manage miners,
+          Your plans keep crediting while you are away. Sign in to watch earnings land, manage plans,
           and withdraw to your wallet.
         </p>
         <ul className="mt-8 space-y-3 text-sm text-slate-300">
@@ -101,7 +101,7 @@ export default function LoginPage() {
                 </div>
                 <div>
                   <Label htmlFor="password">Password</Label>
-                  <Input id="password" name="password" type="password" autoComplete="current-password" placeholder="••••••••" required />
+                  <Input id="password" name="password" type="password" autoComplete="current-password" placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢" required />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? (
@@ -182,3 +182,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
