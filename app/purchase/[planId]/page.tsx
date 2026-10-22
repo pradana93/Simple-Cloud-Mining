@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { ArrowLeft, BadgeCheck, Coins, ShieldCheck, Timer } from "lucide-react";
 import { getCachedSettings } from "@/lib/catalog";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -63,7 +63,7 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
     cryptoToPrice: cfg.cryptoToPrice,
   });
   const fiatHint = (value: number) =>
-    cfg.mode === "fiat" && cfg.rate > 0 ? `â‰ˆ${formatFiat(value * cfg.rate, cfg.fiatCurrency)}` : null;
+    cfg.mode === "fiat" && cfg.rate > 0 ? `≈${formatFiat(value * cfg.rate, cfg.fiatCurrency)}` : null;
   const crypto = (value: number) =>
     `${formatCrypto(value, s.currency_decimals).replace(/\.?0+$/, "")} ${s.currency_code}`;
 
@@ -117,7 +117,7 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
           <p className="text-xs font-semibold uppercase tracking-wide text-gold-300">Paid reward plan</p>
           <h1 className="font-display mt-2 text-3xl font-bold text-white">{plan.plan_name}</h1>
           <p className="mt-1 text-sm text-slate-400">
-            {plan.version ? `${plan.version} Â· ` : ""}Starts after your payment is confirmed.
+            {plan.version ? `${plan.version} · ` : ""}Starts after your payment is confirmed.
           </p>
 
           <div className="mt-6 grid gap-3 text-center sm:grid-cols-3">
@@ -129,7 +129,7 @@ export default async function PurchasePage({ params }: { params: Promise<{ planI
               <p className="mt-1 text-xs text-slate-400">
                 Set in {s.price_currency}
                 {cfg.mode === "fiat" && cfg.fiatCurrency !== s.price_currency
-                  ? ` Â· â‰ˆ${formatFiat(price * cfg.priceToDisplay, cfg.fiatCurrency)}`
+                  ? ` · ≈${formatFiat(price * cfg.priceToDisplay, cfg.fiatCurrency)}`
                   : ""}
               </p>
             </div>

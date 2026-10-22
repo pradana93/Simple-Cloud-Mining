@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { getCachedFaqs } from "@/lib/catalog";
 import { FaqList } from "@/components/faq-list";
 

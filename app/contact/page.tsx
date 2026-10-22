@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { Mail, Send } from "lucide-react";
 import { Input, Label } from "@/components/ui/input";

@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import Link from "next/link";
 import { KeyRound, Loader2, ShieldCheck } from "lucide-react";

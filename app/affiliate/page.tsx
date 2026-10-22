@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { headers } from "next/headers";
 import { Link2, Percent, Users } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";

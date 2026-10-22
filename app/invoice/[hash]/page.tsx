@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { AlertTriangle, ArrowLeft, BadgeCheck, Hourglass, QrCode, ShieldCheck } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { CopyButton } from "@/components/copy-button";

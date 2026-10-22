@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, MessageCircle, Send, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";

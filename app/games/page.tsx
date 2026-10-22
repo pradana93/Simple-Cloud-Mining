@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";

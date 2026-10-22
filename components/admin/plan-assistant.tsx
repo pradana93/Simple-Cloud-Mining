@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useState } from "react";
 import { Check, Loader2, Sparkles, TriangleAlert, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";

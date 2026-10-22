@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 import { useMemo, useState } from "react";
 import { AlertTriangle, Pencil, Plus, Trash2, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -128,7 +128,7 @@ function Calculator({
       </div>
       <p className="mt-3 text-[11px] text-slate-400">
         Credited at <span className="font-mono text-slate-300">{earningRateFromDaily(e.daily)}</span> {code}/min
-        {" Â· "}
+        {" · "}
         <span className="font-mono text-slate-300">{formatCrypto(e.daily, 8)}</span> {code}/day
       </p>
       {!rateAvailable && (
@@ -343,7 +343,7 @@ export function PlansManager({
                         <span className="font-medium text-white">{p.plan_name}</span>
                         {p.is_default && <Badge variant="gold" className="ml-2">default</Badge>}
                         <span className="block text-xs text-slate-400">
-                          {p.version ? `${p.version} Â· ` : ""}
+                          {p.version ? `${p.version} · ` : ""}
                           {String(p.speed ?? "")}
                         </span>
                       </td>
@@ -363,7 +363,7 @@ export function PlansManager({
                         {p.is_default ? "free" : formatFiat(e.netProfit, priceCurrency)}
                       </td>
                       <td className={cn("font-mono py-3 pr-4 tabular-nums", p.is_default ? "text-slate-300" : e.netMarginPct < 0 ? "text-red-300" : "text-emerald-300")}>
-                        {p.is_default ? "â€”" : `${e.netMarginPct.toFixed(1)}%`}
+                        {p.is_default ? "-" : `${e.netMarginPct.toFixed(1)}%`}
                       </td>
                       <td className="font-mono py-3 pr-4 tabular-nums text-slate-200">{usage[p.id] ?? 0}</td>
                       <td className="py-3 pr-4">

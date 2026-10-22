@@ -1,4 +1,4 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { cookies, headers } from "next/headers";
 import { History, Plus, WalletMinimal } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
@@ -455,7 +455,7 @@ export default async function DashboardPage() {
                 {openInvoices.map((t, i) => (
                   <li key={t.hash ?? i} className="flex items-center justify-between gap-2 py-2.5 text-sm">
                     <Link href={`/invoice/${t.hash}`} className="font-mono text-gold-300 hover:text-gold-400">
-                      {t.hash ? `${t.hash.slice(0, 12)}â€¦` : "invoice"}
+                      {t.hash ? `${t.hash.slice(0, 12)}…` : "invoice"}
                     </Link>
                     <div className="flex items-center gap-2">
                       <span className="font-mono tabular-nums text-slate-200">

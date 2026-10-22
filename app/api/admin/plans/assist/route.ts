@@ -1,4 +1,4 @@
-﻿import { NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { requireAdminApi } from "@/lib/api-admin";
 import { coerceIntent, parseGoal, solvePlan, type PlanContext } from "@/lib/plan-goal";
 
