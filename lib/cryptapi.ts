@@ -85,7 +85,7 @@ export async function getTickerInfo(ticker: string): Promise<TickerInfo | null> 
   const cached = infoCache.get(ticker);
   if (cached && Date.now() - cached.at < INFO_TTL_MS) return cached.value;
   try {
-    const data = await getJson(`${API_BASE}/${ticker}/info/`);
+    const data = await getJson(`${API_BASE}/${ticker}/info/`, INFO_TTL_MS / 1000);
     const rawPrices = (data.prices ?? {}) as Record<string, unknown>;
     const prices: Record<string, number> = {};
     for (const [code, value] of Object.entries(rawPrices)) {
@@ -133,8 +133,11 @@ function requiredTicker(coin: string): string {
   return ticker;
 }
 
-async function getJson(url: string): Promise<Record<string, unknown>> {
-  const res = await fetch(url, { cache: "no-store", headers: { accept: "application/json" } });
+async function getJson(url: string, revalidate?: number): Promise<Record<string, unknown>> {
+  const res = await fetch(url, {
+    ...(revalidate ? { next: { revalidate } } : { cache: "no-store" as const }),
+    headers: { accept: "application/json" },
+  });
   if (!res.ok) throw new Error(`CryptAPI returned HTTP ${res.status}.`);
   const data = (await res.json()) as Record<string, unknown>;
   if (data.status !== "success") {

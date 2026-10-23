@@ -8,12 +8,12 @@ import { PayoutFeed } from "@/components/payout-feed";
 export const revalidate = 30;
 
 export default async function PayoutsPage() {
-  const [s, { deposits, withdrawals }, stats] = await Promise.all([
+  const [s, { deposits, withdrawals }, stats, cfg] = await Promise.all([
     getCachedSettings(),
     getCachedPayouts(),
     getCachedStats(),
+    getMoneyCfg(),
   ]);
-  const cfg = await getMoneyCfg();
   return (
     <div className="space-y-8 py-8 sm:py-10">
       <Reveal>

@@ -16,6 +16,20 @@ type RatePayload = {
   rate?: number | null;
 };
 
+let rateRequest: Promise<RatePayload> | null = null;
+
+function loadRate(): Promise<RatePayload> {
+  if (!rateRequest) {
+    rateRequest = fetch("/api/rate")
+      .then((r) => r.json() as Promise<RatePayload>)
+      .catch(() => {
+        rateRequest = null;
+        return {};
+      });
+  }
+  return rateRequest;
+}
+
 export function CurrencyToggle({ enabled, cryptoCode, className }: Props) {
   const router = useRouter();
   const [mode, setMode] = useState<MoneyMode>("crypto");
@@ -33,9 +47,8 @@ export function CurrencyToggle({ enabled, cryptoCode, className }: Props) {
     const picked = readCookie(CUR_COOKIE);
     if (picked) setCur(picked.toUpperCase());
     let alive = true;
-    fetch("/api/rate")
-      .then((r) => r.json())
-      .then((d: RatePayload) => {
+    loadRate()
+      .then((d) => {
         if (!alive) return;
         if (Array.isArray(d.currencies) && d.currencies.length) setCurrencies(d.currencies);
         if (!picked && d.display) setCur(d.display);

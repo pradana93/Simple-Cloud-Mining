@@ -26,14 +26,14 @@ function Metric({ children, label }: { children: React.ReactNode; label: string 
 }
 
 export default async function HomePage() {
-  const [s, plans, stats, payouts, popularity] = await Promise.all([
+  const [s, plans, stats, payouts, popularity, cfg] = await Promise.all([
     getCachedSettings(),
     getCachedPlans(),
     getCachedStats(),
     getCachedPayouts(),
     getCachedPlanPopularity(),
+    getMoneyCfg(),
   ]);
-  const cfg = await getMoneyCfg();
   const completedPayouts = payouts.withdrawals.filter((w) => String(w.status ?? "").toUpperCase() === "SUCCESS");
 
   return (

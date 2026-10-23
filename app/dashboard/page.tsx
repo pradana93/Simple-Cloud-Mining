@@ -138,17 +138,20 @@ function Readout({ label, children, hint }: { label: string; children: React.Rea
 
 export default async function DashboardPage() {
   const supabase = createServerSupabase();
-  let userId: string | null = null;
-  let userEmail: string | null = null;
-  let usernameMeta: string | null = null;
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    userId = user?.id ?? null;
-    userEmail = user?.email ?? null;
-    usernameMeta = ((user as { user_metadata?: { username?: string } } | null)?.user_metadata?.username ?? null);
-  } catch {
-    userId = null;
-  }
+  const [auth, refCookie, s, cfg] = await Promise.all([
+    supabase.auth
+      .getUser()
+      .then(({ data: { user } }) => ({
+        userId: user?.id ?? null,
+        userEmail: user?.email ?? null,
+        usernameMeta: (user as { user_metadata?: { username?: string } } | null)?.user_metadata?.username ?? null,
+      }))
+      .catch(() => ({ userId: null, userEmail: null, usernameMeta: null })),
+    cookies().then((store) => store.get("ref")?.value ?? null),
+    getCachedSettings(),
+    getMoneyCfg(),
+  ]);
+  const { userId, userEmail, usernameMeta } = auth;
   if (!userId) {
     return (
       <div className="mx-auto max-w-lg py-12 text-center sm:py-16">
@@ -166,9 +169,6 @@ export default async function DashboardPage() {
     );
   }
 
-  const refCookie = (await cookies()).get("ref")?.value ?? null;
-  const s = await getCachedSettings();
-  const cfg = await getMoneyCfg();
   const now = Date.now();
   const historySelect = "id,status,created_at,expire_date,last_sum,plan:plans(id,plan_name,version,earning_rate,price,duration)";
 
@@ -182,9 +182,50 @@ export default async function DashboardPage() {
   let txns: Array<{ hash: string | null; amount: number; paid_amount: number | null; status: string; date: string; plan_id: number }> = [];
   let paidPlans: PaidPlan[] = [];
   let planNames = new Map<number, string>();
+  let checkinLast: { day: string; streak: number } | null = null;
+  let hasAllowlist = false;
+  let twoFactorOn = false;
 
   try {
-    const [p, ph, r, dep, wd, aff, tx, pp] = await Promise.all([
+    const refRowsPromise = (async () => {
+      try {
+        const admin = createAdminSupabase();
+        const { data } = await admin
+          .from("profiles")
+          .select("username,created_at")
+          .eq("reference_user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(12);
+        return (data ?? null) as Array<{ username: string | null; created_at: string }> | null;
+      } catch {
+        return null;
+      }
+    })();
+    const checkinPromise = (async () => {
+      try {
+        return await supabase
+          .from("checkins")
+          .select("day,streak")
+          .eq("user_id", userId)
+          .order("day", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+      } catch {
+        return null;
+      }
+    })();
+    const allowlistPromise = (async () => {
+      try {
+        return await supabase
+          .from("withdrawal_allowlist")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId);
+      } catch {
+        return null;
+      }
+    })();
+
+    const [p, ph, r, dep, wd, aff, tx, pp, refRows, ck, al, tfa] = await Promise.all([
       supabase.from("profiles").select("balance,username,reference_user_id,unique_id,affiliate_earns,affiliate_paid").eq("id", userId).maybeSingle(),
       supabase.from("user_plan_history").select(historySelect).eq("user_id", userId),
       supabase.from("profiles").select("username,created_at").eq("reference_user_id", userId).order("created_at", { ascending: false }),
@@ -193,6 +234,10 @@ export default async function DashboardPage() {
       supabase.from("affiliate_history").select("amount,status,date").eq("user_id", userId).order("date", { ascending: false }).limit(12),
       supabase.from("transactions_history").select("hash,amount,paid_amount,status,date,plan_id").eq("user_id", userId).order("date", { ascending: false }).limit(20),
       supabase.from("plans").select("id,plan_name,price,point_per_day,duration").order("price"),
+      refRowsPromise,
+      checkinPromise,
+      allowlistPromise,
+      isTwoFactorEnabled(userId).catch(() => false),
     ]);
     profile = ((p as { data: ProfileLite | null }).data ?? null);
     rows = (((ph as { data: unknown }).data ?? []) as HistoryRow[]);
@@ -207,21 +252,10 @@ export default async function DashboardPage() {
         (x) => [x.id, x.plan_name] as [number, string]
       )
     );
-
-    // The profiles policy hides other members, so the downline is counted with
-    // the service role, scoped to this user's id.
-    try {
-      const admin = createAdminSupabase();
-      const { data: refRows } = await admin
-        .from("profiles")
-        .select("username,created_at")
-        .eq("reference_user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(12);
-      if (refRows) referrals = refRows as typeof referrals;
-    } catch {
-      // Keep whatever the user-scoped query returned.
-    }
+    if (refRows) referrals = refRows;
+    checkinLast = (ck?.data as { day: string; streak: number } | null) ?? null;
+    hasAllowlist = ((al as { count: number | null } | null)?.count ?? 0) > 0;
+    twoFactorOn = tfa;
 
     // Bootstrap the profile + free rig only when there is real work to do.
     if (!profile || rows.filter((x) => x.status === "active").length === 0 || (!profile.reference_user_id && refCookie)) {
@@ -248,21 +282,6 @@ export default async function DashboardPage() {
   const balance = stored + pending;
   const perDay = rate * 1440;
 
-  let checkinLast: { day: string; streak: number } | null = null;
-  let hasAllowlist = false;
-  let twoFactorOn = false;
-  try {
-    const [ck, al, tfa] = await Promise.all([
-      supabase.from("checkins").select("day,streak").eq("user_id", userId).order("day", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("withdrawal_allowlist").select("id", { count: "exact", head: true }).eq("user_id", userId),
-      isTwoFactorEnabled(userId),
-    ]);
-    checkinLast = (ck.data as { day: string; streak: number } | null) ?? null;
-    hasAllowlist = ((al as { count: number | null }).count ?? 0) > 0;
-    twoFactorOn = tfa;
-  } catch {
-    // leave the checklist steps pending
-  }
   const today = utcDay(new Date());
   const claimedToday = checkinLast?.day === today;
   const nextStreak = computeStreak(checkinLast, today);

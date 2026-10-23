@@ -79,25 +79,29 @@ type PurchasePlan = {
 
 export default async function PurchasePage({ params }: { params: Promise<{ planId: string }> }) {
   const { planId } = await params;
-  const s = await getCachedSettings();
-  const cfg = await getMoneyCfg();
-  let plan: PurchasePlan | null = null;
-  let ladderPlans: LadderPlan[] = [];
-  let firstPurchaseEligible = false;
-  try {
-    const supabase = createServerSupabase();
-    const [{ data }, { data: ladder }] = await Promise.all([
+  const supabase = createServerSupabase();
+  const [s, cfg, auth, plans] = await Promise.all([
+    getCachedSettings(),
+    getMoneyCfg(),
+    supabase.auth.getUser().catch(() => ({ data: { user: null } })),
+    Promise.all([
       supabase.from("plans").select("*").eq("id", Number(planId)).maybeSingle(),
       supabase
         .from("plans")
         .select("id,plan_name,price,point_per_day,duration")
         .gt("price", 0)
         .order("price"),
-    ]);
+    ]),
+  ]);
+  let plan: PurchasePlan | null = null;
+  let ladderPlans: LadderPlan[] = [];
+  let firstPurchaseEligible = false;
+  try {
+    const [{ data }, { data: ladder }] = plans;
     plan = (data as PurchasePlan | null) ?? null;
     ladderPlans = (ladder ?? []) as LadderPlan[];
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = auth.data.user;
     if (user) {
       const { count } = await supabase
         .from("transactions_history")

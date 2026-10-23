@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, Receipt } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getMoneyCfg } from "@/lib/currency";
-import { formatMoney } from "@/lib/money";
+import { formatMoney, type MoneyCfg } from "@/lib/money";
 import { formatCrypto } from "@/lib/utils";
 import { accrueOwnPlans, type AccrualRow } from "@/lib/accrue-user";
 import { isTwoFactorEnabled } from "@/lib/two-factor";
@@ -74,8 +74,6 @@ export default async function AccountPage() {
       </div>
     );
   }
-  const cfg = await getMoneyCfg();
-  const twoFactorOn = await isTwoFactorEnabled(userId);
   const empty = { data: [] as Array<Record<string, number | string | null>> };
   let referrals = empty;
   let aff = empty;
@@ -84,8 +82,12 @@ export default async function AccountPage() {
   let pending = empty;
   let accrualRows: Array<AccrualRow & { status?: string }> = [];
   let planHistory: PlanHistoryRow[] = [];
+  let cfg: MoneyCfg | null = null;
+  let twoFactorOn = false;
   try {
-    const [r1, r2, r3, r4, r5, ar] = await Promise.all([
+    const [money, tfa, r1, r2, r3, r4, r5, ar] = await Promise.all([
+      getMoneyCfg(),
+      isTwoFactorEnabled(userId).catch(() => false),
       supabase.from("profiles").select("username,created_at").eq("reference_user_id", userId).order("created_at", { ascending: false }),
       supabase.from("affiliate_history").select("*").eq("user_id", userId).order("date", { ascending: false }),
       supabase.from("user_deposits").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
@@ -97,6 +99,8 @@ export default async function AccountPage() {
         .eq("user_id", userId)
         .order("created_at", { ascending: false }),
     ]);
+    cfg = money;
+    twoFactorOn = tfa;
     referrals = (r1 as typeof empty);
     aff = (r2 as typeof empty);
     deposits = (r3 as typeof empty);
@@ -107,6 +111,7 @@ export default async function AccountPage() {
   } catch {
     // render empty sections
   }
+  if (!cfg) cfg = await getMoneyCfg();
   await accrueOwnPlans(userId, { rows: accrualRows.filter((row) => row.status === "active") });
 
   const sections: Array<{ title: string; rows: Array<Record<string, number | string | null>>; render: (r: Record<string, number | string | null>, i: number) => React.ReactNode; emptyText: string }> = [

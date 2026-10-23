@@ -1,15 +1,19 @@
 import { cookies, headers } from "next/headers";
 import { getCachedSettings } from "./catalog";
-import { cross, getFxTable, isSupportedFiat } from "./fx";
+import { cross, getFxTable, isSupportedFiat, type FxTable } from "./fx";
 import { detectCurrency } from "./geo";
 import { FX_COOKIE, CUR_COOKIE, type MoneyCfg } from "./money";
+import type { SiteSettings } from "./types";
 
 // Resolves how money renders for this request. The display currency is the
 // visitor's explicit pick, else their location, else the site default. Values
 // stay in crypto; conversion happens here and never fabricates a rate.
 
-export async function getMoneyCfg(): Promise<MoneyCfg> {
-  const s = await getCachedSettings();
+export async function getMoneyCfg(
+  settings?: SiteSettings,
+  fxTable?: FxTable | null
+): Promise<MoneyCfg> {
+  const s = settings ?? (await getCachedSettings());
   const cookieStore = await cookies();
   const priceCurrency = (s.price_currency || "USD").toUpperCase();
 
@@ -35,7 +39,7 @@ export async function getMoneyCfg(): Promise<MoneyCfg> {
 
   if (!s.fiat_enabled) return base;
 
-  const table = await getFxTable(s.currency_code);
+  const table = fxTable !== undefined ? fxTable : await getFxTable(s.currency_code);
   if (!table) return base;
 
   const rate = table.rates[displayCurrency] ?? 0;

@@ -31,8 +31,11 @@ function Readout({ label, value, hint, tone }: { label: string; value: string; h
 }
 
 export default async function AffiliatePage() {
-  const [s, c] = await Promise.all([getCachedSettings(), getCachedContents()]);
-  const cfg = await getMoneyCfg();
+  const [s, c, cfg] = await Promise.all([
+    getCachedSettings(),
+    getCachedContents(),
+    getMoneyCfg(),
+  ]);
 
   const supabase = createServerSupabase();
   let userId: string | null = null;
@@ -52,35 +55,17 @@ export default async function AffiliatePage() {
   let tierCommission: Array<{ name: string; price: number; commission: number }> = [];
   if (userId) {
     try {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("unique_id,affiliate_earns,affiliate_paid")
-        .eq("id", userId)
-        .maybeSingle();
-      if (prof) {
-        uniqueId = (prof as { unique_id: number }).unique_id;
-        earns = Number((prof as { affiliate_earns: number }).affiliate_earns);
-        paid = Number((prof as { affiliate_paid: number }).affiliate_paid);
-      }
-    } catch {
-      // Profile not resolved yet; the page still explains the program.
-    }
-    try {
-      // Service role: the profiles policy hides other members from the anon key,
-      // so counting the downline has to happen server-side, scoped to this user.
       const admin = createAdminSupabase();
-      const { count } = await admin
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("reference_user_id", userId);
-      invited = count ?? 0;
-    } catch {
-      invited = 0;
-    }
-
-    try {
-      const admin = createAdminSupabase();
-      const [bonusRes, pendingRes, plansRes] = await Promise.all([
+      const [profRes, invitedRes, bonusRes, referredRes, plansRes] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("unique_id,affiliate_earns,affiliate_paid")
+          .eq("id", userId)
+          .maybeSingle(),
+        admin
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("reference_user_id", userId),
         admin
           .from("affiliate_history")
           .select("amount,ref_type")
@@ -93,11 +78,18 @@ export default async function AffiliatePage() {
           .not("id", "is", null),
         admin.from("plans").select("plan_name,price").gt("price", 0).order("price"),
       ]);
+      const prof = profRes.data as { unique_id: number; affiliate_earns: number; affiliate_paid: number } | null;
+      if (prof) {
+        uniqueId = prof.unique_id;
+        earns = Number(prof.affiliate_earns);
+        paid = Number(prof.affiliate_paid);
+      }
+      invited = invitedRes.count ?? 0;
       bonusPaid = ((bonusRes.data ?? []) as Array<{ amount: number }>).reduce(
         (sum, row) => sum + Number(row.amount ?? 0),
         0
       );
-      const referredIds = ((pendingRes.data ?? []) as Array<{ id: string }>).map((row) => row.id);
+      const referredIds = ((referredRes.data ?? []) as Array<{ id: string }>).map((row) => row.id);
       if (referredIds.length > 0) {
         const { data: paidRows } = await admin
           .from("transactions_history")
