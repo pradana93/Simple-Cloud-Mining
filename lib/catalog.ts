@@ -9,14 +9,22 @@ import type { Plan, SiteSettings } from "./types";
 export const getCachedSettings = unstable_cache(
   async (): Promise<SiteSettings> => {
     try {
-      const { data } = await getPublicSupabase()
+      const { data, error } = await getPublicSupabase()
         .from("settings")
         .select(PUBLIC_SETTINGS_COLUMNS)
         .order("id", { ascending: true })
         .limit(1)
         .maybeSingle();
-      if (!data) return FALLBACK;
-      return { ...FALLBACK, ...(data as Partial<SiteSettings>) };
+      if (!error && data) return { ...FALLBACK, ...(data as Partial<SiteSettings>) };
+
+      const { data: adminData, error: adminError } = await createAdminSupabase()
+        .from("settings")
+        .select(PUBLIC_SETTINGS_COLUMNS)
+        .order("id", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (adminError || !adminData) return FALLBACK;
+      return { ...FALLBACK, ...(adminData as Partial<SiteSettings>) };
     } catch {
       return FALLBACK;
     }
