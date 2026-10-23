@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { after } from "next/server";
 import { ArrowLeft, ArrowUpRight, Receipt } from "lucide-react";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { getMoneyCfg } from "@/lib/currency";
@@ -112,7 +113,7 @@ export default async function AccountPage() {
     // render empty sections
   }
   if (!cfg) cfg = await getMoneyCfg();
-  await accrueOwnPlans(userId, { rows: accrualRows.filter((row) => row.status === "active") });
+  after(() => accrueOwnPlans(userId, { rows: accrualRows.filter((row) => row.status === "active") }));
 
   const sections: Array<{ title: string; rows: Array<Record<string, number | string | null>>; render: (r: Record<string, number | string | null>, i: number) => React.ReactNode; emptyText: string }> = [
     {

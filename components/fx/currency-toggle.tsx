@@ -16,18 +16,19 @@ type RatePayload = {
   rate?: number | null;
 };
 
-let rateRequest: Promise<RatePayload> | null = null;
+type RateScope = typeof globalThis & { __scmRateRequest?: Promise<RatePayload> };
 
 function loadRate(): Promise<RatePayload> {
-  if (!rateRequest) {
-    rateRequest = fetch("/api/rate")
+  const scope = globalThis as RateScope;
+  if (!scope.__scmRateRequest) {
+    scope.__scmRateRequest = fetch("/api/rate")
       .then((r) => r.json() as Promise<RatePayload>)
       .catch(() => {
-        rateRequest = null;
+        scope.__scmRateRequest = undefined;
         return {};
       });
   }
-  return rateRequest;
+  return scope.__scmRateRequest;
 }
 
 export function CurrencyToggle({ enabled, cryptoCode, className }: Props) {
